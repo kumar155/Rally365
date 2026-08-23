@@ -1,308 +1,399 @@
- "use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, ChevronRight, CircleUserRound, History, Plus, Trophy, Users, X } from "lucide-react";
+import {
+  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockKeyhole,
+  MapPin, Plus, ReceiptText, Trophy, Users, X
+} from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Player = { id: string; name: string };
-type Match = {
-  id: string;
-  group_id: string;
-  team_a_score: number;
-  team_b_score: number;
-  played_at: string;
-  match_players: { player_id: string; team: "A" | "B" }[];
-};
+type Match = { id: string; group_id: string; team_a_score: number; team_b_score: number; played_at: string; status: string; edit_count: number; last_edited_at: string | null; match_players: { player_id: string; team: "A" | "B" }[] };
+type Expense = { id: string; expense_date: string; category: string; amount: number; description: string | null };
+type Attendance = { id: string; player_id: string; attendance_date: string; status: string; late_minutes: number; fine_amount: number };
 
-const GROUP_CODE = "RALLY365";
-
-function formatTeam(ids: string[], players: Player[]) {
-  const map = new Map(players.map(p => [p.id, p.name]));
-  return ids.map(id => map.get(id) ?? "?").join(" + ");
-}
+const CODE = "RALLY365";
+const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
 
 export default function Home() {
+  const [tab, setTab] = useState<"today" | "stats" | "money" | "players">("today");
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"today" | "stats" | "players">("today");
-  const [showNewMatch, setShowNewMatch] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
-  const [scoreA, setScoreA] = useState("");
-  const [scoreB, setScoreB] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [scoreA, setScoreA] = useState(""); const [scoreB, setScoreB] = useState("");
+  const [modal, setModal] = useState<null | "match" | "edit" | "pin" | "fine" | "expense">(null);
+  const [targetMatch, setTargetMatch] = useState<Match | null>(null);
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
+  const [statsDate, setStatsDate] = useState(new Date().toISOString().slice(0, 10));
+  const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
+  const [finePlayer, setFinePlayer] = useState(""); const [fineType, setFineType] = useState<"late" | "missed">("late"); const [minutes, setMinutes] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("SHUTTLES"); const [expenseAmount, setExpenseAmount] = useState(""); const [expenseDesc, setExpenseDesc] = useState(""); const [split, setSplit] = useState<string[]>([]);
+  const [lateRate, setLateRate] = useState("1"); const [missedRate, setMissedRate] = useState("10");
 
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     setError("");
-    const { data: group, error: groupError } = await supabase
-      .from("groups")
-      .select("id,name,join_code")
-      .eq("join_code", GROUP_CODE)
-      .single();
-
-    if (groupError || !group) {
-      setError(groupError?.message ?? "Rally365 group not found.");
-      setLoading(false);
-      return;
-    }
-
-    setGroupId(group.id);
-
-    const [playersResult, matchesResult] = await Promise.all([
-      supabase.from("players").select("id,name").eq("group_id", group.id).order("name"),
-      supabase
-        .from("matches")
-        .select("id,group_id,team_a_score,team_b_score,played_at,match_players(player_id,team)")
-        .eq("group_id", group.id)
-        .order("played_at", { ascending: false }),
+    const { data: g, error: ge } = await supabase.from("groups").select("id,name,join_code").eq("join_code", CODE).single();
+    if (ge || !g) { setError(ge?.message || "Group not found"); setLoading(false); return }
+    setGroupId(g.id);
+    const [p, m, e, a, r] = await Promise.all([
+      supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
+      supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
+      supabase.from("expenses").select("id,expense_date,category,amount,description").eq("group_id", g.id).order("expense_date", { ascending: false }),
+      supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
+      supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).single()
     ]);
-
-    if (playersResult.error) setError(playersResult.error.message);
-    else setPlayers(playersResult.data ?? []);
-
-    if (matchesResult.error) setError(matchesResult.error.message);
-    else setMatches((matchesResult.data ?? []) as Match[]);
-
+    if (p.error) setError(p.error.message); else setPlayers(p.data || []);
+    if (m.error) setError(m.error.message); else setMatches((m.data || []) as Match[]);
+    if (e.error) setError(e.error.message); else setExpenses((e.data || []) as Expense[]);
+    if (a.error) setError(a.error.message); else setAttendance((a.data || []) as Attendance[]);
+    if (!r.error && r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
+  useEffect(() => { load() }, [load]);
   useEffect(() => {
     if (!groupId) return;
-
-    const channel = supabase
-      .channel(`rally365-${groupId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${groupId}` }, loadData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_players" }, loadData)
+    const ch = supabase.channel("rally365-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${groupId}` }, load)
       .subscribe();
+    return () => { supabase.removeChannel(ch) }
+  }, [groupId, load]);
 
-    return () => { supabase.removeChannel(channel); };
-  }, [groupId, loadData]);
+  const name = (id: string) => players.find(p => p.id === id)?.name || "?";
+  const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
 
-  const stats = useMemo(() => {
-    return players.map(player => {
-      const played = matches.filter(m => m.match_players.some(mp => mp.player_id === player.id));
-      let wins = 0;
-      let pointsFor = 0;
-      let pointsAgainst = 0;
+  const validMatches = useMemo(
+    () => matches.filter(m => m.status !== "VOIDED"),
+    [matches]
+  );
 
-      for (const m of played) {
-        const team = m.match_players.find(mp => mp.player_id === player.id)?.team;
-        const own = team === "A" ? m.team_a_score : m.team_b_score;
-        const opp = team === "A" ? m.team_b_score : m.team_a_score;
-        pointsFor += own;
-        pointsAgainst += opp;
-        if (own > opp) wins++;
-      }
+  const filteredMatches = useMemo(() => {
+    const anchor = new Date(`${statsDate}T00:00:00`);
+    const start = new Date(anchor);
+    const end = new Date(anchor);
 
-      return {
-        ...player,
-        played: played.length,
-        wins,
-        losses: played.length - wins,
-        winRate: played.length ? Math.round((wins / played.length) * 100) : 0,
-        points: wins,
-        diff: pointsFor - pointsAgainst,
-      };
-    }).sort((a, b) => b.points - a.points || b.winRate - a.winRate || b.diff - a.diff);
-  }, [players, matches]);
+    if (statsRange === "DAILY") {
+      end.setDate(end.getDate() + 1);
+    } else if (statsRange === "WEEKLY") {
+      const day = start.getDay();
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+      start.setDate(start.getDate() + mondayOffset);
+      start.setHours(0, 0, 0, 0);
+      end.setTime(start.getTime());
+      end.setDate(end.getDate() + 7);
+    } else {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      end.setMonth(start.getMonth() + 1, 1);
+      end.setHours(0, 0, 0, 0);
+    }
 
-  const togglePlayer = (id: string) => {
-    setSelected(prev =>
-      prev.includes(id)
-        ? prev.filter(x => x !== id)
-        : prev.length < 4 ? [...prev, id] : prev
-    );
+    return validMatches.filter(m => {
+      const played = new Date(m.played_at);
+      return played >= start && played < end;
+    });
+  }, [validMatches, statsRange, statsDate]);
+
+  const selectorLabel = useMemo(() => {
+    const anchor = new Date(`${statsDate}T00:00:00`);
+
+    if (statsRange === "DAILY") {
+      return anchor.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    }
+
+    if (statsRange === "WEEKLY") {
+      const start = new Date(anchor);
+      const day = start.getDay();
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+      start.setDate(start.getDate() + mondayOffset);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+
+      return `${start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+    }
+
+    return anchor.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  }, [statsRange, statsDate]);
+
+  const moveStatsPeriod = (direction: number) => {
+    const d = new Date(`${statsDate}T00:00:00`);
+    if (statsRange === "DAILY") d.setDate(d.getDate() + direction);
+    else if (statsRange === "WEEKLY") d.setDate(d.getDate() + direction * 7);
+    else d.setMonth(d.getMonth() + direction);
+    setStatsDate(d.toISOString().slice(0, 10));
   };
+
+  const stats = useMemo(() => players.map(p => {
+    const ms = filteredMatches.filter(m => m.status !== "VOIDED" && m.match_players.some(x => x.player_id === p.id));
+    let w = 0, pf = 0, pa = 0; ms.forEach(m => { const t = m.match_players.find(x => x.player_id === p.id)?.team; const own = t === "A" ? m.team_a_score : m.team_b_score; const opp = t === "A" ? m.team_b_score : m.team_a_score; pf += own; pa += opp; if (own > opp) w++ });
+    const fines = attendance.filter(a => a.player_id === p.id).reduce((s, a) => s + Number(a.fine_amount), 0);
+    return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
+  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [players, filteredMatches, attendance]);
+
+  const monthlyAttendance = useMemo(() => attendance.filter(a => a.attendance_date.slice(0, 7) === reportMonth), [attendance, reportMonth]);
+  const monthlyFineStats = useMemo(() => players.map(p => {
+    const rows = monthlyAttendance.filter(a => a.player_id === p.id);
+    const late = rows.filter(a => a.status === "PRESENT").reduce((s, a) => s + Number(a.fine_amount), 0);
+    const missed = rows.filter(a => a.status === "MISSED").reduce((s, a) => s + Number(a.fine_amount), 0);
+    return { ...p, late, missed, total: late + missed, lateCount: rows.filter(a => a.status === "PRESENT").length, missedCount: rows.filter(a => a.status === "MISSED").length };
+  }).sort((a, b) => b.total - a.total), [players, monthlyAttendance]);
+  const monthTotal = monthlyFineStats.reduce((s, p) => s + p.total, 0);
+  const monthLate = monthlyFineStats.reduce((s, p) => s + p.late, 0);
+  const monthMissed = monthlyFineStats.reduce((s, p) => s + p.missed, 0);
+  const monthLateCount = monthlyFineStats.reduce((s, p) => s + p.lateCount, 0);
+  const monthMissedCount = monthlyFineStats.reduce((s, p) => s + p.missedCount, 0);
+
+  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalFines = attendance.reduce((s, a) => s + Number(a.fine_amount), 0);
 
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4) return;
-    const a = selected.slice(0, 2);
-    const b = selected.slice(2, 4);
-    const sa = Number(scoreA);
-    const sb = Number(scoreB);
-
-    if (!Number.isInteger(sa) || !Number.isInteger(sb) || sa < 0 || sb < 0 || sa === sb) {
-      setError("Enter two different non-negative final scores.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-
-    const { data: match, error: matchError } = await supabase
-      .from("matches")
-      .insert({
-        group_id: groupId,
-        team_a_score: sa,
-        team_b_score: sb,
-      })
-      .select("id")
-      .single();
-
-    if (matchError || !match) {
-      setError(matchError?.message ?? "Could not save match.");
-      setSaving(false);
-      return;
-    }
-
-    const rows = [
-      ...a.map(player_id => ({ match_id: match.id, player_id, team: "A" as const })),
-      ...b.map(player_id => ({ match_id: match.id, player_id, team: "B" as const })),
-    ];
-
-    const { error: playersError } = await supabase.from("match_players").insert(rows);
-
-    if (playersError) {
-      await supabase.from("matches").delete().eq("id", match.id);
-      setError(playersError.message);
-      setSaving(false);
-      return;
-    }
-
-    setSelected([]);
-    setScoreA("");
-    setScoreB("");
-    setShowNewMatch(false);
-    setSaving(false);
-    await loadData();
+    const a = Number(scoreA), b = Number(scoreB); if (!Number.isInteger(a) || !Number.isInteger(b) || a === b || a < 0 || b < 0) { setError("Enter two different final scores"); return }
+    const { data: m, error: me } = await supabase.from("matches").insert({ group_id: groupId, team_a_score: a, team_b_score: b }).select("id").single();
+    if (me || !m) { setError(me?.message || "Could not save"); return }
+    const rows = selected.slice(0, 2).map(player_id => ({ match_id: m.id, player_id, team: "A" })).concat(selected.slice(2, 4).map(player_id => ({ match_id: m.id, player_id, team: "B" })));
+    const { error: pe } = await supabase.from("match_players").insert(rows); if (pe) { setError(pe.message); return }
+    setSelected([]); setScoreA(""); setScoreB(""); setModal(null); load();
   };
 
-  const teamIds = (m: Match, team: "A" | "B") =>
-    m.match_players.filter(mp => mp.team === team).map(mp => mp.player_id);
+  const verify = async () => {
+    if (!groupId || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setError("Admin PIN must be exactly 6 digits");
+      return;
+    }
+
+    if (pinAction === "edit" && targetMatch) {
+      // IMPORTANT: Do not call edit_match_with_pin here.
+      // That RPC performs the edit and increments edit_count.
+      // The actual edit must happen exactly once when Save is clicked.
+      setVerifiedEditPin(pin);
+      setPin("");
+      setAdminOK(true);
+      setError("");
+      setModal("edit");
+      return;
+    }
+
+    // Money authorization only.
+    setAdminOK(true);
+    setPin("");
+    setError("");
+    setModal(moneyAction);
+  };
+
+
+  const addFine = async () => {
+    if (!groupId || !adminOK || !finePlayer) return;
+    const mins = fineType === "late" ? Number(minutes) : 0; const amount = fineType === "late" ? mins * Number(lateRate) : Number(missedRate);
+    const { error } = await supabase.from("attendance").insert({ group_id: groupId, player_id: finePlayer, attendance_date: new Date().toISOString().slice(0, 10), status: fineType === "late" ? "PRESENT" : "MISSED", late_minutes: mins, fine_amount: amount });
+    if (error) setError(error.message); else { setAdminOK(false); setModal(null); setMinutes(""); load() }
+  };
+
+  const addExpense = async () => {
+    if (!groupId || !adminOK || !expenseAmount || !split.length) return;
+    const amount = Number(expenseAmount), { data: e, error: ee } = await supabase.from("expenses").insert({ group_id: groupId, expense_date: new Date().toISOString().slice(0, 10), category: expenseCategory, amount, description: expenseDesc || null }).select("id").single();
+    if (ee || !e) { setError(ee?.message || "Could not save expense"); return }
+    const share = Math.round(amount / split.length * 100) / 100;
+    const { error: se } = await supabase.from("expense_splits").insert(split.map(player_id => ({ expense_id: e.id, player_id, share_amount: share })));
+    if (se) { setError(se.message); return }
+    setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); load();
+  };
+
+  const saveEditedMatch = async () => {
+    if (!groupId || !targetMatch || !adminOK || !/^\d{6}$/.test(verifiedEditPin)) {
+      setError("Admin PIN verification required.");
+      return;
+    }
+
+    const na = Number(scoreA);
+    const nb = Number(scoreB);
+
+    if (!Number.isInteger(na) || !Number.isInteger(nb) || na < 0 || nb < 0 || na === nb) {
+      setError("Enter two different final scores");
+      return;
+    }
+
+    // This is the ONLY call that performs the edit and increments edit_count.
+    const { error } = await supabase.rpc("edit_match_with_pin", {
+      p_group_id: groupId,
+      p_match_id: targetMatch.id,
+      p_pin: verifiedEditPin,
+      p_team_a_score: na,
+      p_team_b_score: nb,
+    });
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setVerifiedEditPin("");
+    setPin("");
+    setTargetMatch(null);
+    setScoreA("");
+    setScoreB("");
+    setPinAction("money");
+    setAdminOK(false);
+    setModal(null);
+    setError("");
+
+    await load();
+  };
+
+  const openAdmin = (action: "edit" | "money") => { setPinAction(action); setPin(""); setModal("pin") };
+
+  const openEdit = (match: Match) => {
+    setTargetMatch(match);
+    setScoreA(String(match.team_a_score));
+    setScoreB(String(match.team_b_score));
+    setPinAction("edit");
+    setPin("");
+    setModal("pin");
+  };
 
   if (loading) return <main className="center">Loading Rally365…</main>;
 
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <div className="brand">Rally<span>365</span></div>
-          <div className="subtitle">Everyday badminton</div>
-        </div>
-        <div className="group-pill"><Users size={15}/> Rally365 Court</div>
-      </header>
+  return <main className="app-shell">
+    <header className="topbar"><div><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
+    <section className="content">
+      {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      <section className="content">
-        {error && <div className="error-banner">{error}</div>}
-
-        {tab === "today" && (
-          <>
-            <div className="hero-card">
-              <div>
-                <div className="eyebrow">RALLY365 COURT</div>
-                <h1>Today&apos;s games</h1>
-                <p>{players.length} players · {matches.length} matches recorded</p>
-              </div>
-              <Trophy size={42} strokeWidth={1.5}/>
-            </div>
-
-            <button className="primary-button" onClick={() => setShowNewMatch(true)}>
-              <Plus size={21}/> New match
-            </button>
-
-            <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
-
-            <div className="match-list">
-              {matches.length === 0 && <div className="empty-card">No matches yet. Create the first match.</div>}
-              {matches.map((m, index) => {
-                const a = teamIds(m, "A");
-                const b = teamIds(m, "B");
-                return (
-                  <div className="match-card" key={m.id}>
-                    <div className="match-number">M{matches.length - index}</div>
-                    <div className="teams">
-                      <div><strong>{formatTeam(a, players)}</strong><span className={m.team_a_score > m.team_b_score ? "win" : ""}>{m.team_a_score}</span></div>
-                      <div><strong>{formatTeam(b, players)}</strong><span className={m.team_b_score > m.team_a_score ? "win" : ""}>{m.team_b_score}</span></div>
-                    </div>
-                    <ChevronRight size={18} className="muted"/>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {tab === "stats" && (
-          <>
-            <div className="page-heading">
-              <div className="eyebrow">ALL RECORDED MATCHES</div>
-              <h1>Leaderboard</h1>
-              <p>Calculated directly from Supabase match history.</p>
-            </div>
-            <div className="stats-table">
-              <div className="table-head"><span>#</span><span>PLAYER</span><span>P</span><span>W</span><span>L</span><span>WIN%</span></div>
-              {stats.map((s, i) => (
-                <div className="table-row" key={s.id}>
-                  <span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b></span>
-                  <span>{s.played}</span><span>{s.wins}</span><span>{s.losses}</span><span>{s.winRate}%</span>
+      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+        <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
+        <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
+        <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
+          {matches.map((m, i) => {
+            const aWon = m.team_a_score > m.team_b_score;
+            return <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
+              <div className="match-number">M{matches.length - i}</div>
+              <div className="teams">
+                <div>
+                  <strong>{team(m, "A")}</strong>
+                  <span className={aWon ? "score-more" : "score-less"}>{m.team_a_score}</span>
                 </div>
-              ))}
+                <div>
+                  <strong>{team(m, "B")}</strong>
+                  <span className={!aWon ? "score-more" : "score-less"}>{m.team_b_score}</span>
+                </div>
+                {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
+              </div>
+              <button className="edit-link" onClick={() => openEdit(m)}><LockKeyhole size={16} /></button>
             </div>
-          </>
-        )}
+          })}
+        </div></>}
 
-        {tab === "players" && (
-          <>
-            <div className="page-heading">
-              <div className="eyebrow">GROUP</div>
-              <h1>Players</h1>
-              <p>Rally365 Court · {players.length} players</p>
-            </div>
-            <div className="player-grid">
-              {players.map(p => {
-                const s = stats.find(x => x.id === p.id)!;
-                return <div className="player-card" key={p.id}>
-                  <div className="avatar">{p.name.slice(0,1)}</div>
-                  <div><b>{p.name}</b><small>{s.wins}W · {s.losses}L · {s.winRate}%</small></div>
-                  <CircleUserRound size={19} className="muted"/>
-                </div>;
-              })}
-            </div>
-          </>
-        )}
-      </section>
+      {tab === "stats" && <>
+        <div className="page-heading"><div className="eyebrow">PERFORMANCE</div><h1>Leaderboard</h1><p>Performance for the selected period.</p></div>
 
-      <nav className="bottom-nav">
-        <button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History/><span>Today</span></button>
-        <button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3/><span>Stats</span></button>
-        <button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users/><span>Players</span></button>
-      </nav>
-
-      {showNewMatch && (
-        <div className="modal-backdrop" onClick={() => setShowNewMatch(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div><div className="eyebrow">NEW MATCH</div><h2>Choose 4 players</h2></div>
-              <button className="icon-button" onClick={() => setShowNewMatch(false)}><X/></button>
-            </div>
-            <p className="helper">First two selected = Team A. Next two = Team B.</p>
-            <div className="selection-grid">
-              {players.map(p => (
-                <button key={p.id} onClick={() => togglePlayer(p.id)} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`}>
-                  <span>{p.name}</span>{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}
-                </button>
-              ))}
-            </div>
-            <div className="match-preview">
-              <b>{formatTeam(selected.slice(0,2), players) || "—"}</b><span>vs</span><b>{formatTeam(selected.slice(2,4), players) || "—"}</b>
-            </div>
-            <div className="score-inputs">
-              <input inputMode="numeric" placeholder="Team A" value={scoreA} onChange={e => setScoreA(e.target.value)}/>
-              <span>:</span>
-              <input inputMode="numeric" placeholder="Team B" value={scoreB} onChange={e => setScoreB(e.target.value)}/>
-            </div>
-            <button className="primary-button" disabled={saving || selected.length !== 4 || !scoreA || !scoreB || scoreA === scoreB} onClick={saveMatch}>
-              {saving ? "Saving…" : "Save match"}
-            </button>
-          </div>
+        <div className="range-toggle three">
+          <button className={statsRange === "DAILY" ? "active" : ""} onClick={() => setStatsRange("DAILY")}>Daily</button>
+          <button className={statsRange === "WEEKLY" ? "active" : ""} onClick={() => setStatsRange("WEEKLY")}>Weekly</button>
+          <button className={statsRange === "MONTHLY" ? "active" : ""} onClick={() => setStatsRange("MONTHLY")}>Monthly</button>
         </div>
-      )}
-    </main>
-  );
+
+        <div className="period-selector">
+          <button className="period-arrow" onClick={() => moveStatsPeriod(-1)} aria-label="Previous period">‹</button>
+
+          {statsRange === "DAILY" ? (
+            <label className="date-picker-control">
+              <span>DATE</span>
+              <input
+                type="date"
+                value={statsDate}
+                onChange={e => setStatsDate(e.target.value)}
+              />
+            </label>
+          ) : (
+            <div className="period-label">
+              <span>{statsRange === "WEEKLY" ? "WEEK" : "MONTH"}</span>
+              <b>{selectorLabel}</b>
+            </div>
+          )}
+
+          <button className="period-arrow" onClick={() => moveStatsPeriod(1)} aria-label="Next period">›</button>
+        </div>
+
+        <div className="stats-table">
+          <div className="table-head"><span>#</span><span>PLAYER</span><span>P</span><span>W</span><span>L</span><span>WIN%</span></div>
+          {stats.map((s, i) => <div className="table-row" key={s.id}>
+            <span className="rank">{i + 1}</span>
+            <span className="player-name"><b>{s.name}</b></span>
+            <span>{s.played}</span><span>{s.w}</span><span>{s.l}</span><span>{s.winRate}%</span>
+          </div>)}
+        </div>
+
+        {statsRange === "DAILY" && <>
+          <div className="section-title"><span>Match history</span><span>{filteredMatches.length}</span></div>
+          <div className="match-list">
+            {filteredMatches.length === 0 && <div className="empty-card">No matches today.</div>}
+            {filteredMatches.map((m, i) => {
+              const matchNumber = matches.length - matches.findIndex(x => x.id === m.id);
+              const aWon = m.team_a_score > m.team_b_score;
+              return <div className="match-card" key={m.id}>
+                <div className="match-number">M{matchNumber}</div>
+                <div className="teams">
+                  <div>
+                    <strong className={aWon ? "winning-team" : "losing-team"}>{team(m, "A")}</strong>
+                    <span className={aWon ? "score-more" : "score-less"}>{m.team_a_score}</span>
+                  </div>
+                  <div>
+                    <strong className={!aWon ? "winning-team" : "losing-team"}>{team(m, "B")}</strong>
+                    <span className={!aWon ? "score-more" : "score-less"}>{m.team_b_score}</span>
+                  </div>
+                  {m.edit_count > 0 && <small>Edited · {m.edit_count}x</small>}
+                </div>
+              </div>
+            })}
+          </div>
+        </>}
+      </>}
+
+      {tab === "money" && <><div className="page-heading"><div className="eyebrow">GROUP LEDGER</div><h1>Money</h1><p>Fines, shared expenses and /* payments removed */.</p></div>
+        <div className="money-grid"><div><b>{money(totalFines)}</b><small>Fines</small></div><div><b>{money(totalExpenses)}</b><small>Expenses</small></div></div>
+        <div className="section-title"><span>Admin actions</span><span><LockKeyhole size={14} /></span></div>
+        <div className="admin-actions"><button onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button><button onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button></div>
+        <div className="section-title"><span>Recent expenses</span><span>{expenses.length}</span></div>
+        <div className="match-list">{expenses.map(e => <div className="match-card" key={e.id}><div className="expense-icon">₹</div><div className="teams"><div><strong>{e.category}</strong><span>{money(Number(e.amount))}</span></div><small>{e.description || e.expense_date}</small></div></div>)}</div>
+        <div className="section-title"><span>Fines by player</span><span>Tap a player</span></div>
+        <div className="stats-table">{stats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}><span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b><small>{attendance.filter(a => a.player_id === s.id).length} entries</small></span><strong>{money(s.fines)}</strong><ChevronRight size={17} /></button>)}</div>
+        <div className="section-title"><span>Monthly fine report</span><span>Fines only</span></div>
+        <div className="month-picker"><button onClick={() => { const d = new Date(reportMonth + "-01"); d.setMonth(d.getMonth() - 1); setReportMonth(d.toISOString().slice(0, 7)) }}>‹</button><b>{new Date(reportMonth + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</b><button onClick={() => { const d = new Date(reportMonth + "-01"); d.setMonth(d.getMonth() + 1); setReportMonth(d.toISOString().slice(0, 7)) }}>›</button></div>
+        <div className="money-grid four"><div><b>{money(monthTotal)}</b><small>Total fines</small></div><div><b>{money(monthLate)}</b><small>Late fines</small></div><div><b>{money(monthMissed)}</b><small>Missed fines</small></div><div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div></div>
+        <div className="stats-table monthly-fines"><div className="table-head"><span>#</span><span>PLAYER</span><span>LATE</span><span>MISSED</span><span>TOTAL</span><span></span></div>{monthlyFineStats.map((s, i) => <button className="monthly-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}><span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b><small>{s.lateCount} late · {s.missedCount} missed</small></span><span>{money(s.late)}</span><span>{money(s.missed)}</span><strong>{money(s.total)}</strong><ChevronRight size={16} /></button>)}</div>
+      </>}
+
+      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
+    </section>
+    <nav className="bottom-nav"><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
+
+    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div><div className="score-inputs"><input inputMode="numeric" value={scoreA} placeholder="Team A" onChange={e => setScoreA(e.target.value)} /><span>:</span><input inputMode="numeric" value={scoreB} placeholder="Team B" onChange={e => setScoreB(e.target.value)} /></div><button className="primary-button" disabled={selected.length !== 4 || !scoreA || !scoreB} onClick={saveMatch}>Save match</button></Modal>}
+
+    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
+      <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
+
+    {modal === "edit" && targetMatch && <Modal title={`Edit Match`} close={() => setModal(null)}><p className="helper">Admin verified. The match ID remains unchanged.</p><div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div><div className="score-inputs"><input value={scoreA} onChange={e => setScoreA(e.target.value)} /><span>:</span><input value={scoreB} onChange={e => setScoreB(e.target.value)} /></div><button className="primary-button" onClick={saveEditedMatch}>Save corrected score</button></Modal>}
+
+    {modal === "fine" && <Modal title="Add fine" close={() => setModal(null)}><select value={finePlayer} onChange={e => setFinePlayer(e.target.value)}><option value="">Select player</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select value={fineType} onChange={e => setFineType(e.target.value as "late" | "missed")}><option value="late">Late arrival · ₹{lateRate}/min</option><option value="missed">Missed day · ₹{missedRate}</option></select>{fineType === "late" && <input inputMode="numeric" placeholder="Minutes late" value={minutes} onChange={e => setMinutes(e.target.value)} />}<button className="primary-button" onClick={addFine}>Save fine</button></Modal>}
+
+    {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
+
+
+    {fineDetailsPlayer && <Modal title={`${name(fineDetailsPlayer)} · Fine history`} close={() => setFineDetailsPlayer(null)}>
+      <div className="fine-history">
+        {attendance.filter(a => a.player_id === fineDetailsPlayer).length === 0 && <div className="empty-card">No fines recorded.</div>}
+        {attendance.filter(a => a.player_id === fineDetailsPlayer).map(a => <div className="fine-history-row" key={a.id}>
+          <div><b>{a.status === "MISSED" ? "Missed day" : "Late arrival"}</b><small>{a.attendance_date}{a.status === "PRESENT" && a.late_minutes ? ` · ${a.late_minutes} min late` : ""}</small></div>
+          <strong>{money(Number(a.fine_amount))}</strong>
+        </div>)}
+      </div>
+    </Modal>}
+  </main>
 }
+
+function Modal({ title, close, children }: { title: string; close: () => void; children: React.ReactNode }) { return <div className="modal-backdrop" onClick={close}><div className="modal" onClick={e => e.stopPropagation()}><div className="modal-header"><div><div className="eyebrow">RALLY365</div><h2>{title}</h2></div><button className="icon-button" onClick={close}><X /></button></div>{children}</div></div> }

@@ -71,3 +71,30 @@ The Supabase database schema must already exist. This source expects:
 - `match_players`
 
 with the schema created for Rally365 Court.
+
+
+## v1.3 UI — Money + Admin PIN
+
+This version adds:
+- Money tab
+- Late/missed-day fines
+- Shuttle/breakfast/coffee/other expenses
+- Selective expense splitting
+- Payment recording
+- Fixed read-only roster
+- Admin PIN modal for score edits and money actions
+- Match edit indicators
+- Realtime refresh
+
+IMPORTANT: the money UI is currently a client-side PIN gate for the existing MVP. Before exposing financial writes to untrusted users, move all money mutations behind Supabase SECURITY DEFINER RPCs (the same server-side pattern used by `edit_match_with_pin`).
+
+
+### Money UI change
+- Removed payment recording from the user UI.
+- Removed paid totals from the user UI.
+- Tapping a player in the fines list opens that player's dated fine history.
+
+
+### v1.4 reports
+- Stats tab now includes match history and All time / Last 30 days filters.
+- Money tab now includes a monthly fine report with late/missed breakdown and dated player drill-down.

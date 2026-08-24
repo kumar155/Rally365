@@ -73,6 +73,25 @@ export default function Home() {
     [matches]
   );
 
+  const localDateKey = (date = new Date()) => {
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  };
+
+  const todayKey = localDateKey();
+
+  const todayMatches = useMemo(
+    () => matches.filter(m => localDateKey(new Date(m.played_at)) === todayKey),
+    [matches, todayKey]
+  );
+
+  const todayValidMatches = useMemo(
+    () => todayMatches.filter(m => m.status !== "VOIDED"),
+    [todayMatches]
+  );
+
   const filteredMatches = useMemo(() => {
     const anchor = new Date(`${statsDate}T00:00:00`);
     const start = new Date(anchor);
@@ -264,29 +283,81 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+      {tab === "today" && <>
+        <div className="hero-card">
+          <div>
+            <div className="eyebrow">TODAY · {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+            <h1>Today's games</h1>
+            <p>{new Set(todayValidMatches.flatMap(m => m.match_players.map(x => x.player_id))).size} players · {todayValidMatches.length} valid matches</p>
+          </div>
+          <Trophy size={42} />
+        </div>
         <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
-        <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
-        <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
-          {matches.map((m, i) => {
-            const aWon = m.team_a_score > m.team_b_score;
-            return <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
-              <div className="match-number">M{matches.length - i}</div>
-              <div className="teams">
-                <div>
-                  <strong>{team(m, "A")}</strong>
-                  <span className={aWon ? "score-more" : "score-less"}>{m.team_a_score}</span>
-                </div>
-                <div>
-                  <strong>{team(m, "B")}</strong>
-                  <span className={!aWon ? "score-more" : "score-less"}>{m.team_b_score}</span>
-                </div>
-                {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
-              </div>
-              <button className="edit-link" onClick={() => openEdit(m)}><LockKeyhole size={16} /></button>
+        <div className="section-title"><span>Today's match history</span><span>{todayMatches.length}</span></div>
+
+        {todayMatches.length === 0 ? (
+          <div className="empty-rally-card">
+            <div className="rally-illustration rally-illustration-alt" aria-hidden="true">
+              <svg viewBox="0 0 340 190">
+                <defs>
+                  <linearGradient id="emptySky" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#e9f8f0"/>
+                    <stop offset="100%" stopColor="#f8fcfa"/>
+                  </linearGradient>
+                  <filter id="softShadow">
+                    <feDropShadow dx="0" dy="4" stdDeviation="5" floodOpacity=".10"/>
+                  </filter>
+                </defs>
+                <rect x="14" y="12" width="312" height="166" rx="28" fill="url(#emptySky)"/>
+                <path d="M34 146 Q170 105 306 146" fill="none" stroke="#b9dcc8" strokeWidth="2"/>
+                <path d="M36 150 H304" stroke="#8dbda3" strokeWidth="3"/>
+                <path d="M170 83 V151" stroke="#9cc9ae" strokeWidth="3" strokeDasharray="4 5"/>
+                <path d="M82 144 L92 74 M258 144 L248 74" stroke="#b1d3be" strokeWidth="3"/>
+                <path d="M70 76 H270" stroke="#15985c" strokeWidth="4" strokeLinecap="round"/>
+                <path d="M70 76 V86 M270 76 V86" stroke="#15985c" strokeWidth="4" strokeLinecap="round"/>
+
+                <g className="floating-shuttle">
+                  <path d="M163 57 L177 57 L185 69 L155 69 Z" fill="#fff" stroke="#15985c" strokeWidth="3"/>
+                  <path d="M158 69 L182 69" stroke="#15985c" strokeWidth="3"/>
+                  <circle cx="170" cy="77" r="8" fill="#15985c"/>
+                </g>
+
+                <path className="motion-trail" d="M112 48 Q137 30 158 42" fill="none" stroke="#7bc29a" strokeWidth="4" strokeLinecap="round" strokeDasharray="3 9"/>
+                <path className="motion-trail motion-trail-2" d="M190 39 Q215 26 237 42" fill="none" stroke="#7bc29a" strokeWidth="3" strokeLinecap="round" strokeDasharray="2 8"/>
+
+                <g className="empty-racket-left" filter="url(#softShadow)">
+                  <ellipse cx="82" cy="109" rx="21" ry="28" fill="none" stroke="#15985c" strokeWidth="6"/>
+                  <path d="M96 130 L120 157" stroke="#15985c" strokeWidth="7" strokeLinecap="round"/>
+                  <path d="M70 86 L94 132 M95 86 L69 132 M62 109 H102" stroke="#9bd2b0" strokeWidth="2"/>
+                </g>
+
+                <g className="empty-racket-right" filter="url(#softShadow)">
+                  <ellipse cx="258" cy="108" rx="21" ry="28" fill="none" stroke="#15985c" strokeWidth="6"/>
+                  <path d="M244 130 L220 157" stroke="#15985c" strokeWidth="7" strokeLinecap="round"/>
+                  <path d="M246 85 L270 131 M271 85 L245 131 M238 108 H278" stroke="#9bd2b0" strokeWidth="2"/>
+                </g>
+              </svg>
             </div>
-          })}
-        </div></>}
+            <div className="empty-rally-title">No games today</div>
+            <div className="empty-rally-text">No matches have been recorded for {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.</div>
+          </div>
+        ) : (
+          <div className="match-list">
+            {todayMatches.map((m, i) => {
+              const aWon = m.team_a_score > m.team_b_score;
+              return <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
+                <div className="match-number">M{matches.length - matches.findIndex(x => x.id === m.id)}</div>
+                <div className="teams">
+                  <div><strong>{team(m, "A")}</strong><span className={aWon ? "score-more" : "score-less"}>{m.team_a_score}</span></div>
+                  <div><strong>{team(m, "B")}</strong><span className={!aWon ? "score-more" : "score-less"}>{m.team_b_score}</span></div>
+                  {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
+                </div>
+                <button className="edit-link" onClick={() => openEdit(m)}><LockKeyhole size={16} /></button>
+              </div>
+            })}
+          </div>
+        )}
+      </>}
 
       {tab === "stats" && <>
         <div className="page-heading"><div className="eyebrow">PERFORMANCE</div><h1>Leaderboard</h1><p>Performance for the selected period.</p></div>
@@ -372,7 +443,7 @@ export default function Home() {
     </section>
     <nav className="bottom-nav"><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
 
-    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div><div className="score-inputs"><input inputMode="numeric" value={scoreA} placeholder="Team A Score" onChange={e => setScoreA(e.target.value)} /><span>:</span><input inputMode="numeric" value={scoreB} placeholder="Team B Score" onChange={e => setScoreB(e.target.value)} /></div><button className="primary-button" disabled={selected.length !== 4 || !scoreA || !scoreB} onClick={saveMatch}>Save match</button></Modal>}
+    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div><div className="score-inputs"><input inputMode="numeric" value={scoreA} placeholder="Team A" onChange={e => setScoreA(e.target.value)} /><span>:</span><input inputMode="numeric" value={scoreB} placeholder="Team B" onChange={e => setScoreB(e.target.value)} /></div><button className="primary-button" disabled={selected.length !== 4 || !scoreA || !scoreB} onClick={saveMatch}>Save match</button></Modal>}
 
     {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}

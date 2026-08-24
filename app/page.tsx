@@ -72,6 +72,25 @@ export default function Home() {
     [matches]
   );
 
+  const localDateKey = (date = new Date()) => {
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  };
+
+  const todayKey = localDateKey();
+
+  const todayMatches = useMemo(
+    () => matches.filter(m => localDateKey(new Date(m.played_at)) === todayKey),
+    [matches, todayKey]
+  );
+
+  const todayValidMatches = useMemo(
+    () => todayMatches.filter(m => m.status !== "VOIDED"),
+    [todayMatches]
+  );
+
   const filteredMatches = useMemo(() => {
     const anchor = new Date(`${statsDate}T00:00:00`);
     const start = new Date(anchor);
@@ -328,19 +347,53 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+      {tab === "today" && <>
+        <div className="hero-card">
+          <div>
+            <div className="eyebrow">TODAY · {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+            <h1>Today's games</h1>
+            <p>{new Set(todayValidMatches.flatMap(m => m.match_players.map(x => x.player_id))).size} players · {todayValidMatches.length} valid matches</p>
+          </div>
+          <Trophy size={42} />
+        </div>
+
         <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
-        <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
-        <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
-          {matches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{matches.length - i}</div><div className="teams"><div><strong>{team(m, "A")}</strong><span>{m.team_a_score}</span></div><div><strong>{team(m, "B")}</strong><span>{m.team_b_score}</span></div>{m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}</div>{m.status !== "VOIDED" && <button
+
+        <div className="section-title"><span>Today's match history</span><span>{todayMatches.length}</span></div>
+
+        {todayMatches.length === 0 ? (
+          <div className="empty-rally-card">
+            <div className="rally-illustration rally-illustration-image" aria-hidden="true">
+              <img src="/badminton-court-clean.png" alt="" />
+            </div>
+            <div className="empty-rally-title">No games today!</div>
+            <div className="empty-rally-text">Hit the court and add a new match.</div>
+            <div className="empty-rally-date">📅 {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+          </div>
+        ) : (
+          <div className="match-list">
+            {todayMatches.map((m) => {
+              const aWon = m.team_a_score > m.team_b_score;
+              return <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
+                <div className="match-number">M{matches.length - matches.findIndex(x => x.id === m.id)}</div>
+                <div className="teams">
+                  <div><strong>{team(m, "A")}</strong><span className={aWon ? "score-more" : "score-less"}>{m.team_a_score}</span></div>
+                  <div><strong>{team(m, "B")}</strong><span className={!aWon ? "score-more" : "score-less"}>{m.team_b_score}</span></div>
+                  {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
+                </div>
+                {m.status !== "VOIDED" && <button
                   className="edit-link"
                   title="Edit match"
                   aria-label="Edit match"
                   onClick={() => openEdit(m)}
                 >
                   <Pencil size={16} />
-                </button>}</div>)}
-        </div></>}
+                </button>}
+              </div>
+            })}
+          </div>
+        )}
+      </>}
 
       {tab === "stats" && <>
         <div className="page-heading"><div className="eyebrow">PERFORMANCE</div><h1>Leaderboard</h1><p>Performance for the selected period.</p></div>

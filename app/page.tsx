@@ -28,7 +28,10 @@ export default function Home() {
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
   const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
-  const [statsDate, setStatsDate] = useState(new Date().toISOString().slice(0, 10));
+  const [statsDate, setStatsDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
   const [finePlayer, setFinePlayer] = useState(""); const [fineType, setFineType] = useState<"late" | "missed">("late"); const [minutes, setMinutes] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("SHUTTLES"); const [expenseAmount, setExpenseAmount] = useState(""); const [expenseDesc, setExpenseDesc] = useState(""); const [split, setSplit] = useState<string[]>([]);
@@ -92,69 +95,141 @@ export default function Home() {
     [todayMatches]
   );
 
-  const filteredMatches = useMemo(() => {
-    const anchor = new Date(`${statsDate}T00:00:00`);
+  const statsPeriod = useMemo(() => {
+    // Noon avoids DST/midnight edge cases while keeping the date in the user's
+    // local calendar. Never convert these period dates through toISOString().
+    const anchor = new Date(`${statsDate}T12:00:00`);
     const start = new Date(anchor);
-    const end = new Date(anchor);
 
     if (statsRange === "DAILY") {
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
       end.setDate(end.getDate() + 1);
-    } else if (statsRange === "WEEKLY") {
+      return { start, end };
+    }
+
+    if (statsRange === "WEEKLY") {
       const day = start.getDay();
       const mondayOffset = day === 0 ? -6 : 1 - day;
       start.setDate(start.getDate() + mondayOffset);
       start.setHours(0, 0, 0, 0);
-      end.setTime(start.getTime());
+      const end = new Date(start);
       end.setDate(end.getDate() + 7);
-    } else {
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      end.setMonth(start.getMonth() + 1, 1);
-      end.setHours(0, 0, 0, 0);
+      return { start, end };
     }
 
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1, 1);
+    end.setHours(0, 0, 0, 0);
+    return { start, end };
+  }, [statsRange, statsDate]);
+
+  const filteredMatches = useMemo(() => {
+    const { start, end } = statsPeriod;
     return validMatches.filter(m => {
       const played = new Date(m.played_at);
       return played >= start && played < end;
     });
-  }, [validMatches, statsRange, statsDate]);
+  }, [validMatches, statsPeriod]);
 
   const selectorLabel = useMemo(() => {
-    const anchor = new Date(`${statsDate}T00:00:00`);
+    const { start, end } = statsPeriod;
 
     if (statsRange === "DAILY") {
-      return anchor.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+      return start.toLocaleDateString("en-IN", {
+        weekday: "short", day: "numeric", month: "short", year: "numeric"
+      });
     }
 
     if (statsRange === "WEEKLY") {
-      const start = new Date(anchor);
-      const day = start.getDay();
-      const mondayOffset = day === 0 ? -6 : 1 - day;
-      start.setDate(start.getDate() + mondayOffset);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 6);
-
-      return `${start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+      const weekEnd = new Date(end);
+      weekEnd.setDate(weekEnd.getDate() - 1);
+      return `${start.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${weekEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
     }
 
-    return anchor.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-  }, [statsRange, statsDate]);
+    return start.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  }, [statsRange, statsPeriod]);
 
   const moveStatsPeriod = (direction: number) => {
-    const d = new Date(`${statsDate}T00:00:00`);
-    if (statsRange === "DAILY") d.setDate(d.getDate() + direction);
-    else if (statsRange === "WEEKLY") d.setDate(d.getDate() + direction * 7);
-    else d.setMonth(d.getMonth() + direction);
-    setStatsDate(d.toISOString().slice(0, 10));
+    // Work with calendar components, not UTC ISO strings.
+    const d = new Date(`${statsDate}T12:00:00`);
+
+    if (statsRange === "DAILY") {
+      d.setDate(d.getDate() + direction);
+    } else if (statsRange === "WEEKLY") {
+      d.setDate(d.getDate() + direction * 7);
+    } else {
+      d.setMonth(d.getMonth() + direction);
+    }
+
+    const nextKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setStatsDate(nextKey);
   };
 
-  const stats = useMemo(() => players.map(p => {
-    const ms = filteredMatches.filter(m => m.status !== "VOIDED" && m.match_players.some(x => x.player_id === p.id));
-    let w = 0, pf = 0, pa = 0; ms.forEach(m => { const t = m.match_players.find(x => x.player_id === p.id)?.team; const own = t === "A" ? m.team_a_score : m.team_b_score; const opp = t === "A" ? m.team_b_score : m.team_a_score; pf += own; pa += opp; if (own > opp) w++ });
-    const fines = attendance.filter(a => a.player_id === p.id).reduce((s, a) => s + Number(a.fine_amount), 0);
-    return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
-  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [players, filteredMatches, attendance]);
+  // Players tab is intentionally all-time: it should not change when the
+  // Stats tab period/date changes.
+  const allTimeStats = useMemo(() => players.map(p => {
+    const ms = validMatches.filter(m => m.match_players.some(x => x.player_id === p.id));
+    let w = 0, pf = 0, pa = 0;
+    ms.forEach(m => {
+      const t = m.match_players.find(x => x.player_id === p.id)?.team;
+      const own = t === "A" ? m.team_a_score : m.team_b_score;
+      const opp = t === "A" ? m.team_b_score : m.team_a_score;
+      pf += own; pa += opp;
+      if (own > opp) w++;
+    });
+    return {
+      ...p,
+      played: ms.length,
+      w,
+      l: ms.length - w,
+      winRate: ms.length ? Math.round(w / ms.length * 100) : 0,
+      diff: pf - pa
+    };
+  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate || b.played - a.played), [players, validMatches]);
 
+
+  const stats = useMemo(() => players.map(p => {
+    const ms = filteredMatches.filter(m =>
+      m.match_players.some(x => x.player_id === p.id)
+    );
+
+    let w = 0;
+    let pf = 0;
+    let pa = 0;
+
+    ms.forEach(m => {
+      const team = m.match_players.find(x => x.player_id === p.id)?.team;
+      const own = team === "A" ? m.team_a_score : m.team_b_score;
+      const opp = team === "A" ? m.team_b_score : m.team_a_score;
+
+      pf += own;
+      pa += opp;
+
+      if (own > opp) w++;
+    });
+
+    const fines = attendance
+      .filter(a => a.player_id === p.id)
+      .reduce((sum, a) => sum + Number(a.fine_amount), 0);
+
+    return {
+      ...p,
+      played: ms.length,
+      w,
+      l: ms.length - w,
+      winRate: ms.length
+        ? Math.round((w / ms.length) * 100)
+        : 0,
+      diff: pf - pa,
+      fines,
+      owedExpenses: 0,
+    };
+  }).sort(
+    (a, b) => b.w - a.w || b.winRate - a.winRate
+  ), [players, filteredMatches, attendance]);
   const monthlyAttendance = useMemo(() => attendance.filter(a => a.attendance_date.slice(0, 7) === reportMonth), [attendance, reportMonth]);
   const monthlyFineStats = useMemo(() => players.map(p => {
     const rows = monthlyAttendance.filter(a => a.player_id === p.id);
@@ -401,7 +476,7 @@ export default function Home() {
         <div className="stats-table monthly-fines"><div className="table-head"><span>#</span><span>PLAYER</span><span>LATE</span><span>MISSED</span><span>TOTAL</span><span></span></div>{monthlyFineStats.map((s, i) => <button className="monthly-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}><span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b><small>{s.lateCount} late · {s.missedCount} missed</small></span><span>{money(s.late)}</span><span>{money(s.missed)}</span><strong>{money(s.total)}</strong><ChevronRight size={16} /></button>)}</div>
       </>}
 
-      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
+      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All-time performance through the latest recorded match.</p></div><div className="player-grid">{allTimeStats.map(s => <div className="player-card" key={s.id}><div className="avatar">{s.name.slice(0, 1)}</div><div><b>{s.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div>)}</div></>}
     </section>
     <nav className="bottom-nav"><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
 

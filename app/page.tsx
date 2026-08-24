@@ -297,49 +297,11 @@ export default function Home() {
 
         {todayMatches.length === 0 ? (
           <div className="empty-rally-card">
-            <div className="rally-illustration rally-illustration-alt" aria-hidden="true">
-              <svg viewBox="0 0 340 190">
-                <defs>
-                  <linearGradient id="emptySky" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#e9f8f0"/>
-                    <stop offset="100%" stopColor="#f8fcfa"/>
-                  </linearGradient>
-                  <filter id="softShadow">
-                    <feDropShadow dx="0" dy="4" stdDeviation="5" floodOpacity=".10"/>
-                  </filter>
-                </defs>
-                <rect x="14" y="12" width="312" height="166" rx="28" fill="url(#emptySky)"/>
-                <path d="M34 146 Q170 105 306 146" fill="none" stroke="#b9dcc8" strokeWidth="2"/>
-                <path d="M36 150 H304" stroke="#8dbda3" strokeWidth="3"/>
-                <path d="M170 83 V151" stroke="#9cc9ae" strokeWidth="3" strokeDasharray="4 5"/>
-                <path d="M82 144 L92 74 M258 144 L248 74" stroke="#b1d3be" strokeWidth="3"/>
-                <path d="M70 76 H270" stroke="#15985c" strokeWidth="4" strokeLinecap="round"/>
-                <path d="M70 76 V86 M270 76 V86" stroke="#15985c" strokeWidth="4" strokeLinecap="round"/>
-
-                <g className="floating-shuttle">
-                  <path d="M163 57 L177 57 L185 69 L155 69 Z" fill="#fff" stroke="#15985c" strokeWidth="3"/>
-                  <path d="M158 69 L182 69" stroke="#15985c" strokeWidth="3"/>
-                  <circle cx="170" cy="77" r="8" fill="#15985c"/>
-                </g>
-
-                <path className="motion-trail" d="M112 48 Q137 30 158 42" fill="none" stroke="#7bc29a" strokeWidth="4" strokeLinecap="round" strokeDasharray="3 9"/>
-                <path className="motion-trail motion-trail-2" d="M190 39 Q215 26 237 42" fill="none" stroke="#7bc29a" strokeWidth="3" strokeLinecap="round" strokeDasharray="2 8"/>
-
-                <g className="empty-racket-left" filter="url(#softShadow)">
-                  <ellipse cx="82" cy="109" rx="21" ry="28" fill="none" stroke="#15985c" strokeWidth="6"/>
-                  <path d="M96 130 L120 157" stroke="#15985c" strokeWidth="7" strokeLinecap="round"/>
-                  <path d="M70 86 L94 132 M95 86 L69 132 M62 109 H102" stroke="#9bd2b0" strokeWidth="2"/>
-                </g>
-
-                <g className="empty-racket-right" filter="url(#softShadow)">
-                  <ellipse cx="258" cy="108" rx="21" ry="28" fill="none" stroke="#15985c" strokeWidth="6"/>
-                  <path d="M244 130 L220 157" stroke="#15985c" strokeWidth="7" strokeLinecap="round"/>
-                  <path d="M246 85 L270 131 M271 85 L245 131 M238 108 H278" stroke="#9bd2b0" strokeWidth="2"/>
-                </g>
-              </svg>
+            <div className="rally-illustration rally-illustration-image" aria-hidden="true">
+              <img src="/badminton-court-clean.png" alt="" />
             </div>
-            <div className="empty-rally-title">No games today</div>
-            <div className="empty-rally-text">No matches have been recorded for {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.</div>
+            <div className="empty-rally-title">No games today!</div>
+            <div className="empty-rally-text">Hit the court and add a new match.</div><div className="empty-rally-date">📅 {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
           </div>
         ) : (
           <div className="match-list">

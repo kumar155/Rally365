@@ -1,0 +1,6 @@
+
+.rally-illustration-image{height:auto;display:block;margin:0;border-radius:22px;overflow:hidden;background:#f0f9f4}
+.rally-illustration-image img{display:block;width:100%;height:auto;aspect-ratio:1.78/1;object-fit:cover}
+.empty-rally-title{font-size:22px;font-weight:900;color:#10261c;margin-top:20px}
+.empty-rally-text{font-size:15px;color:#687970;margin-top:7px}
+.empty-rally-date{display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:9px 15px;border-radius:999px;background:#eaf7f0;color:#536c61;font-size:13px;font-weight:700}

@@ -11,3 +11,24 @@
 .teams .score-less{color:#c44b4b;font-weight:900}
 
 .period-selector{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #dfe9e3;border-radius:16px;padding:7px;margin:10px 0 14px}.period-arrow{width:38px;height:38px;border:0;border-radius:11px;background:#eef5f0;color:#15985c;font-size:25px;line-height:1;cursor:pointer}.period-label,.date-picker-control{flex:1;text-align:center;display:flex;flex-direction:column;gap:3px;align-items:center}.period-label span,.date-picker-control span{font-size:9px;letter-spacing:1px;font-weight:900;color:#82928a}.period-label b{font-size:13px;color:#173126}.date-picker-control input{border:0;background:transparent;font:inherit;font-weight:800;color:#173126;text-align:center;outline:none;max-width:145px}
+
+/* Current Home / Today empty state */
+.empty-rally-card{margin-top:10px;padding:0 0 24px;border:1px solid #dce9e1;border-radius:24px;background:#fff;text-align:center;overflow:hidden}
+.rally-illustration-image{height:auto;display:block;margin:0;background:#f0f9f4}
+.rally-illustration-image img{display:block;width:100%;height:auto;aspect-ratio:3.6/1;object-fit:cover;object-position:center}
+.empty-rally-title{font-size:22px;font-weight:900;color:#10261c;margin-top:20px}
+.empty-rally-text{font-size:15px;color:#687970;margin-top:7px}
+.empty-rally-date{display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:9px 15px;border-radius:999px;background:#eaf7f0;color:#536c61;font-size:13px;font-weight:700}
+
+/* Today / match score colors */
+.score-more{color:#15985c!important;font-weight:900}
+.score-less{color:#c44b4b!important;font-weight:900}
+
+/* Current period/stats variants */
+.range-toggle.three{grid-template-columns:repeat(3,1fr)}
+.money-grid.four{grid-template-columns:repeat(4,1fr)}
+.stats-table.monthly-fines{margin-top:8px}
+.muted{color:#718078}
+
+/* Keep the app contained and prevent oversized media from breaking layout */
+.app-shell img{max-width:100%}

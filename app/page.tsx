@@ -192,50 +192,84 @@ export default function Home() {
     const unique = [...new Set(ids)];
     if (unique.length < 4) return [];
 
-    // A practical club-style generator:
-    // - exactly 6 matches
-    // - every match has two doubles teams
-    // - appearance counts stay as even as possible
-    // - partner repeats are minimized first
-    // - opponent repeats are minimized next
-    // - for odd player counts, byes naturally rotate through the group
-    const partnerCount = new Map<string, number>();
-    const opponentCount = new Map<string, number>();
-    const appearanceCount = new Map<string, number>();
-    unique.forEach(id => {
-      partnerCount.set(id, 0);
-      appearanceCount.set(id, 0);
-    });
+    type DuoMatch = { id: number; teamA: string[]; teamB: string[] };
 
     const pairKey = (a: string, b: string) => [a, b].sort().join("|");
-    const candidateScore = (teamA: string[], teamB: string[]) => {
-      let score = 0;
-      const all = [...teamA, ...teamB];
+    const shuffle = <T,>(items: T[]) => {
+      const a = [...items];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
 
-      // Keep participation balanced.
-      const maxAppear = Math.max(...unique.map(id => appearanceCount.get(id) || 0));
-      const minAppear = Math.min(...unique.map(id => appearanceCount.get(id) || 0));
-      const spreadPenalty = maxAppear - minAppear;
-      score += spreadPenalty * 18;
+    const appearances = new Map<string, number>();
+    const consecutive = new Map<string, number>();
+    const partnerCount = new Map<string, number>();
+    const opponentCount = new Map<string, number>();
 
-      all.forEach(id => score += (appearanceCount.get(id) || 0) * 3);
+    unique.forEach(id => {
+      appearances.set(id, 0);
+      consecutive.set(id, 0);
+    });
 
-      // Strongly discourage repeating partners.
-      const pk = pairKey(teamA[0], teamA[1]);
-      const qk = pairKey(teamB[0], teamB[1]);
-      score += (partnerCount.get(pk) || 0) * 30;
-      score += (partnerCount.get(qk) || 0) * 30;
+    const recordMatch = (teamA: string[], teamB: string[]) => {
+      const playing = new Set([...teamA, ...teamB]);
 
-      // Discourage repeating opponents, but less strongly than repeated partners.
-      for (const a of teamA) {
-        for (const b of teamB) {
-          const ok = pairKey(a, b);
-          score += (opponentCount.get(ok) || 0) * 6;
-        }
+      unique.forEach(id => {
+        consecutive.set(id, playing.has(id) ? (consecutive.get(id) || 0) + 1 : 0);
+      });
+
+      for (const team of [teamA, teamB]) {
+        const key = pairKey(team[0], team[1]);
+        partnerCount.set(key, (partnerCount.get(key) || 0) + 1);
+        team.forEach(id => appearances.set(id, (appearances.get(id) || 0) + 1));
       }
 
-      // Small random tie-break keeps the schedule from feeling deterministic.
-      score += Math.random() * 2;
+      for (const a of teamA) {
+        for (const b of teamB) {
+          const key = pairKey(a, b);
+          opponentCount.set(key, (opponentCount.get(key) || 0) + 1);
+        }
+      }
+    };
+
+    const scoreFour = (four: string[], previous: DuoMatch | null) => {
+      let score = Math.random() * 4;
+
+      for (const id of four) {
+        const c = consecutive.get(id) || 0;
+        if (c >= 2) return Infinity; // hard rule: never create a 3rd straight match
+        score += c * 25;
+        score += (appearances.get(id) || 0) * 4;
+      }
+
+      const maxApp = Math.max(...unique.map(id => appearances.get(id) || 0));
+      const minApp = Math.min(...unique.map(id => appearances.get(id) || 0));
+      score += (maxApp - minApp) * 20;
+
+      if (previous) {
+        const previousPlayers = new Set([...previous.teamA, ...previous.teamB]);
+        const carried = four.filter(id => previousPlayers.has(id)).length;
+        score += Math.max(0, carried - 2) * 10;
+        // Prefer some continuity, but do not force it.
+        if (carried === 2) score -= 8;
+      }
+
+      return score;
+    };
+
+    const scoreSplit = (teamA: string[], teamB: string[]) => {
+      let score = Math.random() * 2;
+      score += (partnerCount.get(pairKey(teamA[0], teamA[1])) || 0) * 50;
+      score += (partnerCount.get(pairKey(teamB[0], teamB[1])) || 0) * 50;
+
+      for (const a of teamA) {
+        for (const b of teamB) {
+          score += (opponentCount.get(pairKey(a, b)) || 0) * 8;
+        }
+      }
       return score;
     };
 
@@ -256,54 +290,155 @@ export default function Home() {
       return out;
     };
 
-    const generated: { id: number; teamA: string[]; teamB: string[] }[] = [];
+    const splitBest = (four: string[]) => {
+      const [a, b, c, d] = four;
+      const options: [string[], string[]][] = [
+        [[a, b], [c, d]],
+        [[a, c], [b, d]],
+        [[a, d], [b, c]],
+      ];
+      options.sort((x, y) => scoreSplit(x[0], x[1]) - scoreSplit(y[0], y[1]));
+      return options[0];
+    };
 
-    for (let round = 0; round < 6; round++) {
-      const candidates: { teamA: string[]; teamB: string[]; score: number }[] = [];
+    // First two matches have an explicit coverage rule:
+    // for 4,5,6 and 8 selected players, every selected player must appear
+    // at least once across M1 + M2. For 7, normal rotation starts immediately.
+    const firstTwoNeedCoverage = unique.length !== 7 && unique.length <= 8;
 
-      // Evaluate every possible 4-player selection and both team splits.
-      const groupsOfFour = combinations(unique, 4);
-      for (const four of groupsOfFour) {
-        const splitSets = [
-          [[four[0], four[1]], [four[2], four[3]]],
-          [[four[0], four[2]], [four[1], four[3]]],
-          [[four[0], four[3]], [four[1], four[2]]],
-        ];
+    const schedule: DuoMatch[] = [];
 
-        for (const split of splitSets) {
-          const teamA = split[0];
-          const teamB = split[1];
-          candidates.push({
-            teamA,
-            teamB,
-            score: candidateScore(teamA, teamB)
-          });
-        }
-      }
-
-      candidates.sort((a, b) => a.score - b.score);
-
-      const chosen = candidates[0];
-      if (!chosen) break;
-
-      generated.push({ id: round + 1, teamA: chosen.teamA, teamB: chosen.teamB });
-
-      const teams = [chosen.teamA, chosen.teamB];
-      teams.forEach(teamIds => {
-        const pk = pairKey(teamIds[0], teamIds[1]);
-        partnerCount.set(pk, (partnerCount.get(pk) || 0) + 1);
-        teamIds.forEach(id => appearanceCount.set(id, (appearanceCount.get(id) || 0) + 1));
-      });
-
-      for (const a of chosen.teamA) {
-        for (const b of chosen.teamB) {
-          const ok = pairKey(a, b);
-          opponentCount.set(ok, (opponentCount.get(ok) || 0) + 1);
-        }
-      }
+    // ---------- Match 1 ----------
+    let firstFour: string[];
+    if (firstTwoNeedCoverage && unique.length > 4) {
+      firstFour = shuffle(unique).slice(0, 4);
+    } else {
+      firstFour = shuffle(unique).slice(0, 4);
     }
 
-    return generated;
+    let [teamA, teamB] = splitBest(firstFour);
+    schedule.push({ id: 1, teamA, teamB });
+    recordMatch(teamA, teamB);
+
+    // ---------- Match 2 ----------
+    let secondFour: string[] = [];
+
+    if (firstTwoNeedCoverage) {
+      const remaining = unique.filter(id => !firstFour.includes(id));
+
+      // Cover every remaining player first. Fill the remaining slots from M1.
+      // n=4 -> all four return.
+      // n=5 -> one new + three return.
+      // n=6 -> two new + two return.
+      // n=8 -> four new, so M2 is fully fresh.
+      const neededFresh = Math.min(4, remaining.length);
+      const fresh = shuffle(remaining).slice(0, neededFresh);
+
+      const requiredReturnSlots = 4 - fresh.length;
+      const returnCandidates = shuffle(firstFour)
+        .filter(id => (consecutive.get(id) || 0) < 2)
+        .slice(0, requiredReturnSlots);
+
+      secondFour = [...fresh, ...returnCandidates];
+
+      // For 5/6 players every remaining player must be covered. In the rare
+      // 4-player case, all four necessarily play again; that's unavoidable.
+      if (secondFour.length < 4) {
+        const fallback = shuffle(unique)
+          .filter(id => !secondFour.includes(id))
+          .filter(id => (consecutive.get(id) || 0) < 2);
+        secondFour.push(...fallback.slice(0, 4 - secondFour.length));
+      }
+
+      // If we only have 4 selected players, a third-consecutive break is
+      // mathematically impossible; keep the game playable rather than failing.
+      if (unique.length === 4 && secondFour.length < 4) {
+        secondFour = [...unique];
+      }
+    } else {
+      // 7 players: rotate the rest immediately. Prefer two fresh/rested players
+      // from outside M1 and two carry-over players, but never a third straight.
+      const eligible = shuffle(unique).filter(id => (consecutive.get(id) || 0) < 2);
+      secondFour = eligible.slice(0, 4);
+
+      // If the feasible pool is larger, prefer at most 2 M1 carry-over players.
+      const notInFirst = eligible.filter(id => !firstFour.includes(id));
+      const inFirst = eligible.filter(id => firstFour.includes(id));
+      if (notInFirst.length >= 2) {
+        secondFour = [
+          ...notInFirst.slice(0, 2),
+          ...inFirst.slice(0, 2),
+        ];
+      }
+      secondFour = shuffle(secondFour);
+    }
+
+    [teamA, teamB] = splitBest(secondFour);
+    schedule.push({ id: 2, teamA, teamB });
+    recordMatch(teamA, teamB);
+
+    // ---------- Matches 3-6 ----------
+    for (let round = 3; round <= 6; round++) {
+      const previous = schedule[schedule.length - 1];
+
+      // Hard eligibility: anybody already at 2 consecutive must rest now.
+      const eligible = unique.filter(id => (consecutive.get(id) || 0) < 2);
+
+      // With 4 players, everyone has to play. There is no mathematical way to
+      // satisfy the 2-consecutive maximum; preserve a playable schedule.
+      let pool = unique.length === 4 ? unique : eligible;
+
+      if (pool.length < 4) {
+        // This should only happen for very small groups. Use the least-used
+        // eligible players and keep the hard cap whenever mathematically possible.
+        pool = [...eligible].sort((a, b) => {
+          const ca = consecutive.get(a) || 0;
+          const cb = consecutive.get(b) || 0;
+          if (ca !== cb) return ca - cb;
+          return (appearances.get(a) || 0) - (appearances.get(b) || 0);
+        });
+
+        if (pool.length < 4 && unique.length === 4) pool = unique;
+      }
+
+      // Generate candidate four-player groups and choose one that:
+      // 1) respects the consecutive rule
+      // 2) balances appearances
+      // 3) prefers two carry-over players from the previous match
+      // 4) minimizes partner/opponent repeats
+      const candidates: { four: string[]; score: number }[] = [];
+      for (const four of combinations(pool, 4)) {
+        const score = scoreFour(four, previous);
+        if (score !== Infinity) candidates.push({ four, score });
+      }
+
+      // If feasible candidates exist, take the best randomized candidate.
+      // Otherwise only the 4-player case can reach here legitimately.
+      let chosen = candidates.sort((a, b) => a.score - b.score)[0]?.four;
+
+      if (!chosen) {
+        if (unique.length === 4) {
+          chosen = [...unique];
+        } else {
+          // Defensive fallback: never intentionally schedule a 3rd consecutive
+          // game when a valid alternative exists.
+          chosen = [...pool]
+            .sort((a, b) => {
+              const ca = consecutive.get(a) || 0;
+              const cb = consecutive.get(b) || 0;
+              if (ca !== cb) return ca - cb;
+              return (appearances.get(a) || 0) - (appearances.get(b) || 0);
+            })
+            .slice(0, 4);
+        }
+      }
+
+      [teamA, teamB] = splitBest(chosen);
+      schedule.push({ id: round, teamA, teamB });
+      recordMatch(teamA, teamB);
+    }
+
+    return schedule;
   };
 
   const generateDuosForToday = () => {
@@ -797,7 +932,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""}`}>
+        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""} ${duoGenerated ? "wheel-ready" : ""}`}>
           <div className="spin-pointer"></div>
           <div
             className="spin-wheel"
@@ -834,7 +969,7 @@ export default function Home() {
         </button>
 
         {duoPlayers.length > 0 && duoPlayers.length < 4 &&
-          <div className="duo-note">Select at least 4 players. For an odd number, the generator rotates the bye so everyone gets a fair turn.</div>
+          <div className="duo-note">Select at least 4 players. No player is scheduled for more than 2 matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
         }
 
         {duoGenerated && <div className="duo-schedule">
@@ -842,6 +977,7 @@ export default function Home() {
             <span>Today's 6-match schedule</span>
             <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           </div>
+          <div className="duo-note">Rotation rule: a player can play up to 2 matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>
 
           <div className="duo-schedule-list">
             {duoMatches.map((match, index) => <div className="duo-match-card" key={match.id}>

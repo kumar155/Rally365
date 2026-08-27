@@ -10,7 +10,9 @@ import {
   formatDayMonth, formatDayMonthYear, formatMonthYear, localDateKey, localMonthKey,
   parseDateKeyNoon, parseMonthKey, rangeBounds, rangeLabel, shiftDateKey, shiftMonthKey
 } from "../lib/dates";
-import { DUO_MIN_PLAYERS, generateDuoSchedule, type DuoMatch } from "../lib/duos";
+import {
+  DUO_MATCH_COUNT, DUO_MAX_CONSECUTIVE, DUO_MIN_PLAYERS, generateDuoSchedule, type DuoMatch
+} from "../lib/duos";
 import { money, sumBy } from "../lib/format";
 import { isVoided, matchNumber, teamNames, teamOf, winnerOf, winnerScores } from "../lib/matches";
 import { groupSelect } from "../lib/queries";
@@ -592,7 +594,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""}`}>
+        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""} ${duoGenerated ? "wheel-ready" : ""}`}>
           <div className="spin-pointer"></div>
           <div
             className="spin-wheel"
@@ -629,14 +631,15 @@ export default function Home() {
         </button>
 
         {duoPlayers.length > 0 && duoPlayers.length < DUO_MIN_PLAYERS &&
-          <div className="duo-note">Select at least {DUO_MIN_PLAYERS} players. For an odd number, the generator rotates the bye so everyone gets a fair turn.</div>
+          <div className="duo-note">Select at least {DUO_MIN_PLAYERS} players. No player is scheduled for more than {DUO_MAX_CONSECUTIVE} matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
         }
 
         {duoGenerated && <div className="duo-schedule">
           <div className="section-title">
-            <span>Today's 6-match schedule</span>
+            <span>Today's {DUO_MATCH_COUNT}-match schedule</span>
             <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           </div>
+          <div className="duo-note">Rotation rule: a player can play up to {DUO_MAX_CONSECUTIVE} matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>
 
           <div className="duo-schedule-list">
             {duoMatches.map((match, index) => <div className="duo-match-card" key={match.id}>

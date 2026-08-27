@@ -136,7 +136,6 @@
 .duo-vs{text-align:center;color:#9aa69f;font-size:10px;font-weight:800}
 @media(max-width:720px){.duos-layout{grid-template-columns:1fr}.wheel-label{transform:translate(-50%,-50%) rotate(var(--label-angle)) translateY(-92px)}}
 
-
 .bottom-nav{
     display:grid!important;
     grid-template-columns:repeat(5,minmax(0,1fr))!important;
@@ -158,6 +157,7 @@
     .bottom-nav button span{font-size:9px}
     .bottom-nav button svg{width:16px;height:16px}
 }
+
 
 
 .duos-layout{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
@@ -196,6 +196,22 @@
 @media(max-width:720px){.duos-layout{grid-template-columns:1fr}.wheel-label{transform:translate(-50%,-50%) rotate(var(--label-angle)) translateY(-92px)}}
 
 
+.spin-wheel-wrap{
+    margin-top:28px!important;
+    margin-bottom:18px!important;
+}
+.spin-wheel-wrap.wheel-ready{
+    opacity:0;
+    transform:translateY(24px) scale(.92);
+    max-height:0;
+    min-height:0;
+    height:0;
+    margin-top:0!important;
+    margin-bottom:0!important;
+    overflow:hidden;
+    pointer-events:none;
+    transition:opacity .35s ease,transform .35s ease,max-height .35s ease,margin .35s ease;
+}
 
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}

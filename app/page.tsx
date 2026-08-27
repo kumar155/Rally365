@@ -35,22 +35,30 @@ export default function Home() {
 
   const load = useCallback(async () => {
     setError("");
-    const { data: g, error: ge } = await supabase.from("groups").select("id,name,join_code").eq("join_code", CODE).single();
-    if (ge || !g) { setError(ge?.message || "Group not found"); setLoading(false); return }
-    setGroupId(g.id);
-    const [p, m, e, a, r] = await Promise.all([
-      supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
-      supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
-      supabase.from("expenses").select("id,expense_date,category,amount,description").eq("group_id", g.id).order("expense_date", { ascending: false }),
-      supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
-      supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).single()
-    ]);
-    if (p.error) setError(p.error.message); else setPlayers(p.data || []);
-    if (m.error) setError(m.error.message); else setMatches((m.data || []) as Match[]);
-    if (e.error) setError(e.error.message); else setExpenses((e.data || []) as Expense[]);
-    if (a.error) setError(a.error.message); else setAttendance((a.data || []) as Attendance[]);
-    if (!r.error && r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
-    setLoading(false);
+    try {
+      const { data: g, error: ge } = await supabase.from("groups").select("id,name,join_code").eq("join_code", CODE).single();
+      if (ge || !g) { setError(ge?.message || "Group not found"); return }
+      setGroupId(g.id);
+      const [p, m, e, a, r] = await Promise.all([
+        supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
+        supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
+        supabase.from("expenses").select("id,expense_date,category,amount,description").eq("group_id", g.id).order("expense_date", { ascending: false }),
+        supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
+        supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).maybeSingle()
+      ]);
+      const loadErrors: string[] = [];
+      if (p.error) loadErrors.push(p.error.message); else setPlayers(p.data || []);
+      if (m.error) loadErrors.push(m.error.message); else setMatches((m.data || []) as Match[]);
+      if (e.error) loadErrors.push(e.error.message); else setExpenses((e.data || []) as Expense[]);
+      if (a.error) loadErrors.push(a.error.message); else setAttendance((a.data || []) as Attendance[]);
+      if (r.error) loadErrors.push(r.error.message);
+      else if (r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
+      if (loadErrors.length) setError([...new Set(loadErrors)].join(" · "));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load data");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load() }, [load]);
@@ -60,7 +68,11 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${groupId}` }, load)
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setError(err?.message || "Live updates unavailable — refresh to see the latest data");
+        }
+      });
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
 
@@ -194,7 +206,13 @@ export default function Home() {
     const { data: m, error: me } = await supabase.from("matches").insert({ group_id: groupId, team_a_score: a, team_b_score: b }).select("id").single();
     if (me || !m) { setError(me?.message || "Could not save"); return }
     const rows = selected.slice(0, 2).map(player_id => ({ match_id: m.id, player_id, team: "A" })).concat(selected.slice(2, 4).map(player_id => ({ match_id: m.id, player_id, team: "B" })));
-    const { error: pe } = await supabase.from("match_players").insert(rows); if (pe) { setError(pe.message); return }
+    const { error: pe } = await supabase.from("match_players").insert(rows);
+    if (pe) {
+      const { error: de } = await supabase.from("matches").delete().eq("id", m.id);
+      setError(de ? `${pe.message} · Could not roll back match: ${de.message}` : pe.message);
+      load();
+      return;
+    }
     setSelected([]); setScoreA(""); setScoreB(""); setModal(null); load();
   };
   const verify = async () => {
@@ -250,7 +268,12 @@ export default function Home() {
     if (ee || !e) { setError(ee?.message || "Could not save expense"); return }
     const share = Math.round(amount / split.length * 100) / 100;
     const { error: se } = await supabase.from("expense_splits").insert(split.map(player_id => ({ expense_id: e.id, player_id, share_amount: share })));
-    if (se) { setError(se.message); return }
+    if (se) {
+      const { error: de } = await supabase.from("expenses").delete().eq("id", e.id);
+      setError(de ? `${se.message} · Could not roll back expense: ${de.message}` : se.message);
+      load();
+      return;
+    }
     setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); load();
   };
   const saveEditedMatch = async () => {

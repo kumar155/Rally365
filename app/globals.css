@@ -54,6 +54,7 @@
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}
 
-/* Align the monthly fine report header with its rows so labels are not clipped */
-.stats-table.monthly-fines .table-head{grid-template-columns:28px 1fr 44px 48px 52px 18px}
-.stats-table.monthly-fines .table-head span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Align the monthly fine report header with its rows so LATE/MISSED labels are not clipped */
+.stats-table.monthly-fines .table-head,.stats-table.monthly-fines .monthly-row{grid-template-columns:28px 1fr 46px 52px 54px 18px}
+.stats-table.monthly-fines .table-head span,.stats-table.monthly-fines .monthly-row>span:not(.player-name),.stats-table.monthly-fines .monthly-row>strong{white-space:nowrap}
+.stats-table.monthly-fines .table-head span{letter-spacing:.3px}

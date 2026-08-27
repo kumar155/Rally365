@@ -4,23 +4,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockKeyhole, MapPin, Plus, ReceiptText, Trophy, Users, Trash2
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
 import { isValidPin, PIN_LENGTH } from "../lib/admin";
 import {
   formatDayMonth, formatDayMonthYear, formatMonthYear, localDateKey, localMonthKey,
   parseDateKeyNoon, parseMonthKey, rangeBounds, rangeLabel, shiftDateKey, shiftMonthKey
 } from "../lib/dates";
 import { money, sumBy } from "../lib/format";
-import { isVoided, matchNumber, parseScores, SCORE_ERROR, scoresFor, teamNames, teamOf } from "../lib/matches";
+import { isVoided, matchNumber, teamNames, teamOf, winnerOf, winnerScores } from "../lib/matches";
 import { groupSelect } from "../lib/queries";
 import { toggleSelection } from "../lib/selection";
+import { supabase } from "../lib/supabase";
 import type { Attendance, Expense, Match, Player, StatsRange, Team } from "../lib/types";
 import { MatchCard } from "./components/MatchCard";
 import { Modal } from "./components/Modal";
 import { PlayerChipGrid } from "./components/PlayerChipGrid";
+import { WinnerSelect } from "./components/WinnerSelect";
 
 const CODE = "RALLY365";
 const LIVE_TABLES = ["matches", "attendance", "expenses"];
+
 const STATS_RANGES: { value: StatsRange; label: string }[] = [
   { value: "DAILY", label: "Daily" },
   { value: "WEEKLY", label: "Weekly" },
@@ -28,6 +30,7 @@ const STATS_RANGES: { value: StatsRange; label: string }[] = [
 ];
 
 type Tab = "today" | "stats" | "money" | "players";
+
 const TABS: { value: Tab; label: string; Icon: typeof History }[] = [
   { value: "today", label: "Today", Icon: History },
   { value: "stats", label: "Stats", Icon: BarChart3 },
@@ -43,18 +46,22 @@ export default function Home() {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [scoreA, setScoreA] = useState(""); const [scoreB, setScoreB] = useState("");
+  const [winnerTeam, setWinnerTeam] = useState<Team | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
   const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(localMonthKey()); const [statsRange, setStatsRange] = useState<StatsRange>("DAILY");
-  const [statsDate, setStatsDate] = useState(localDateKey());
+  const [statsDate, setStatsDate] = useState(localDateKey);
   const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
   const [finePlayer, setFinePlayer] = useState(""); const [fineType, setFineType] = useState<"late" | "missed">("late"); const [minutes, setMinutes] = useState("");
+  const [fineDate, setFineDate] = useState(localDateKey);
   const [expenseCategory, setExpenseCategory] = useState("SHUTTLES"); const [expenseAmount, setExpenseAmount] = useState(""); const [expenseDesc, setExpenseDesc] = useState(""); const [split, setSplit] = useState<string[]>([]);
   const [lateRate, setLateRate] = useState("1"); const [missedRate, setMissedRate] = useState("10");
 
-  const applyRows = useCallback(<T,>(result: { data: unknown; error: { message: string } | null }, apply: (rows: T[]) => void) => {
+  const applyRows = useCallback(<T,>(
+    result: { data: unknown; error: { message: string } | null },
+    apply: (rows: T[]) => void
+  ) => {
     if (result.error) setError(result.error.message);
     else apply((result.data || []) as T[]);
   }, []);
@@ -83,7 +90,11 @@ export default function Home() {
   useEffect(() => {
     if (!groupId) return;
     const ch = LIVE_TABLES.reduce(
-      (channel, table) => channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `group_id=eq.${groupId}` }, load),
+      (channel, table) => channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: `group_id=eq.${groupId}` },
+        load
+      ),
       supabase.channel("rally365-live")
     ).subscribe();
     return () => { supabase.removeChannel(ch) }
@@ -92,22 +103,7 @@ export default function Home() {
   const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: Team) => teamNames(m, t, name);
 
-  const validMatches = useMemo(
-    () => matches.filter(m => !isVoided(m)),
-    [matches]
-  );
-
-  const todayKey = localDateKey();
-
-  const todayMatches = useMemo(
-    () => matches.filter(m => localDateKey(new Date(m.played_at)) === todayKey),
-    [matches, todayKey]
-  );
-
-  const todayValidMatches = useMemo(
-    () => todayMatches.filter(m => !isVoided(m)),
-    [todayMatches]
-  );
+  const validMatches = useMemo(() => matches.filter(m => !isVoided(m)), [matches]);
 
   const filteredMatches = useMemo(() => {
     const { start, end } = rangeBounds(statsDate, statsRange);
@@ -121,25 +117,32 @@ export default function Home() {
 
   const moveStatsPeriod = (direction: number) => setStatsDate(shiftDateKey(statsDate, statsRange, direction));
 
-  const finesFor = useCallback(
-    (playerId: string, rows: Attendance[] = attendance) => rows.filter(a => a.player_id === playerId),
-    [attendance]
-  );
+  const finesFor = useCallback((playerId: string) => attendance.filter(a => a.player_id === playerId), [attendance]);
 
   const stats = useMemo(() => players.map(p => {
-    const ms = filteredMatches.filter(m => !isVoided(m) && m.match_players.some(x => x.player_id === p.id));
-    let w = 0, pf = 0, pa = 0; ms.forEach(m => { const { own, opponent } = scoresFor(m, teamOf(m, p.id) === "A" ? "A" : "B"); pf += own; pa += opponent; if (own > opponent) w++ });
-    const fines = sumBy(finesFor(p.id), a => a.fine_amount);
-    return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
+    const ms = filteredMatches.filter(m => m.match_players.some(x => x.player_id === p.id));
+    const w = ms.filter(m => teamOf(m, p.id) === winnerOf(m)).length;
+    return {
+      ...p,
+      played: ms.length,
+      w,
+      l: ms.length - w,
+      winRate: ms.length ? Math.round(w / ms.length * 100) : 0,
+      fines: sumBy(finesFor(p.id), a => a.fine_amount),
+      owedExpenses: 0
+    };
   }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [players, filteredMatches, finesFor]);
 
   const finePlayerStats = useMemo(() => players.map(p => {
     const rows = finesFor(p.id);
-    const total = sumBy(rows, a => a.fine_amount);
-    const late = sumBy(rows.filter(a => a.status !== "MISSED"), a => a.fine_amount);
-    const missed = sumBy(rows.filter(a => a.status === "MISSED"), a => a.fine_amount);
-    const latest = rows[0]?.attendance_date || null;
-    return { ...p, entries: rows.length, total, late, missed, latest };
+    return {
+      ...p,
+      entries: rows.length,
+      total: sumBy(rows, a => a.fine_amount),
+      late: sumBy(rows.filter(a => a.status !== "MISSED"), a => a.fine_amount),
+      missed: sumBy(rows.filter(a => a.status === "MISSED"), a => a.fine_amount),
+      latest: rows[0]?.attendance_date || null
+    };
   }).sort((a, b) => b.total - a.total || b.entries - a.entries), [players, finesFor]);
 
   const monthlyExpenses = useMemo(
@@ -149,31 +152,52 @@ export default function Home() {
 
   const monthlyAttendance = useMemo(() => attendance.filter(a => a.attendance_date.slice(0, 7) === reportMonth), [attendance, reportMonth]);
   const monthlyFineStats = useMemo(() => players.map(p => {
-    const rows = finesFor(p.id, monthlyAttendance);
+    const rows = monthlyAttendance.filter(a => a.player_id === p.id);
     const lateRows = rows.filter(a => a.status === "PRESENT");
     const missedRows = rows.filter(a => a.status === "MISSED");
     const late = sumBy(lateRows, a => a.fine_amount);
     const missed = sumBy(missedRows, a => a.fine_amount);
     return { ...p, late, missed, total: late + missed, lateCount: lateRows.length, missedCount: missedRows.length };
-  }).sort((a, b) => b.total - a.total), [players, monthlyAttendance, finesFor]);
+  }).sort((a, b) => b.total - a.total), [players, monthlyAttendance]);
   const monthTotal = sumBy(monthlyFineStats, p => p.total);
   const monthLate = sumBy(monthlyFineStats, p => p.late);
   const monthMissed = sumBy(monthlyFineStats, p => p.missed);
-  const monthLateCount = sumBy(monthlyFineStats, p => p.lateCount);
-  const monthMissedCount = sumBy(monthlyFineStats, p => p.missedCount);
+  const monthEntries = sumBy(monthlyFineStats, p => p.lateCount + p.missedCount);
 
   const totalExpenses = sumBy(expenses, e => e.amount);
   const totalFines = sumBy(attendance, a => a.fine_amount);
 
   const saveMatch = async () => {
-    if (!groupId || selected.length !== 4) return;
-    const scores = parseScores(scoreA, scoreB); if (!scores) { setError(SCORE_ERROR); return }
-    const { data: m, error: me } = await supabase.from("matches").insert({ group_id: groupId, team_a_score: scores.a, team_b_score: scores.b }).select("id").single();
-    if (me || !m) { setError(me?.message || "Could not save"); return }
-    const rows = selected.slice(0, 2).map(player_id => ({ match_id: m.id, player_id, team: "A" })).concat(selected.slice(2, 4).map(player_id => ({ match_id: m.id, player_id, team: "B" })));
-    const { error: pe } = await supabase.from("match_players").insert(rows); if (pe) { setError(pe.message); return }
-    setSelected([]); setScoreA(""); setScoreB(""); setModal(null); load();
+    if (!groupId || selected.length !== 4 || !winnerTeam) return;
+
+    const { data: m, error: me } = await supabase
+      .from("matches")
+      .insert({ group_id: groupId, ...winnerScores(winnerTeam) })
+      .select("id")
+      .single();
+
+    if (me || !m) {
+      setError(me?.message || "Could not save");
+      return;
+    }
+
+    const rows = [
+      ...selected.slice(0, 2).map(player_id => ({ match_id: m.id, player_id, team: "A" as const })),
+      ...selected.slice(2, 4).map(player_id => ({ match_id: m.id, player_id, team: "B" as const }))
+    ];
+
+    const { error: pe } = await supabase.from("match_players").insert(rows);
+    if (pe) {
+      setError(pe.message);
+      return;
+    }
+
+    setSelected([]);
+    setWinnerTeam("");
+    setModal(null);
+    await load();
   };
+
   const verify = async () => {
     if (!groupId || !isValidPin(pin)) {
       setError(`Admin PIN must be exactly ${PIN_LENGTH} digits`);
@@ -213,12 +237,44 @@ export default function Home() {
     setModal(moneyAction);
   };
 
-
   const addFine = async () => {
-    if (!groupId || !adminOK || !finePlayer) return;
-    const mins = fineType === "late" ? Number(minutes) : 0; const amount = fineType === "late" ? mins * Number(lateRate) : Number(missedRate);
-    const { error } = await supabase.from("attendance").insert({ group_id: groupId, player_id: finePlayer, attendance_date: localDateKey(), status: fineType === "late" ? "PRESENT" : "MISSED", late_minutes: mins, fine_amount: amount });
-    if (error) setError(error.message); else { setAdminOK(false); setModal(null); setMinutes(""); load() }
+    if (!groupId || !adminOK || !finePlayer || !fineDate) return;
+
+    const mins = fineType === "late" ? Number(minutes) : 0;
+    if (fineType === "late" && (!Number.isInteger(mins) || mins <= 0)) {
+      setError("Enter valid minutes late.");
+      return;
+    }
+
+    const amount = fineType === "late" ? mins * Number(lateRate) : Number(missedRate);
+
+    const { error } = await supabase.from("attendance").insert({
+      group_id: groupId,
+      player_id: finePlayer,
+      attendance_date: fineDate,
+      status: fineType === "late" ? "PRESENT" : "MISSED",
+      late_minutes: mins,
+      fine_amount: amount,
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        setError(
+          fineType === "late"
+            ? "A late fine is already recorded for this player on this date."
+            : "A missed-day fine is already recorded for this player on this date."
+        );
+      } else {
+        setError(error.message);
+      }
+      return;
+    }
+
+    setAdminOK(false);
+    setModal(null);
+    setMinutes("");
+    setFineDate(localDateKey());
+    await load();
   };
 
   const addExpense = async () => {
@@ -230,20 +286,20 @@ export default function Home() {
     if (se) { setError(se.message); return }
     setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); load();
   };
+
   const clearAdminSession = () => {
     verifiedEditPinRef.current = "";
     setVerifiedEditPin("");
     setPin("");
     setTargetMatch(null);
-    setScoreA("");
-    setScoreB("");
+    setWinnerTeam("");
     setPinAction("money");
     setAdminOK(false);
     setModal(null);
     setError("");
   };
 
-  /** Returns the PIN verified for the open edit session, or `null` after reporting the failed guard. */
+  /** Returns the PIN verified for the current admin session, or `null` when it is missing. */
   const verifiedSessionPin = () => {
     const sessionPin = verifiedEditPinRef.current || verifiedEditPin;
     if (!groupId || !targetMatch || !adminOK || !isValidPin(sessionPin)) {
@@ -255,6 +311,7 @@ export default function Home() {
 
   const runMatchRpc = async (fn: string, sessionPin: string, args: Record<string, unknown> = {}) => {
     if (!groupId || !targetMatch) return;
+
     const { error } = await supabase.rpc(fn, {
       p_group_id: groupId,
       p_match_id: targetMatch.id,
@@ -275,19 +332,18 @@ export default function Home() {
     const sessionPin = verifiedSessionPin();
     if (!sessionPin) return;
 
-    const scores = parseScores(scoreA, scoreB);
-    if (!scores) {
-      setError(SCORE_ERROR);
+    if (!winnerTeam) {
+      setError("Select the winning team.");
       return;
     }
 
-    await runMatchRpc("edit_match_with_pin", sessionPin, { p_team_a_score: scores.a, p_team_b_score: scores.b });
+    const { team_a_score, team_b_score } = winnerScores(winnerTeam);
+    await runMatchRpc("edit_match_with_pin", sessionPin, { p_team_a_score: team_a_score, p_team_b_score: team_b_score });
   };
 
   const removeMatch = async () => {
     const sessionPin = verifiedSessionPin();
     if (!sessionPin) return;
-
     await runMatchRpc("void_match_with_pin", sessionPin);
   };
 
@@ -296,8 +352,7 @@ export default function Home() {
     setError("");
     verifiedEditPinRef.current = "";
     setTargetMatch(match);
-    setScoreA(String(match.team_a_score));
-    setScoreB(String(match.team_b_score));
+    setWinnerTeam(winnerOf(match));
     setPinAction("edit");
     setPin("");
     setVerifiedEditPin("");
@@ -305,10 +360,7 @@ export default function Home() {
     setModal("pin");
   };
 
-  if (loading) return <main className="center">Loading Rally365…</main>;
-
-  const todayLabel = formatDayMonthYear(new Date());
-  const renderMatchCard = (m: Match, options: { highlightWinner?: boolean; onEdit?: (match: Match) => void } = {}) =>
+  const renderMatchCard = (m: Match, options: { variant?: "history" | "stats"; onEdit?: (match: Match) => void } = {}) =>
     <MatchCard
       key={m.id}
       match={m}
@@ -318,40 +370,20 @@ export default function Home() {
       {...options}
     />;
 
+  if (loading) return <main className="center">Loading Rally365…</main>;
+
   return <main className="app-shell">
     <header className="topbar"><div><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <>
-        <div className="hero-card">
-          <div>
-            <div className="eyebrow">TODAY · {todayLabel}</div>
-            <h1>Today's games</h1>
-            <p>{new Set(todayValidMatches.flatMap(m => m.match_players.map(x => x.player_id))).size} players · {todayValidMatches.length} valid matches</p>
-          </div>
-          <Trophy size={42} />
-        </div>
-
+      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {validMatches.length} valid matches</p></div><Trophy size={42} /></div>
         <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
-
-        <div className="section-title"><span>Today's match history</span><span>{todayMatches.length}</span></div>
-
-        {todayMatches.length === 0 ? (
-          <div className="empty-rally-card">
-            <div className="rally-illustration rally-illustration-image" aria-hidden="true">
-              <img src="/badminton-court-clean.png" alt="" />
-            </div>
-            <div className="empty-rally-title">No games today!</div>
-            <div className="empty-rally-text">Hit the court and add a new match.</div>
-            <div className="empty-rally-date">📅 {todayLabel}</div>
-          </div>
-        ) : (
-          <div className="match-list">
-            {todayMatches.map(m => renderMatchCard(m, { onEdit: openEdit }))}
-          </div>
-        )}
-      </>}
+        <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
+        <div className="match-list">
+          {matches.length === 0 && <div className="empty-card">No matches yet.</div>}
+          {matches.map(m => renderMatchCard(m, { onEdit: openEdit }))}
+        </div></>}
 
       {tab === "stats" && <>
         <div className="page-heading"><div className="eyebrow">PERFORMANCE</div><h1>Leaderboard</h1><p>Performance for the selected period.</p></div>
@@ -399,7 +431,7 @@ export default function Home() {
           <div className="section-title"><span>Match history</span><span>{filteredMatches.length}</span></div>
           <div className="match-list">
             {filteredMatches.length === 0 && <div className="empty-card">No matches today.</div>}
-            {filteredMatches.map(m => renderMatchCard(m, { highlightWinner: true }))}
+            {filteredMatches.map(m => renderMatchCard(m, { variant: "stats" }))}
           </div>
         </>}
       </>}
@@ -433,7 +465,7 @@ export default function Home() {
           <div><b>{money(monthTotal)}</b><small>Total fines</small></div>
           <div><b>{money(monthLate)}</b><small>Late fines</small></div>
           <div><b>{money(monthMissed)}</b><small>Missed fines</small></div>
-          <div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
+          <div><b>{monthEntries}</b><small>Entries</small></div>
         </div>
 
         <div className="stats-table monthly-fines">
@@ -471,7 +503,7 @@ export default function Home() {
                 {s.latest ? ` · Last ${formatDayMonth(parseDateKeyNoon(s.latest))}` : " · No fines"}
               </small>
             </span>
-            <span className="fine-breakdown"><small>Late {money(s.late)} · Missed {money(s.missed)}</small><strong>{money(s.total)}</strong></span>
+            <span className="fine-breakdown"><small><b>L</b> {money(s.late)} · <b>M</b> {money(s.missed)}</small><strong>{money(s.total)}</strong></span>
             <ChevronRight size={17} />
           </button>)}
         </div>
@@ -479,15 +511,30 @@ export default function Home() {
 
       {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
     </section>
-    <nav className="bottom-nav">{TABS.map(({ value, label, Icon }) => <button
-      key={value}
-      className={tab === value ? "active" : ""}
-      onClick={() => setTab(value)}
-    ><Icon /><span>{label}</span></button>)}</nav>
+    <nav className="bottom-nav">
+      {TABS.map(({ value, label, Icon }) => <button
+        key={value}
+        className={tab === value ? "active" : ""}
+        onClick={() => setTab(value)}
+      ><Icon /><span>{label}</span></button>)}
+    </nav>
 
-    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><PlayerChipGrid players={players} selected={selected} showOrder toggle={id => setSelected(x => toggleSelection(x, id, 4))} /><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div><div className="score-inputs"><input inputMode="numeric" value={scoreA} placeholder="Team A" onChange={e => setScoreA(e.target.value)} /><span>:</span><input inputMode="numeric" value={scoreB} placeholder="Team B" onChange={e => setScoreB(e.target.value)} /></div><button className="primary-button" disabled={selected.length !== 4 || !scoreA || !scoreB} onClick={saveMatch}>Save match</button></Modal>}
+    {modal === "match" && <Modal title="New match" close={() => setModal(null)}>
+      <p className="helper">First two selected = Team A. Next two = Team B.</p>
+      <PlayerChipGrid players={players} selected={selected} toggle={id => setSelected(x => toggleSelection(x, id, 4))} showOrder />
+      <div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>
+      {selected.length === 4 && <WinnerSelect
+        labels={{
+          A: `Team A · ${selected.slice(0, 2).map(name).join(" & ")}`,
+          B: `Team B · ${selected.slice(2, 4).map(name).join(" & ")}`
+        }}
+        winner={winnerTeam}
+        select={setWinnerTeam}
+      />}
+      <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button>
+    </Modal>}
 
-    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the {PIN_LENGTH}-digit admin PIN.</p><input autoFocus maxLength={PIN_LENGTH} inputMode="numeric" pattern={`[0-9]{${PIN_LENGTH}}`} type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))} placeholder={"•".repeat(PIN_LENGTH)} />
+    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the {PIN_LENGTH}-digit admin PIN.</p><input autoFocus maxLength={PIN_LENGTH} inputMode="numeric" pattern={`[0-9]{${PIN_LENGTH}}`} type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== PIN_LENGTH} onClick={verify}>Verify</button></div></Modal>}
 
     {modal === "edit" && targetMatch && <Modal title="Edit Match" close={() => {
@@ -499,11 +546,11 @@ export default function Home() {
     }}>
       <p className="helper">Admin verified. The match ID remains unchanged.</p>
       <div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div>
-      <div className="score-inputs">
-        <input value={scoreA} onChange={e => setScoreA(e.target.value)} />
-        <span>:</span>
-        <input value={scoreB} onChange={e => setScoreB(e.target.value)} />
-      </div>
+      <WinnerSelect
+        labels={{ A: `Team A · ${team(targetMatch, "A")}`, B: `Team B · ${team(targetMatch, "B")}` }}
+        winner={winnerTeam}
+        select={setWinnerTeam}
+      />
 
       <div className="edit-modal-actions">
         <button className="primary-button edit-save-button" onClick={saveEditedMatch}>
@@ -515,18 +562,44 @@ export default function Home() {
         </button>
       </div>
     </Modal>}
-    
 
-    {modal === "fine" && <Modal title="Add fine" close={() => setModal(null)}><select value={finePlayer} onChange={e => setFinePlayer(e.target.value)}><option value="">Select player</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select value={fineType} onChange={e => setFineType(e.target.value as "late" | "missed")}><option value="late">Late arrival · ₹{lateRate}/min</option><option value="missed">Missed day · ₹{missedRate}</option></select>{fineType === "late" && <input inputMode="numeric" placeholder="Minutes late" value={minutes} onChange={e => setMinutes(e.target.value)} />}<button className="primary-button" onClick={addFine}>Save fine</button></Modal>}
+    {modal === "fine" && <Modal title="Add fine" close={() => setModal(null)}>
+      <select value={finePlayer} onChange={e => setFinePlayer(e.target.value)}>
+        <option value="">Select player</option>
+        {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
 
-    {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><PlayerChipGrid players={players} selected={split} toggle={id => setSplit(x => toggleSelection(x, id))} />{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
+      <select value={fineType} onChange={e => setFineType(e.target.value as "late" | "missed")}>
+        <option value="late">Late arrival · ₹{lateRate}/min</option>
+        <option value="missed">Missed day · ₹{missedRate}</option>
+      </select>
 
+      <label className="fine-date-field">
+        <span>Fine date</span>
+        <input type="date" value={fineDate} onChange={e => setFineDate(e.target.value)} />
+      </label>
+
+      {fineType === "late" && <input inputMode="numeric" placeholder="Minutes late" value={minutes} onChange={e => setMinutes(e.target.value.replace(/\D/g, ""))} />}
+
+      <div className="helper">{fineType === "missed" ? "Choose the date the player missed." : "Choose the date the player arrived late."}</div>
+      <button className="primary-button" onClick={addFine}>Save fine</button>
+    </Modal>}
+
+    {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}>
+      <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select>
+      <input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} />
+      <input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} />
+      <p className="helper">Split among</p>
+      <PlayerChipGrid players={players} selected={split} toggle={id => setSplit(x => toggleSelection(x, id))} />
+      {split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}
+      <button className="primary-button" onClick={addExpense}>Save expense</button>
+    </Modal>}
 
     {fineDetailsPlayer && <Modal title={`${name(fineDetailsPlayer)} · Fine history`} close={() => setFineDetailsPlayer(null)}>
       <div className="fine-history">
         {finesFor(fineDetailsPlayer).length === 0 && <div className="empty-card">No fines recorded.</div>}
         {finesFor(fineDetailsPlayer).map(a => <div className="fine-history-row" key={a.id}>
-          <div><b>{a.status === "MISSED" ? "Missed day" : "Late arrival"}</b><small>{a.attendance_date}{a.status === "PRESENT" && a.late_minutes ? ` · ${a.late_minutes} min late` : ""}</small></div>
+          <div><b>{a.status === "MISSED" ? "Missed day" : "Late arrival"}</b><small>{formatDayMonthYear(parseDateKeyNoon(a.attendance_date))}{a.status === "PRESENT" && a.late_minutes ? ` · ${a.late_minutes} min late` : ""}</small></div>
           <strong>{money(Number(a.fine_amount))}</strong>
         </div>)}
       </div>

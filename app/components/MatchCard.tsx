@@ -1,35 +1,39 @@
 "use client";
 
 import { Pencil } from "lucide-react";
-import { isVoided } from "../../lib/matches";
+import { isVoided, winnerOf } from "../../lib/matches";
 import type { Match } from "../../lib/types";
+
+/** `history` is the plain list on the Today tab; `stats` adds W/L badges. */
+const VARIANTS = {
+  history: { won: "home-team-win", lost: "home-team-loss", badges: false },
+  stats: { won: "winning-team", lost: "losing-team", badges: true },
+};
 
 type Props = {
   match: Match;
   number: number;
   teamA: string;
   teamB: string;
-  /** Adds winning/losing classes to the team names. */
-  highlightWinner?: boolean;
+  variant?: keyof typeof VARIANTS;
   onEdit?: (match: Match) => void;
 };
 
-export function MatchCard({ match, number, teamA, teamB, highlightWinner = false, onEdit }: Props) {
-  const aWon = match.team_a_score > match.team_b_score;
+export function MatchCard({ match, number, teamA, teamB, variant = "history", onEdit }: Props) {
+  const { won, lost, badges } = VARIANTS[variant];
   const voided = isVoided(match);
-  const teamClass = (won: boolean) => (highlightWinner ? (won ? "winning-team" : "losing-team") : undefined);
+  const teams: { name: string; isWinner: boolean }[] = [
+    { name: teamA, isWinner: winnerOf(match) === "A" },
+    { name: teamB, isWinner: winnerOf(match) === "B" },
+  ];
 
   return <div className={voided ? "match-card voided" : "match-card"}>
     <div className="match-number">M{number}</div>
     <div className="teams">
-      <div>
-        <strong className={teamClass(aWon)}>{teamA}</strong>
-        <span className={aWon ? "score-more" : "score-less"}>{match.team_a_score}</span>
-      </div>
-      <div>
-        <strong className={teamClass(!aWon)}>{teamB}</strong>
-        <span className={!aWon ? "score-more" : "score-less"}>{match.team_b_score}</span>
-      </div>
+      {teams.map(({ name, isWinner }, i) => <div key={i}>
+        <strong className={isWinner ? won : lost}>{name}</strong>
+        {badges && <span className={isWinner ? "win-badge" : "loss-badge"}>{isWinner ? "W" : "L"}</span>}
+      </div>)}
       {voided ? <small>VOIDED</small> : match.edit_count > 0 ? <small>Edited · {match.edit_count}x</small> : null}
     </div>
     {onEdit && !voided && <button

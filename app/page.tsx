@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole, MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2
+  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
+  MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, RotateCw
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -15,13 +16,17 @@ const CODE = "RALLY365";
 const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
 
 export default function Home() {
-  const [tab, setTab] = useState<"today" | "stats" | "money" | "players">("today");
+  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "duos">("today");
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
+  const [duoMatches, setDuoMatches] = useState<{ id: number; teamA: string[]; teamB: string[] }[]>([]);
+  const [duoSpinning, setDuoSpinning] = useState(false);
+  const [duoGenerated, setDuoGenerated] = useState(false);
   const [scoreA, setScoreA] = useState(""); const [scoreB, setScoreB] = useState("");
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
@@ -181,6 +186,144 @@ export default function Home() {
 
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const totalFines = attendance.reduce((s, a) => s + Number(a.fine_amount), 0);
+  const duoName = (ids: string[]) => ids.map(name).join(" & ");
+
+  const generateDuoSchedule = (ids: string[]) => {
+    const unique = [...new Set(ids)];
+    if (unique.length < 4) return [];
+
+    // A practical club-style generator:
+    // - exactly 6 matches
+    // - every match has two doubles teams
+    // - appearance counts stay as even as possible
+    // - partner repeats are minimized first
+    // - opponent repeats are minimized next
+    // - for odd player counts, byes naturally rotate through the group
+    const partnerCount = new Map<string, number>();
+    const opponentCount = new Map<string, number>();
+    const appearanceCount = new Map<string, number>();
+    unique.forEach(id => {
+      partnerCount.set(id, 0);
+      appearanceCount.set(id, 0);
+    });
+
+    const pairKey = (a: string, b: string) => [a, b].sort().join("|");
+    const candidateScore = (teamA: string[], teamB: string[]) => {
+      let score = 0;
+      const all = [...teamA, ...teamB];
+
+      // Keep participation balanced.
+      const maxAppear = Math.max(...unique.map(id => appearanceCount.get(id) || 0));
+      const minAppear = Math.min(...unique.map(id => appearanceCount.get(id) || 0));
+      const spreadPenalty = maxAppear - minAppear;
+      score += spreadPenalty * 18;
+
+      all.forEach(id => score += (appearanceCount.get(id) || 0) * 3);
+
+      // Strongly discourage repeating partners.
+      const pk = pairKey(teamA[0], teamA[1]);
+      const qk = pairKey(teamB[0], teamB[1]);
+      score += (partnerCount.get(pk) || 0) * 30;
+      score += (partnerCount.get(qk) || 0) * 30;
+
+      // Discourage repeating opponents, but less strongly than repeated partners.
+      for (const a of teamA) {
+        for (const b of teamB) {
+          const ok = pairKey(a, b);
+          score += (opponentCount.get(ok) || 0) * 6;
+        }
+      }
+
+      // Small random tie-break keeps the schedule from feeling deterministic.
+      score += Math.random() * 2;
+      return score;
+    };
+
+    const combinations = <T,>(arr: T[], k: number) => {
+      const out: T[][] = [];
+      const walk = (start: number, current: T[]) => {
+        if (current.length === k) {
+          out.push([...current]);
+          return;
+        }
+        for (let i = start; i < arr.length; i++) {
+          current.push(arr[i]);
+          walk(i + 1, current);
+          current.pop();
+        }
+      };
+      walk(0, []);
+      return out;
+    };
+
+    const generated: { id: number; teamA: string[]; teamB: string[] }[] = [];
+
+    for (let round = 0; round < 6; round++) {
+      const candidates: { teamA: string[]; teamB: string[]; score: number }[] = [];
+
+      // Evaluate every possible 4-player selection and both team splits.
+      const groupsOfFour = combinations(unique, 4);
+      for (const four of groupsOfFour) {
+        const splitSets = [
+          [[four[0], four[1]], [four[2], four[3]]],
+          [[four[0], four[2]], [four[1], four[3]]],
+          [[four[0], four[3]], [four[1], four[2]]],
+        ];
+
+        for (const split of splitSets) {
+          const teamA = split[0];
+          const teamB = split[1];
+          candidates.push({
+            teamA,
+            teamB,
+            score: candidateScore(teamA, teamB)
+          });
+        }
+      }
+
+      candidates.sort((a, b) => a.score - b.score);
+
+      const chosen = candidates[0];
+      if (!chosen) break;
+
+      generated.push({ id: round + 1, teamA: chosen.teamA, teamB: chosen.teamB });
+
+      const teams = [chosen.teamA, chosen.teamB];
+      teams.forEach(teamIds => {
+        const pk = pairKey(teamIds[0], teamIds[1]);
+        partnerCount.set(pk, (partnerCount.get(pk) || 0) + 1);
+        teamIds.forEach(id => appearanceCount.set(id, (appearanceCount.get(id) || 0) + 1));
+      });
+
+      for (const a of chosen.teamA) {
+        for (const b of chosen.teamB) {
+          const ok = pairKey(a, b);
+          opponentCount.set(ok, (opponentCount.get(ok) || 0) + 1);
+        }
+      }
+    }
+
+    return generated;
+  };
+
+  const generateDuosForToday = () => {
+    if (duoPlayers.length < 4) {
+      setError("Select at least 4 players to generate duos.");
+      return;
+    }
+
+    setError("");
+    setDuoSpinning(true);
+    setDuoGenerated(false);
+
+    // Give the wheel a short physical spin before revealing the schedule.
+    window.setTimeout(() => {
+      setDuoMatches(generateDuoSchedule(duoPlayers));
+      setDuoGenerated(true);
+      setDuoSpinning(false);
+    }, 1100);
+  };
+
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4 || !winnerTeam) return;
 
@@ -604,9 +747,125 @@ export default function Home() {
         </div>
       </>}
 
+      {tab === "duos" && <>
+        <div className="page-heading">
+          <div className="eyebrow">DAILY DRAW</div>
+          <h1>Generate duos</h1>
+          <p>Pick today's players and let Rally365 balance the doubles schedule.</p>
+        </div>
+
+        <div className="duos-layout">
+          <div className="duos-panel">
+            <div className="section-title"><span>1 · All players</span><span>{players.length}</span></div>
+            <div className="duo-player-list">
+              {players.map(p => {
+                const added = duoPlayers.includes(p.id);
+                return <button
+                  key={p.id}
+                  className={`duo-player-row ${added ? "added" : ""}`}
+                  onClick={() => {
+                    setDuoPlayers(current =>
+                      current.includes(p.id)
+                        ? current.filter(id => id !== p.id)
+                        : [...current, p.id]
+                    );
+                    setDuoGenerated(false);
+                  }}
+                >
+                  <span className="avatar small">{p.name.slice(0, 1)}</span>
+                  <span className="duo-player-name">{p.name}</span>
+                  <span className="duo-add-icon">{added ? <UserMinus size={16} /> : <UserPlus size={16} />}</span>
+                </button>
+              })}
+            </div>
+          </div>
+
+          <div className="duos-panel">
+            <div className="section-title"><span>2 · Today's draw</span><span>{duoPlayers.length} selected</span></div>
+            <div className="duo-selected-list">
+              {duoPlayers.length === 0
+                ? <div className="empty-card">Select players from the list.</div>
+                : duoPlayers.map((id, index) => <div className="duo-selected-row" key={id}>
+                    <span className="duo-order">{index + 1}</span>
+                    <span>{name(id)}</span>
+                    <button aria-label={`Remove ${name(id)}`} onClick={() => {
+                      setDuoPlayers(current => current.filter(x => x !== id));
+                      setDuoGenerated(false);
+                    }}><UserMinus size={14} /></button>
+                  </div>)}
+            </div>
+          </div>
+        </div>
+
+        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""}`}>
+          <div className="spin-pointer"></div>
+          <div
+            className="spin-wheel"
+            style={{
+              ["--slice-count" as string]: Math.max(1, duoPlayers.length),
+              ["--wheel-angle" as string]: `${duoPlayers.length ? 360 / duoPlayers.length : 360}deg`
+            }}
+          >
+            {duoPlayers.length === 0 ? (
+              <div className="wheel-empty">Add players<br />to the draw</div>
+            ) : (
+              duoPlayers.map((id, index) => {
+                const angle = (360 / duoPlayers.length) * index + (180 / duoPlayers.length);
+                return <div
+                  className="wheel-label"
+                  key={id}
+                  style={{ ["--label-angle" as string]: `${angle}deg` }}
+                >
+                  <span>{name(id)}</span>
+                </div>
+              })
+            )}
+            <div className="wheel-center"><Shuffle size={20} /><span>DUOS</span></div>
+          </div>
+        </div>
+
+        <button
+          className="primary-button duo-generate-button"
+          disabled={duoPlayers.length < 4 || duoSpinning}
+          onClick={generateDuosForToday}
+        >
+          <RotateCw size={18} className={duoSpinning ? "spin-icon" : ""} />
+          {duoSpinning ? "Shuffling players…" : "Generate Duos for today"}
+        </button>
+
+        {duoPlayers.length > 0 && duoPlayers.length < 4 &&
+          <div className="duo-note">Select at least 4 players. For an odd number, the generator rotates the bye so everyone gets a fair turn.</div>
+        }
+
+        {duoGenerated && <div className="duo-schedule">
+          <div className="section-title">
+            <span>Today's 6-match schedule</span>
+            <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+          </div>
+
+          <div className="duo-schedule-list">
+            {duoMatches.map((match, index) => <div className="duo-match-card" key={match.id}>
+              <div className="duo-match-number">M{index + 1}</div>
+              <div className="duo-match-team">
+                <span>{duoName(match.teamA)}</span>
+              </div>
+              <div className="duo-vs">vs</div>
+              <div className="duo-match-team right">
+                <span>{duoName(match.teamB)}</span>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+      </>}
+
       {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
     </section>
-    <nav className="bottom-nav"><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
+    <nav className="bottom-nav" style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+      width: "100%",
+      minWidth: 0
+    }}><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "duos" ? "active" : ""} onClick={() => setTab("duos")}><Shuffle /><span>Duos</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
 
     {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
         <div className="helper">Who won?</div>

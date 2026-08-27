@@ -86,7 +86,7 @@ This version adds:
 - Match edit indicators
 - Realtime refresh
 
-IMPORTANT: the money UI is currently a client-side PIN gate for the existing MVP. Before exposing financial writes to untrusted users, move all money mutations behind Supabase SECURITY DEFINER RPCs (the same server-side pattern used by `edit_match_with_pin`).
+Money mutations use PIN-validated Supabase `SECURITY DEFINER` RPCs. Apply the migrations in `supabase/migrations` before deploying the corresponding frontend.
 
 
 ### Money UI change

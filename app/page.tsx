@@ -205,21 +205,21 @@ export default function Home() {
     }
 
   const rows: {
-      match_id: string;
-      player_id: string;
-      team: "A" | "B";
-    }[] = [
-      ...selected.slice(0, 2).map(player_id => ({
-        match_id: m.id,
-        player_id,
-        team: "A" as const
-      })),
-      ...selected.slice(2, 4).map(player_id => ({
-        match_id: m.id,
-        player_id,
-        team: "B" as const
-      }))
-];
+    match_id: string;
+    player_id: string;
+    team: "A" | "B";
+  }[] = [
+    ...selected.slice(0, 2).map(player_id => ({
+      match_id: m.id,
+      player_id,
+      team: "A" as const
+    })),
+    ...selected.slice(2, 4).map(player_id => ({
+      match_id: m.id,
+      player_id,
+      team: "B" as const
+    }))
+  ];
 
     const { error: pe } = await supabase.from("match_players").insert(rows);
     if (pe) {
@@ -579,6 +579,14 @@ export default function Home() {
 
         <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
         <div className="stats-table">
+          <div className="fine-player-header">
+            <span>#</span>
+            <span>PLAYER</span>
+            <span>L</span>
+            <span>M</span>
+            <span>TOTAL</span>
+            <span></span>
+          </div>
           {finePlayerStats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}>
             <span className="rank">{i + 1}</span>
             <span className="player-name">
@@ -588,7 +596,9 @@ export default function Home() {
                 {s.latest ? ` · Last ${new Date(`${s.latest}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : " · No fines"}
               </small>
             </span>
-            <span className="fine-breakdown"><small><b>L</b> {money(s.late)} · <b>M</b> {money(s.missed)}</small><strong>{money(s.total)}</strong></span>
+            <span className="fine-value">{money(s.late)}</span>
+            <span className="fine-value">{money(s.missed)}</span>
+            <span className="fine-total">{money(s.total)}</span>
             <ChevronRight size={17} />
           </button>)}
         </div>

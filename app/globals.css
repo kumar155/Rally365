@@ -62,5 +62,14 @@
 .fine-date-field span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#718078}
 .fine-date-field input{width:100%}
 
+
+.fine-player-header{display:grid;grid-template-columns:32px minmax(0,1fr) 58px 58px 68px 18px;align-items:center;padding:11px 12px;background:#f3f8f5;border-bottom:1px solid #dfe9e3;color:#718078;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.fine-player-header span:nth-child(n+3):nth-child(-n+5){text-align:right}
+.fine-value,.fine-total{font-size:13px;text-align:right;white-space:nowrap}
+.fine-total{font-weight:900}
+.fine-player-row{display:grid!important;grid-template-columns:32px minmax(0,1fr) 58px 58px 68px 18px!important;align-items:center;width:100%}
+@media (max-width:520px){.fine-player-header,.fine-player-row{grid-template-columns:28px minmax(0,1fr) 44px 44px 54px 16px!important}.fine-player-header{font-size:9px}.fine-value,.fine-total{font-size:12px}}
+
+
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}

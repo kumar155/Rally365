@@ -32,7 +32,7 @@ export function MatchCard({ match, number, teamA, teamB, variant = "history", on
     <div className="teams">
       {teams.map(({ name, isWinner }, i) => <div key={i}>
         <strong className={isWinner ? won : lost}>{name}</strong>
-        {badges && <span className={isWinner ? "win-badge" : "loss-badge"}>{isWinner ? "W" : "L"}</span>}
+        {badges && <span className={`match-result-circle ${isWinner ? "match-result-win" : "match-result-loss"}`}>{isWinner ? "W" : "L"}</span>}
       </div>)}
       {voided ? <small>VOIDED</small> : match.edit_count > 0 ? <small>Edited · {match.edit_count}x</small> : null}
     </div>

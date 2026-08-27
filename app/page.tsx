@@ -378,7 +378,7 @@ export default function Home() {
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
       {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {validMatches.length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
+        <button className="primary-button" onClick={() => { setWinnerTeam(""); setModal("match"); }}><Plus size={21} /> New match</button>
         <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
         <div className="match-list">
           {matches.length === 0 && <div className="empty-card">No matches yet.</div>}

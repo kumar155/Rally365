@@ -873,21 +873,23 @@ export default function Home() {
           <button
             type="button"
             className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "B" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {selected.slice(0, 2).map(name).join(" & ")}</span>
-            {winnerTeam === "A" && <b className="result-win">W</b>}
-            {winnerTeam === "B" && <b className="result-loss">L</b>}
+            {winnerTeam === "A" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "B" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
 
           <button
             type="button"
             className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "A" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {selected.slice(2, 4).map(name).join(" & ")}</span>
-            {winnerTeam === "B" && <b className="result-win">W</b>}
-            {winnerTeam === "A" && <b className="result-loss">L</b>}
+            {winnerTeam === "B" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "A" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
         </div>
       </div>}
@@ -911,21 +913,23 @@ export default function Home() {
           <button
             type="button"
             className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "B" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {team(targetMatch, "A")}</span>
-            {winnerTeam === "A" && <b className="result-win">W</b>}
-            {winnerTeam === "B" && <b className="result-loss">L</b>}
+            {winnerTeam === "A" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "B" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
 
           <button
             type="button"
             className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "A" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {team(targetMatch, "B")}</span>
-            {winnerTeam === "B" && <b className="result-win">W</b>}
-            {winnerTeam === "A" && <b className="result-loss">L</b>}
+            {winnerTeam === "B" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "A" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
         </div>
       </div>

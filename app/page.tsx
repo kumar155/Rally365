@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockKeyhole, MapPin, Plus, ReceiptText, Trophy, Users, Trash2
+  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockKeyhole, MapPin, Plus,
+  ReceiptText, RotateCw, Shuffle, Trophy, Trash2, UserMinus, UserPlus, Users
 } from "lucide-react";
 import { isValidPin, PIN_LENGTH } from "../lib/admin";
 import {
   formatDayMonth, formatDayMonthYear, formatMonthYear, localDateKey, localMonthKey,
   parseDateKeyNoon, parseMonthKey, rangeBounds, rangeLabel, shiftDateKey, shiftMonthKey
 } from "../lib/dates";
+import { DUO_MIN_PLAYERS, generateDuoSchedule, type DuoMatch } from "../lib/duos";
 import { money, sumBy } from "../lib/format";
 import { isVoided, matchNumber, teamNames, teamOf, winnerOf, winnerScores } from "../lib/matches";
 import { groupSelect } from "../lib/queries";
@@ -29,12 +31,13 @@ const STATS_RANGES: { value: StatsRange; label: string }[] = [
   { value: "MONTHLY", label: "Monthly" },
 ];
 
-type Tab = "today" | "stats" | "money" | "players";
+type Tab = "today" | "stats" | "money" | "duos" | "players";
 
 const TABS: { value: Tab; label: string; Icon: typeof History }[] = [
   { value: "today", label: "Today", Icon: History },
   { value: "stats", label: "Stats", Icon: BarChart3 },
   { value: "money", label: "Money", Icon: ReceiptText },
+  { value: "duos", label: "Duos", Icon: Shuffle },
   { value: "players", label: "Players", Icon: Users },
 ];
 
@@ -47,6 +50,10 @@ export default function Home() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [winnerTeam, setWinnerTeam] = useState<Team | "">("");
+  const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
+  const [duoMatches, setDuoMatches] = useState<DuoMatch[]>([]);
+  const [duoSpinning, setDuoSpinning] = useState(false);
+  const [duoGenerated, setDuoGenerated] = useState(false);
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
   const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
@@ -166,6 +173,26 @@ export default function Home() {
 
   const totalExpenses = sumBy(expenses, e => e.amount);
   const totalFines = sumBy(attendance, a => a.fine_amount);
+
+  const duoName = (ids: string[]) => ids.map(name).join(" & ");
+
+  const generateDuosForToday = () => {
+    if (duoPlayers.length < DUO_MIN_PLAYERS) {
+      setError(`Select at least ${DUO_MIN_PLAYERS} players to generate duos.`);
+      return;
+    }
+
+    setError("");
+    setDuoSpinning(true);
+    setDuoGenerated(false);
+
+    // Give the wheel a short physical spin before revealing the schedule.
+    window.setTimeout(() => {
+      setDuoMatches(generateDuoSchedule(duoPlayers));
+      setDuoGenerated(true);
+      setDuoSpinning(false);
+    }, 1100);
+  };
 
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4 || !winnerTeam) return;
@@ -519,9 +546,121 @@ export default function Home() {
         </div>
       </>}
 
+      {tab === "duos" && <>
+        <div className="page-heading">
+          <div className="eyebrow">DAILY DRAW</div>
+          <h1>Generate duos</h1>
+          <p>Pick today's players and let Rally365 balance the doubles schedule.</p>
+        </div>
+
+        <div className="duos-layout">
+          <div className="duos-panel">
+            <div className="section-title"><span>1 · All players</span><span>{players.length}</span></div>
+            <div className="duo-player-list">
+              {players.map(p => {
+                const added = duoPlayers.includes(p.id);
+                return <button
+                  key={p.id}
+                  className={`duo-player-row ${added ? "added" : ""}`}
+                  onClick={() => {
+                    setDuoPlayers(current => toggleSelection(current, p.id));
+                    setDuoGenerated(false);
+                  }}
+                >
+                  <span className="avatar small">{p.name.slice(0, 1)}</span>
+                  <span className="duo-player-name">{p.name}</span>
+                  <span className="duo-add-icon">{added ? <UserMinus size={16} /> : <UserPlus size={16} />}</span>
+                </button>
+              })}
+            </div>
+          </div>
+
+          <div className="duos-panel">
+            <div className="section-title"><span>2 · Today's draw</span><span>{duoPlayers.length} selected</span></div>
+            <div className="duo-selected-list">
+              {duoPlayers.length === 0
+                ? <div className="empty-card">Select players from the list.</div>
+                : duoPlayers.map((id, index) => <div className="duo-selected-row" key={id}>
+                    <span className="duo-order">{index + 1}</span>
+                    <span>{name(id)}</span>
+                    <button aria-label={`Remove ${name(id)}`} onClick={() => {
+                      setDuoPlayers(current => toggleSelection(current, id));
+                      setDuoGenerated(false);
+                    }}><UserMinus size={14} /></button>
+                  </div>)}
+            </div>
+          </div>
+        </div>
+
+        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""}`}>
+          <div className="spin-pointer"></div>
+          <div
+            className="spin-wheel"
+            style={{
+              ["--slice-count" as string]: Math.max(1, duoPlayers.length),
+              ["--wheel-angle" as string]: `${duoPlayers.length ? 360 / duoPlayers.length : 360}deg`
+            }}
+          >
+            {duoPlayers.length === 0 ? (
+              <div className="wheel-empty">Add players<br />to the draw</div>
+            ) : (
+              duoPlayers.map((id, index) => {
+                const angle = (360 / duoPlayers.length) * index + (180 / duoPlayers.length);
+                return <div
+                  className="wheel-label"
+                  key={id}
+                  style={{ ["--label-angle" as string]: `${angle}deg` }}
+                >
+                  <span>{name(id)}</span>
+                </div>
+              })
+            )}
+            <div className="wheel-center"><Shuffle size={20} /><span>DUOS</span></div>
+          </div>
+        </div>
+
+        <button
+          className="primary-button duo-generate-button"
+          disabled={duoPlayers.length < DUO_MIN_PLAYERS || duoSpinning}
+          onClick={generateDuosForToday}
+        >
+          <RotateCw size={18} className={duoSpinning ? "spin-icon" : ""} />
+          {duoSpinning ? "Shuffling players…" : "Generate Duos for today"}
+        </button>
+
+        {duoPlayers.length > 0 && duoPlayers.length < DUO_MIN_PLAYERS &&
+          <div className="duo-note">Select at least {DUO_MIN_PLAYERS} players. For an odd number, the generator rotates the bye so everyone gets a fair turn.</div>
+        }
+
+        {duoGenerated && <div className="duo-schedule">
+          <div className="section-title">
+            <span>Today's 6-match schedule</span>
+            <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+          </div>
+
+          <div className="duo-schedule-list">
+            {duoMatches.map((match, index) => <div className="duo-match-card" key={match.id}>
+              <div className="duo-match-number">M{index + 1}</div>
+              <div className="duo-match-team">
+                <span>{duoName(match.teamA)}</span>
+              </div>
+              <div className="duo-vs">vs</div>
+              <div className="duo-match-team right">
+                <span>{duoName(match.teamB)}</span>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+      </>}
+
       {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
     </section>
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" style={{
+      display: "grid",
+      gridTemplateColumns: `repeat(${TABS.length}, minmax(0, 1fr))`,
+      width: "100%",
+      minWidth: 0
+    }}>
       {TABS.map(({ value, label, Icon }) => <button
         key={value}
         className={tab === value ? "active" : ""}

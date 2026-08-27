@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole, MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2
+  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
+  MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, RotateCw
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -15,18 +16,24 @@ const CODE = "RALLY365";
 const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
 
 export default function Home() {
-  const [tab, setTab] = useState<"today" | "stats" | "money" | "players">("today");
+  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "duos">("today");
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
+  const [duoMatches, setDuoMatches] = useState<{ id: number; teamA: string[]; teamB: string[] }[]>([]);
+  const [duoSpinning, setDuoSpinning] = useState(false);
+  const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
+  const [homeSchedule, setHomeSchedule] = useState<{ id: string; matchNo: number; teamA: string[]; teamB: string[]; status: "PLANNED" | "RECORDED"; recordedMatchId: string | null }[]>([]);
+  const [duoGenerated, setDuoGenerated] = useState(false);
   const [scoreA, setScoreA] = useState(""); const [scoreB, setScoreB] = useState("");
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [statsDate, setStatsDate] = useState(() => {
     const d = new Date();
@@ -58,6 +65,45 @@ export default function Home() {
       if (a.error) loadErrors.push(a.error.message); else setAttendance((a.data || []) as Attendance[]);
       if (r.error) loadErrors.push(r.error.message);
       else if (r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
+
+      const now = new Date();
+      const todayScheduleDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+      const { data: ds, error: dse } = await supabase
+        .from("duo_schedules")
+        .select("id")
+        .eq("group_id", g.id)
+        .eq("schedule_date", todayScheduleDate)
+        .eq("status", "ACTIVE")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (dse) {
+        loadErrors.push(dse.message);
+      } else if (ds) {
+        const { data: dsm, error: dsme } = await supabase
+          .from("duo_schedule_matches")
+          .select("id,match_no,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2,status,recorded_match_id")
+          .eq("schedule_id", ds.id)
+          .order("match_no");
+
+        if (dsme) {
+          loadErrors.push(dsme.message);
+        } else {
+          setHomeSchedule((dsm || []).map(x => ({
+            id: x.id,
+            matchNo: x.match_no,
+            teamA: [x.team_a_player_1, x.team_a_player_2],
+            teamB: [x.team_b_player_1, x.team_b_player_2],
+            status: x.status as "PLANNED" | "RECORDED",
+            recordedMatchId: x.recorded_match_id
+          })));
+        }
+      } else {
+        setHomeSchedule([]);
+      }
+
       if (loadErrors.length) setError([...new Set(loadErrors)].join(" · "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load data");
@@ -193,6 +239,300 @@ export default function Home() {
 
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const totalFines = attendance.reduce((s, a) => s + Number(a.fine_amount), 0);
+  const duoName = (ids: string[]) => ids.map(name).join(" & ");
+
+  const generateDuoSchedule = (ids: string[]) => {
+    const unique = [...new Set(ids)];
+    if (unique.length < 4) return [];
+
+    type DuoMatch = { id: number; teamA: string[]; teamB: string[] };
+
+    const pairKey = (a: string, b: string) => [a, b].sort().join("|");
+    const shuffle = <T,>(items: T[]) => {
+      const a = [...items];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    const appearances = new Map<string, number>();
+    const consecutive = new Map<string, number>();
+    const partnerCount = new Map<string, number>();
+    const opponentCount = new Map<string, number>();
+
+    unique.forEach(id => {
+      appearances.set(id, 0);
+      consecutive.set(id, 0);
+    });
+
+    const recordMatch = (teamA: string[], teamB: string[]) => {
+      const playing = new Set([...teamA, ...teamB]);
+
+      unique.forEach(id => {
+        consecutive.set(id, playing.has(id) ? (consecutive.get(id) || 0) + 1 : 0);
+      });
+
+      for (const team of [teamA, teamB]) {
+        const key = pairKey(team[0], team[1]);
+        partnerCount.set(key, (partnerCount.get(key) || 0) + 1);
+        team.forEach(id => appearances.set(id, (appearances.get(id) || 0) + 1));
+      }
+
+      for (const a of teamA) {
+        for (const b of teamB) {
+          const key = pairKey(a, b);
+          opponentCount.set(key, (opponentCount.get(key) || 0) + 1);
+        }
+      }
+    };
+
+    const scoreFour = (four: string[], previous: DuoMatch | null) => {
+      let score = Math.random() * 4;
+
+      for (const id of four) {
+        const c = consecutive.get(id) || 0;
+        if (c >= 2) return Infinity; // hard rule: never create a 3rd straight match
+        score += c * 25;
+        score += (appearances.get(id) || 0) * 4;
+      }
+
+      const maxApp = Math.max(...unique.map(id => appearances.get(id) || 0));
+      const minApp = Math.min(...unique.map(id => appearances.get(id) || 0));
+      score += (maxApp - minApp) * 20;
+
+      if (previous) {
+        const previousPlayers = new Set([...previous.teamA, ...previous.teamB]);
+        const carried = four.filter(id => previousPlayers.has(id)).length;
+        score += Math.max(0, carried - 2) * 10;
+        // Prefer some continuity, but do not force it.
+        if (carried === 2) score -= 8;
+      }
+
+      return score;
+    };
+
+    const scoreSplit = (teamA: string[], teamB: string[]) => {
+      let score = Math.random() * 2;
+      score += (partnerCount.get(pairKey(teamA[0], teamA[1])) || 0) * 50;
+      score += (partnerCount.get(pairKey(teamB[0], teamB[1])) || 0) * 50;
+
+      for (const a of teamA) {
+        for (const b of teamB) {
+          score += (opponentCount.get(pairKey(a, b)) || 0) * 8;
+        }
+      }
+      return score;
+    };
+
+    const combinations = <T,>(arr: T[], k: number) => {
+      const out: T[][] = [];
+      const walk = (start: number, current: T[]) => {
+        if (current.length === k) {
+          out.push([...current]);
+          return;
+        }
+        for (let i = start; i < arr.length; i++) {
+          current.push(arr[i]);
+          walk(i + 1, current);
+          current.pop();
+        }
+      };
+      walk(0, []);
+      return out;
+    };
+
+    const splitBest = (four: string[]) => {
+      const [a, b, c, d] = four;
+      const options: [string[], string[]][] = [
+        [[a, b], [c, d]],
+        [[a, c], [b, d]],
+        [[a, d], [b, c]],
+      ];
+      options.sort((x, y) => scoreSplit(x[0], x[1]) - scoreSplit(y[0], y[1]));
+      return options[0];
+    };
+
+    // First two matches have an explicit coverage rule:
+    // for 4,5,6 and 8 selected players, every selected player must appear
+    // at least once across M1 + M2. For 7, normal rotation starts immediately.
+    const firstTwoNeedCoverage = unique.length !== 7 && unique.length <= 8;
+
+    const schedule: DuoMatch[] = [];
+
+    // ---------- Match 1 ----------
+    let firstFour: string[];
+    if (firstTwoNeedCoverage && unique.length > 4) {
+      firstFour = shuffle(unique).slice(0, 4);
+    } else {
+      firstFour = shuffle(unique).slice(0, 4);
+    }
+
+    let [teamA, teamB] = splitBest(firstFour);
+    schedule.push({ id: 1, teamA, teamB });
+    recordMatch(teamA, teamB);
+
+    // ---------- Match 2 ----------
+    let secondFour: string[] = [];
+
+    if (firstTwoNeedCoverage) {
+      const remaining = unique.filter(id => !firstFour.includes(id));
+
+      // Cover every remaining player first. Fill the remaining slots from M1.
+      // n=4 -> all four return.
+      // n=5 -> one new + three return.
+      // n=6 -> two new + two return.
+      // n=8 -> four new, so M2 is fully fresh.
+      const neededFresh = Math.min(4, remaining.length);
+      const fresh = shuffle(remaining).slice(0, neededFresh);
+
+      const requiredReturnSlots = 4 - fresh.length;
+      const returnCandidates = shuffle(firstFour)
+        .filter(id => (consecutive.get(id) || 0) < 2)
+        .slice(0, requiredReturnSlots);
+
+      secondFour = [...fresh, ...returnCandidates];
+
+      // For 5/6 players every remaining player must be covered. In the rare
+      // 4-player case, all four necessarily play again; that's unavoidable.
+      if (secondFour.length < 4) {
+        const fallback = shuffle(unique)
+          .filter(id => !secondFour.includes(id))
+          .filter(id => (consecutive.get(id) || 0) < 2);
+        secondFour.push(...fallback.slice(0, 4 - secondFour.length));
+      }
+
+      // If we only have 4 selected players, a third-consecutive break is
+      // mathematically impossible; keep the game playable rather than failing.
+      if (unique.length === 4 && secondFour.length < 4) {
+        secondFour = [...unique];
+      }
+    } else {
+      // 7 players: rotate the rest immediately. Prefer two fresh/rested players
+      // from outside M1 and two carry-over players, but never a third straight.
+      const eligible = shuffle(unique).filter(id => (consecutive.get(id) || 0) < 2);
+      secondFour = eligible.slice(0, 4);
+
+      // If the feasible pool is larger, prefer at most 2 M1 carry-over players.
+      const notInFirst = eligible.filter(id => !firstFour.includes(id));
+      const inFirst = eligible.filter(id => firstFour.includes(id));
+      if (notInFirst.length >= 2) {
+        secondFour = [
+          ...notInFirst.slice(0, 2),
+          ...inFirst.slice(0, 2),
+        ];
+      }
+      secondFour = shuffle(secondFour);
+    }
+
+    [teamA, teamB] = splitBest(secondFour);
+    schedule.push({ id: 2, teamA, teamB });
+    recordMatch(teamA, teamB);
+
+    // ---------- Matches 3-6 ----------
+    for (let round = 3; round <= 6; round++) {
+      const previous = schedule[schedule.length - 1];
+
+      // Hard eligibility: anybody already at 2 consecutive must rest now.
+      const eligible = unique.filter(id => (consecutive.get(id) || 0) < 2);
+
+      // With 4 players, everyone has to play. There is no mathematical way to
+      // satisfy the 2-consecutive maximum; preserve a playable schedule.
+      let pool = unique.length === 4 ? unique : eligible;
+
+      if (pool.length < 4) {
+        // This should only happen for very small groups. Use the least-used
+        // eligible players and keep the hard cap whenever mathematically possible.
+        pool = [...eligible].sort((a, b) => {
+          const ca = consecutive.get(a) || 0;
+          const cb = consecutive.get(b) || 0;
+          if (ca !== cb) return ca - cb;
+          return (appearances.get(a) || 0) - (appearances.get(b) || 0);
+        });
+
+        if (pool.length < 4 && unique.length === 4) pool = unique;
+      }
+
+      // Generate candidate four-player groups and choose one that:
+      // 1) respects the consecutive rule
+      // 2) balances appearances
+      // 3) prefers two carry-over players from the previous match
+      // 4) minimizes partner/opponent repeats
+      const candidates: { four: string[]; score: number }[] = [];
+      for (const four of combinations(pool, 4)) {
+        const score = scoreFour(four, previous);
+        if (score !== Infinity) candidates.push({ four, score });
+      }
+
+      // If feasible candidates exist, take the best randomized candidate.
+      // Otherwise only the 4-player case can reach here legitimately.
+      let chosen = candidates.sort((a, b) => a.score - b.score)[0]?.four;
+
+      if (!chosen) {
+        if (unique.length === 4) {
+          chosen = [...unique];
+        } else {
+          // Defensive fallback: never intentionally schedule a 3rd consecutive
+          // game when a valid alternative exists.
+          chosen = [...pool]
+            .sort((a, b) => {
+              const ca = consecutive.get(a) || 0;
+              const cb = consecutive.get(b) || 0;
+              if (ca !== cb) return ca - cb;
+              return (appearances.get(a) || 0) - (appearances.get(b) || 0);
+            })
+            .slice(0, 4);
+        }
+      }
+
+      [teamA, teamB] = splitBest(chosen);
+      schedule.push({ id: round, teamA, teamB });
+      recordMatch(teamA, teamB);
+    }
+
+    return schedule;
+  };
+
+  const exportScheduleToHome = () => {
+    if (duoMatches.length !== 6) {
+      setError("Generate a 6-match schedule first.");
+      return;
+    }
+    setPinAction("duos");
+    setPin("");
+    setError("");
+    setModal("pin");
+  };
+
+  const recordScheduledMatch = (scheduled: { id: string; teamA: string[]; teamB: string[] }) => {
+    setScheduledMatchToRecord(scheduled);
+    setTab("today");
+    setSelected([...scheduled.teamA, ...scheduled.teamB]);
+    setWinnerTeam("");
+    setScoreA("");
+    setScoreB("");
+    setModal("match");
+  };
+
+  const generateDuosForToday = () => {
+    if (duoPlayers.length < 4) {
+      setError("Select at least 4 players to generate duos.");
+      return;
+    }
+
+    setError("");
+    setDuoSpinning(true);
+    setDuoGenerated(false);
+
+    // Give the wheel a short physical spin before revealing the schedule.
+    window.setTimeout(() => {
+      setDuoMatches(generateDuoSchedule(duoPlayers));
+      setDuoGenerated(true);
+      setDuoSpinning(false);
+    }, 1100);
+  };
+
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4 || !winnerTeam) return;
 
@@ -216,7 +556,7 @@ export default function Home() {
       return;
     }
 
-  const rows: {
+    const rows: {
       match_id: string;
       player_id: string;
       team: "A" | "B";
@@ -231,7 +571,7 @@ export default function Home() {
         player_id,
         team: "B" as const
       }))
-];
+    ];
 
     const { error: pe } = await supabase.from("match_players").insert(rows);
     if (pe) {
@@ -241,10 +581,23 @@ export default function Home() {
       return;
     }
 
+    if (scheduledMatchToRecord) {
+      const { error: scheduleError } = await supabase
+        .from("duo_schedule_matches")
+        .update({ status: "RECORDED", recorded_match_id: m.id })
+        .eq("id", scheduledMatchToRecord.id);
+
+      if (scheduleError) {
+        setError(scheduleError.message);
+        return;
+      }
+    }
+
     setSelected([]);
     setScoreA("");
     setScoreB("");
     setWinnerTeam("");
+    setScheduledMatchToRecord(null);
     setModal(null);
     await load();
   };
@@ -256,9 +609,48 @@ export default function Home() {
       return;
     }
 
+    if (pinAction === "duos") {
+      if (duoMatches.length !== 6) {
+        setError("Generate a 6-match schedule first.");
+        return;
+      }
+
+      const d = new Date();
+      const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+      const payload = duoMatches.map(match => ({
+        match_no: match.id,
+        teamA: match.teamA,
+        teamB: match.teamB
+      }));
+
+      const { data, error: publishError } = await supabase.rpc("publish_duo_schedule_with_pin", {
+        p_group_id: groupId,
+        p_pin: pin,
+        p_schedule_date: scheduleDate,
+        p_matches: payload
+      });
+
+      if (publishError) {
+        setError(publishError.message);
+        return;
+      }
+
+      if (!data) {
+        setError("Could not publish today's schedule.");
+        return;
+      }
+
+      setPin("");
+      setError("");
+      setModal(null);
+      setTab("today");
+      await load();
+      return;
+    }
+
     if (pinAction === "edit" && targetMatch) {
       const enteredPin = pin;
-
       const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
         p_group_id: groupId,
         p_pin: enteredPin,
@@ -288,7 +680,6 @@ export default function Home() {
     setError("");
     setModal(moneyAction);
   };
-
 
   const addFine = async () => {
     if (!groupId || !adminOK || !finePlayer || !fineDate) return;
@@ -449,7 +840,30 @@ export default function Home() {
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
       {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
+        <button className="primary-button" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={21} /> New match</button>
+        {homeSchedule.length > 0 && <div className="home-schedule-export">
+          <div className="section-title">
+            <span>Today's scheduled duos</span>
+            <span>{homeSchedule.length} matches</span>
+          </div>
+          <div className="match-list">
+            {homeSchedule.map(m => <button
+              key={m.id}
+              type="button"
+              className="match-card home-schedule-card"
+              disabled={m.status === "RECORDED"}
+              onClick={() => m.status === "PLANNED" && recordScheduledMatch(m)}
+            >
+              <div className="match-number">M{m.matchNo}</div>
+              <div className="teams">
+                <div><strong className="scheduled-team-name">{duoName(m.teamA)}</strong></div>
+                <div><strong className="scheduled-team-name">{duoName(m.teamB)}</strong></div>
+              </div>
+              <span className="scheduled-record-label">{m.status === "RECORDED" ? "Recorded" : "Record"}</span>
+            </button>)}
+          </div>
+        </div>}
+
         <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
         <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
           {matches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{matches.length - i}</div><div className="teams">
@@ -518,11 +932,11 @@ export default function Home() {
                 <div className="teams">
                   <div>
                     <strong className={aWon ? "winning-team" : "losing-team"}>{team(m, "A")}</strong>
-                    <span className={aWon ? "win-badge" : "loss-badge"}>{aWon ? "W" : "L"}</span>
+                    <span className={aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{aWon ? "W" : "L"}</span>
                   </div>
                   <div>
                     <strong className={!aWon ? "winning-team" : "losing-team"}>{team(m, "B")}</strong>
-                    <span className={!aWon ? "win-badge" : "loss-badge"}>{!aWon ? "W" : "L"}</span>
+                    <span className={!aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{!aWon ? "W" : "L"}</span>
                   </div>
                   {m.edit_count > 0 && <small>Edited · {m.edit_count}x</small>}
                 </div>
@@ -598,6 +1012,14 @@ export default function Home() {
 
         <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
         <div className="stats-table">
+          <div className="fine-player-header">
+            <span>#</span>
+            <span>PLAYER</span>
+            <span>L</span>
+            <span>M</span>
+            <span>TOTAL</span>
+            <span></span>
+          </div>
           {finePlayerStats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}>
             <span className="rank">{i + 1}</span>
             <span className="player-name">
@@ -607,38 +1029,175 @@ export default function Home() {
                 {s.latest ? ` · Last ${new Date(`${s.latest}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : " · No fines"}
               </small>
             </span>
-            <span className="fine-breakdown"><small><b>L</b> {money(s.late)} · <b>M</b> {money(s.missed)}</small><strong>{money(s.total)}</strong></span>
+            <span className="fine-value">{money(s.late)}</span>
+            <span className="fine-value">{money(s.missed)}</span>
+            <span className="fine-total">{money(s.total)}</span>
             <ChevronRight size={17} />
           </button>)}
         </div>
       </>}
 
+      {tab === "duos" && <>
+        <div className="page-heading">
+          <div className="eyebrow">DAILY DRAW</div>
+          <h1>Generate duos</h1>
+          <p>Pick today's players and let Rally365 balance the doubles schedule.</p>
+        </div>
+
+        <div className="duos-layout">
+          <div className="duos-panel">
+            <div className="section-title"><span>1 · All players</span><span>{players.length}</span></div>
+            <div className="duo-player-list">
+              {players.map(p => {
+                const added = duoPlayers.includes(p.id);
+                return <button
+                  key={p.id}
+                  className={`duo-player-row ${added ? "added" : ""}`}
+                  onClick={() => {
+                    setDuoPlayers(current =>
+                      current.includes(p.id)
+                        ? current.filter(id => id !== p.id)
+                        : [...current, p.id]
+                    );
+                    setDuoGenerated(false);
+                  }}
+                >
+                  <span className="avatar small">{p.name.slice(0, 1)}</span>
+                  <span className="duo-player-name">{p.name}</span>
+                  <span className="duo-add-icon">{added ? <UserMinus size={16} /> : <UserPlus size={16} />}</span>
+                </button>
+              })}
+            </div>
+          </div>
+
+          <div className="duos-panel">
+            <div className="section-title"><span>2 · Today's draw</span><span>{duoPlayers.length} selected</span></div>
+            <div className="duo-selected-list">
+              {duoPlayers.length === 0
+                ? <div className="empty-card">Select players from the list.</div>
+                : duoPlayers.map((id, index) => <div className="duo-selected-row" key={id}>
+                    <span className="duo-order">{index + 1}</span>
+                    <span>{name(id)}</span>
+                    <button aria-label={`Remove ${name(id)}`} onClick={() => {
+                      setDuoPlayers(current => current.filter(x => x !== id));
+                      setDuoGenerated(false);
+                    }}><UserMinus size={14} /></button>
+                  </div>)}
+            </div>
+          </div>
+        </div>
+
+        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""} ${duoGenerated ? "wheel-ready" : ""}`}>
+          <div className="spin-pointer"></div>
+          <div
+            className="spin-wheel"
+            style={{
+              ["--slice-count" as string]: Math.max(1, duoPlayers.length),
+              ["--wheel-angle" as string]: `${duoPlayers.length ? 360 / duoPlayers.length : 360}deg`
+            }}
+          >
+            {duoPlayers.length === 0 ? (
+              <div className="wheel-empty">Add players<br />to the draw</div>
+            ) : (
+              duoPlayers.map((id, index) => {
+                const angle = (360 / duoPlayers.length) * index + (180 / duoPlayers.length);
+                return <div
+                  className="wheel-label"
+                  key={id}
+                  style={{ ["--label-angle" as string]: `${angle}deg` }}
+                >
+                  <span>{name(id)}</span>
+                </div>
+              })
+            )}
+            <div className="wheel-center"><Shuffle size={20} /><span>DUOS</span></div>
+          </div>
+        </div>
+
+        <button
+          className="primary-button duo-generate-button"
+          disabled={duoPlayers.length < 4 || duoSpinning}
+          onClick={generateDuosForToday}
+        >
+          <RotateCw size={18} className={duoSpinning ? "spin-icon" : ""} />
+          {duoSpinning ? "Shuffling players…" : "Generate Duos for today"}
+        </button>
+
+        {duoPlayers.length > 0 && duoPlayers.length < 4 &&
+          <div className="duo-note">Select at least 4 players. No player is scheduled for more than 2 matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
+        }
+
+        {duoGenerated && <div className="duo-schedule">
+          <div className="section-title">
+            <span>Today's 6-match schedule</span>
+            <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+          </div>
+          <div className="duo-note">Rotation rule: a player can play up to 2 matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>
+
+          <div className="duo-schedule-list">
+            {duoMatches.map((match, index) => <button
+              className="duo-match-card"
+              key={match.id}
+              type="button"
+            >
+              <div className="duo-match-number">M{index + 1}</div>
+              <div className="duo-match-team">
+                <span>{duoName(match.teamA)}</span>
+              </div>
+              <div className="duo-vs">vs</div>
+              <div className="duo-match-team right">
+                <span>{duoName(match.teamB)}</span>
+              </div>
+            </button>)}
+          </div>
+
+          <button className="primary-button duo-home-button" onClick={exportScheduleToHome}>
+            <History size={18} />
+            Send schedule to Today's Matches
+          </button>
+        </div>}
+      </>}
+
       {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
     </section>
-    <nav className="bottom-nav"><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
+    <nav className="bottom-nav" style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+      width: "100%",
+      minWidth: 0
+    }}><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "duos" ? "active" : ""} onClick={() => setTab("duos")}><Shuffle /><span>Duos</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
 
-    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
+    {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p>
+      {scheduledMatchToRecord && <div className="scheduled-record-banner">
+        <b>Scheduled match</b>
+        <span>Select the winner and save the result. You can also close this and create a different match.</span>
+      </div>}<div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
         <div className="helper">Who won?</div>
         <div className="winner-options">
           <button
             type="button"
-            className={winnerTeam === "A" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "B" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {selected.slice(0, 2).map(name).join(" & ")}</span>
-            {winnerTeam === "A" && <b>W</b>}
+            {winnerTeam === "A" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "B" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
+
           <button
             type="button"
-            className={winnerTeam === "B" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "A" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {selected.slice(2, 4).map(name).join(" & ")}</span>
-            {winnerTeam === "B" && <b>W</b>}
+            {winnerTeam === "B" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "A" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
         </div>
       </div>}
-            <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
+      <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
 
     {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
@@ -657,19 +1216,24 @@ export default function Home() {
         <div className="winner-options">
           <button
             type="button"
-            className={winnerTeam === "A" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "B" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {team(targetMatch, "A")}</span>
-            {winnerTeam === "A" && <b>W</b>}
+            {winnerTeam === "A" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "B" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
+
           <button
             type="button"
-            className={winnerTeam === "B" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
+            style={winnerTeam === "A" ? { borderColor: "#e4b8b8", background: "#fff4f4", color: "#a63e3e" } : undefined}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {team(targetMatch, "B")}</span>
-            {winnerTeam === "B" && <b>W</b>}
+            {winnerTeam === "B" && <b className="result-win" style={{ background: "#15985c", color: "#fff" }}>W</b>}
+            {winnerTeam === "A" && <b className="result-loss" style={{ background: "#d94d4d", color: "#fff" }}>L</b>}
           </button>
         </div>
       </div>

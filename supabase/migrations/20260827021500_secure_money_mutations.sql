@@ -25,11 +25,12 @@ begin
     raise exception using errcode = '22023', message = 'Attendance date is required';
   end if;
 
-  if p_status not in ('PRESENT', 'MISSED') then
+  if p_status is null or p_status not in ('PRESENT', 'MISSED') then
     raise exception using errcode = '22023', message = 'Invalid attendance status';
   end if;
 
-  if p_late_minutes < 0
+  if p_late_minutes is null
+    or p_late_minutes < 0
     or p_late_minutes > 1440
     or (p_status = 'PRESENT' and p_late_minutes = 0)
     or (p_status = 'MISSED' and p_late_minutes <> 0)
@@ -50,7 +51,12 @@ begin
   from public.group_rates
   where group_id = p_group_id;
 
-  if not found or v_late_rate < 0 or v_missed_rate < 0 then
+  if not found
+    or v_late_rate is null
+    or v_missed_rate is null
+    or v_late_rate < 0
+    or v_missed_rate < 0
+  then
     raise exception using errcode = '22023', message = 'Invalid group fine rates';
   end if;
 
@@ -108,7 +114,7 @@ begin
     raise exception using errcode = '22023', message = 'Expense date is required';
   end if;
 
-  if p_category not in ('SHUTTLES', 'BREAKFAST', 'COFFEE', 'OTHER') then
+  if p_category is null or p_category not in ('SHUTTLES', 'BREAKFAST', 'COFFEE', 'OTHER') then
     raise exception using errcode = '22023', message = 'Invalid expense category';
   end if;
 

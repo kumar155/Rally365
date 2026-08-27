@@ -204,22 +204,22 @@ export default function Home() {
       return;
     }
 
-  const rows: {
-    match_id: string;
-    player_id: string;
-    team: "A" | "B";
-  }[] = [
-    ...selected.slice(0, 2).map(player_id => ({
-      match_id: m.id,
-      player_id,
-      team: "A" as const
-    })),
-    ...selected.slice(2, 4).map(player_id => ({
-      match_id: m.id,
-      player_id,
-      team: "B" as const
-    }))
-  ];
+    const rows: {
+      match_id: string;
+      player_id: string;
+      team: "A" | "B";
+    }[] = [
+      ...selected.slice(0, 2).map(player_id => ({
+        match_id: m.id,
+        player_id,
+        team: "A" as const
+      })),
+      ...selected.slice(2, 4).map(player_id => ({
+        match_id: m.id,
+        player_id,
+        team: "B" as const
+      }))
+    ];
 
     const { error: pe } = await supabase.from("match_players").insert(rows);
     if (pe) {
@@ -430,7 +430,7 @@ export default function Home() {
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
       {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="primary-button" onClick={() => setModal("match")}><Plus size={21} /> New match</button>
+        <button className="primary-button" onClick={() => { setWinnerTeam(""); setModal("match"); }}><Plus size={21} /> New match</button>
         <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
         <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
           {matches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{matches.length - i}</div><div className="teams">
@@ -499,11 +499,11 @@ export default function Home() {
                 <div className="teams">
                   <div>
                     <strong className={aWon ? "winning-team" : "losing-team"}>{team(m, "A")}</strong>
-                    <span className={aWon ? "win-badge" : "loss-badge"}>{aWon ? "W" : "L"}</span>
+                    <span className={aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{aWon ? "W" : "L"}</span>
                   </div>
                   <div>
                     <strong className={!aWon ? "winning-team" : "losing-team"}>{team(m, "B")}</strong>
-                    <span className={!aWon ? "win-badge" : "loss-badge"}>{!aWon ? "W" : "L"}</span>
+                    <span className={!aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{!aWon ? "W" : "L"}</span>
                   </div>
                   {m.edit_count > 0 && <small>Edited · {m.edit_count}x</small>}
                 </div>
@@ -613,23 +613,26 @@ export default function Home() {
         <div className="winner-options">
           <button
             type="button"
-            className={winnerTeam === "A" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {selected.slice(0, 2).map(name).join(" & ")}</span>
-            {winnerTeam === "A" && <b>W</b>}
+            {winnerTeam === "A" && <b className="result-win">W</b>}
+            {winnerTeam === "B" && <b className="result-loss">L</b>}
           </button>
+
           <button
             type="button"
-            className={winnerTeam === "B" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {selected.slice(2, 4).map(name).join(" & ")}</span>
-            {winnerTeam === "B" && <b>W</b>}
+            {winnerTeam === "B" && <b className="result-win">W</b>}
+            {winnerTeam === "A" && <b className="result-loss">L</b>}
           </button>
         </div>
       </div>}
-            <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
+      <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
 
     {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
@@ -648,19 +651,22 @@ export default function Home() {
         <div className="winner-options">
           <button
             type="button"
-            className={winnerTeam === "A" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "A" ? "winner-option selected" : winnerTeam === "B" ? "winner-option loser-selected" : "winner-option"}
             onClick={() => setWinnerTeam("A")}
           >
             <span>Team A · {team(targetMatch, "A")}</span>
-            {winnerTeam === "A" && <b>W</b>}
+            {winnerTeam === "A" && <b className="result-win">W</b>}
+            {winnerTeam === "B" && <b className="result-loss">L</b>}
           </button>
+
           <button
             type="button"
-            className={winnerTeam === "B" ? "winner-option selected" : "winner-option"}
+            className={winnerTeam === "B" ? "winner-option selected" : winnerTeam === "A" ? "winner-option loser-selected" : "winner-option"}
             onClick={() => setWinnerTeam("B")}
           >
             <span>Team B · {team(targetMatch, "B")}</span>
-            {winnerTeam === "B" && <b>W</b>}
+            {winnerTeam === "B" && <b className="result-win">W</b>}
+            {winnerTeam === "A" && <b className="result-loss">L</b>}
           </button>
         </div>
       </div>

@@ -71,5 +71,35 @@
 @media (max-width:520px){.fine-player-header,.fine-player-row{grid-template-columns:28px minmax(0,1fr) 44px 44px 54px 16px!important}.fine-player-header{font-size:9px}.fine-value,.fine-total{font-size:12px}}
 
 
+.winner-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #d9e6df;background:#fff;border-radius:12px;padding:13px 14px;color:#24382f;font-weight:800;cursor:pointer;text-align:left}
+.winner-option.selected{border-color:#15985c;background:#eaf7f0;color:#0f6d40}
+.result-win,.result-loss{min-width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+.result-win{background:#15985c;color:#fff}
+.result-loss{background:#fff0f0;color:#c44b4b}
+
+.match-result-circle{
+    width:20px!important;
+    height:20px!important;
+    min-width:20px;
+    /* border-radius:50%!important; */
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    font-size:11px!important;
+    font-weight:900!important;
+    line-height:1!important;
+    flex:0 0 20px;
+}
+.match-result-win{
+    background:#15985c!important;
+    color:#fff!important;
+}
+.match-result-loss{
+    background:#fff0f0!important;
+    color:#c44b4b!important;
+    border:1px solid #efc5c5!important;
+}
+
+
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}

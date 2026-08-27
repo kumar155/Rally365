@@ -195,6 +195,10 @@
 .duo-vs{text-align:center;color:#9aa69f;font-size:10px;font-weight:800}
 @media(max-width:720px){.duos-layout{grid-template-columns:1fr}.wheel-label{transform:translate(-50%,-50%) rotate(var(--label-angle)) translateY(-92px)}}
 
+.home-schedule-export{margin-top:16px}
+.home-schedule-card{position:relative;width:100%;cursor:pointer}
+.scheduled-record-label{font-size:10px;font-weight:900;color:#15985c;text-transform:uppercase;letter-spacing:.06em}
+
 
 .spin-wheel-wrap{
     margin-top:28px!important;
@@ -212,6 +216,24 @@
     pointer-events:none;
     transition:opacity .35s ease,transform .35s ease,max-height .35s ease,margin .35s ease;
 }
+
+
+.scheduled-team-name{color:#17271f!important;font-weight:800}
+.scheduled-record-label{font-size:10px;font-weight:900;color:#15985c;text-transform:uppercase;letter-spacing:.06em}
+.home-schedule-card{position:relative;width:100%;cursor:pointer}
+
+.duo-note{margin:10px 0;padding:10px 12px;border-radius:10px;background:#f2f7f4;color:#63736b;font-size:12px;line-height:1.4}
+
+.duo-match-card{width:100%}
+
+.home-schedule-export{margin-top:16px}
+.home-schedule-card{position:relative;width:100%;cursor:pointer}
+.home-schedule-card:disabled{opacity:1;cursor:default}
+.scheduled-team-name{color:#17271f!important;font-weight:800}
+.scheduled-record-label{font-size:10px;font-weight:900;color:#15985c;text-transform:uppercase;letter-spacing:.06em}
+.duo-home-button{margin-top:12px}
+
+
 
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}

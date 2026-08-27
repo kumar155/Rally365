@@ -494,6 +494,14 @@ export default function Home() {
 
         <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
         <div className="stats-table">
+          <div className="fine-player-header">
+            <span>#</span>
+            <span>PLAYER</span>
+            <span>L</span>
+            <span>M</span>
+            <span>TOTAL</span>
+            <span></span>
+          </div>
           {finePlayerStats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}>
             <span className="rank">{i + 1}</span>
             <span className="player-name">
@@ -503,7 +511,9 @@ export default function Home() {
                 {s.latest ? ` · Last ${formatDayMonth(parseDateKeyNoon(s.latest))}` : " · No fines"}
               </small>
             </span>
-            <span className="fine-breakdown"><small><b>L</b> {money(s.late)} · <b>M</b> {money(s.missed)}</small><strong>{money(s.total)}</strong></span>
+            <span className="fine-value">{money(s.late)}</span>
+            <span className="fine-value">{money(s.missed)}</span>
+            <span className="fine-total">{money(s.total)}</span>
             <ChevronRight size={17} />
           </button>)}
         </div>

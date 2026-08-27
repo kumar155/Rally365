@@ -33,7 +33,7 @@ export default function Home() {
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const verifiedAdminPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [statsDate, setStatsDate] = useState(() => {
     const d = new Date();
@@ -487,6 +487,8 @@ export default function Home() {
       setError("Generate a 6-match schedule first.");
       return;
     }
+    verifiedAdminPinRef.current = "";
+    setAdminOK(false);
     setPinAction("duos");
     setPin("");
     setError("");
@@ -628,6 +630,7 @@ export default function Home() {
       }
 
       setPin("");
+      setAdminOK(false);
       setError("");
       setModal(null);
       setTab("today");
@@ -635,59 +638,50 @@ export default function Home() {
       return;
     }
 
-    if (pinAction === "edit" && targetMatch) {
-      const enteredPin = pin;
-      const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
-        p_group_id: groupId,
-        p_pin: enteredPin,
-      });
+    const enteredPin = pin;
+    const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
+      p_group_id: groupId,
+      p_pin: enteredPin,
+    });
 
-      if (pinError) {
-        setError(pinError.message);
-        return;
-      }
-
-      if (!pinValid) {
-        setError("Invalid admin PIN");
-        return;
-      }
-
-      verifiedEditPinRef.current = enteredPin;
-      setVerifiedEditPin(enteredPin);
-      setPin("");
-      setAdminOK(true);
-      setError("");
-      setModal("edit");
+    if (pinError) {
+      setError(pinError.message);
       return;
     }
 
+    if (!pinValid) {
+      setError("Invalid admin PIN");
+      return;
+    }
+
+    verifiedAdminPinRef.current = enteredPin;
     setAdminOK(true);
     setPin("");
     setError("");
-    setModal(moneyAction);
+    setModal(pinAction === "edit" && targetMatch ? "edit" : moneyAction);
   };
 
   const addFine = async () => {
-    if (!groupId || !adminOK || !finePlayer || !fineDate) return;
-
+    const sessionPin = verifiedAdminPinRef.current;
     const mins = fineType === "late" ? Number(minutes) : 0;
-    if (fineType === "late" && (!Number.isInteger(mins) || mins <= 0)) {
-      setError("Enter valid minutes late.");
+
+    if (!groupId || !adminOK || !finePlayer || !fineDate || !/^\d{6}$/.test(sessionPin)) {
+      setError("Admin PIN verification required.");
       return;
     }
 
-    const amount =
-      fineType === "late"
-        ? mins * Number(lateRate)
-        : Number(missedRate);
+    if (!Number.isInteger(mins) || mins < 0 || mins > 1440 || (fineType === "late" && mins === 0)) {
+      setError("Enter valid minutes late");
+      return;
+    }
 
-    const { error } = await supabase.from("attendance").insert({
-      group_id: groupId,
-      player_id: finePlayer,
-      attendance_date: fineDate,
-      status: fineType === "late" ? "PRESENT" : "MISSED",
-      late_minutes: mins,
-      fine_amount: amount,
+    const { error } = await supabase.rpc("add_attendance_fine_with_pin", {
+      p_group_id: groupId,
+      p_player_id: finePlayer,
+      p_pin: sessionPin,
+      p_attendance_date: fineDate,
+      p_status: fineType === "late" ? "PRESENT" : "MISSED",
+      p_late_minutes: mins,
     });
 
     if (error) {
@@ -703,6 +697,7 @@ export default function Home() {
       return;
     }
 
+    verifiedAdminPinRef.current = "";
     setAdminOK(false);
     setModal(null);
     setMinutes("");
@@ -714,16 +709,48 @@ export default function Home() {
   };
 
   const addExpense = async () => {
-    if (!groupId || !adminOK || !expenseAmount || !split.length) return;
-    const amount = Number(expenseAmount), { data: e, error: ee } = await supabase.from("expenses").insert({ group_id: groupId, expense_date: new Date().toISOString().slice(0, 10), category: expenseCategory, amount, description: expenseDesc || null }).select("id").single();
-    if (ee || !e) { setError(ee?.message || "Could not save expense"); return }
-    const share = Math.round(amount / split.length * 100) / 100;
-    const { error: se } = await supabase.from("expense_splits").insert(split.map(player_id => ({ expense_id: e.id, player_id, share_amount: share })));
-    if (se) { setError(se.message); return }
-    setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); load();
+    const sessionPin = verifiedAdminPinRef.current;
+    const amount = Number(expenseAmount);
+
+    if (!groupId || !adminOK || !split.length || !/^\d{6}$/.test(sessionPin)) {
+      setError("Admin PIN verification required.");
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
+      setError("Enter a valid expense amount");
+      return;
+    }
+
+    if (expenseDesc.trim().length > 500) {
+      setError("Description must be 500 characters or fewer");
+      return;
+    }
+
+    const { error } = await supabase.rpc("add_expense_with_pin", {
+      p_group_id: groupId,
+      p_pin: sessionPin,
+      p_expense_date: new Date().toISOString().slice(0, 10),
+      p_category: expenseCategory,
+      p_amount: amount,
+      p_description: expenseDesc.trim() || null,
+      p_player_ids: split,
+    });
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    verifiedAdminPinRef.current = "";
+    setAdminOK(false);
+    setModal(null);
+    setExpenseAmount("");
+    setExpenseDesc("");
+    await load();
   };
   const saveEditedMatch = async () => {
-    const sessionPin = verifiedEditPinRef.current || verifiedEditPin;
+    const sessionPin = verifiedAdminPinRef.current;
 
     if (!groupId || !targetMatch || !adminOK || !/^\d{6}$/.test(sessionPin)) {
       setError("Admin PIN verification required.");
@@ -751,8 +778,7 @@ export default function Home() {
       return;
     }
 
-    verifiedEditPinRef.current = "";
-    setVerifiedEditPin("");
+    verifiedAdminPinRef.current = "";
     setPin("");
     setTargetMatch(null);
     setScoreA("");
@@ -767,7 +793,7 @@ export default function Home() {
 
 
   const removeMatch = async () => {
-    const sessionPin = verifiedEditPinRef.current || verifiedEditPin;
+    const sessionPin = verifiedAdminPinRef.current;
 
     if (!groupId || !targetMatch || !adminOK || !/^\d{6}$/.test(sessionPin)) {
       setError("Admin PIN verification required.");
@@ -785,8 +811,7 @@ export default function Home() {
       return;
     }
 
-    verifiedEditPinRef.current = "";
-    setVerifiedEditPin("");
+    verifiedAdminPinRef.current = "";
     setPin("");
     setTargetMatch(null);
     setScoreA("");
@@ -798,17 +823,22 @@ export default function Home() {
     await load();
   };
 
-  const openAdmin = (action: "edit" | "money") => { setPinAction(action); setPin(""); setModal("pin") };
+  const openAdmin = (action: "edit" | "money") => {
+    verifiedAdminPinRef.current = "";
+    setAdminOK(false);
+    setPinAction(action);
+    setPin("");
+    setModal("pin");
+  };
   const openEdit = (match: Match) => {
     setError("");
-    verifiedEditPinRef.current = "";
+    verifiedAdminPinRef.current = "";
     setTargetMatch(match);
     setScoreA("");
     setScoreB("");
     setWinnerTeam(match.team_a_score > match.team_b_score ? "A" : "B");
     setPinAction("edit");
     setPin("");
-    setVerifiedEditPin("");
     setAdminOK(false);
     setModal("pin");
   };
@@ -1180,12 +1210,12 @@ export default function Home() {
       </div>}
       <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
 
-    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
+    {modal === "pin" && <Modal title="Admin verification" close={() => { verifiedAdminPinRef.current = ""; setAdminOK(false); setPin(""); setModal(null) }}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
 
     {modal === "edit" && targetMatch && <Modal title="Edit Match" close={() => {
+      verifiedAdminPinRef.current = "";
       setPin("");
-      setVerifiedEditPin("");
       setAdminOK(false);
       setTargetMatch(null);
       setModal(null);
@@ -1231,7 +1261,7 @@ export default function Home() {
     </Modal>}
     
 
-    {modal === "fine" && <Modal title="Add fine" close={() => setModal(null)}>
+    {modal === "fine" && <Modal title="Add fine" close={() => { verifiedAdminPinRef.current = ""; setAdminOK(false); setModal(null) }}>
       <select value={finePlayer} onChange={e => setFinePlayer(e.target.value)}>
         <option value="">Select player</option>
         {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1253,7 +1283,7 @@ export default function Home() {
       <button className="primary-button" onClick={addFine}>Save fine</button>
     </Modal>}
 
-    {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
+    {modal === "expense" && <Modal title="Add expense" close={() => { verifiedAdminPinRef.current = ""; setAdminOK(false); setModal(null) }}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input maxLength={500} placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
 
 
     {fineDetailsPlayer && <Modal title={`${name(fineDetailsPlayer)} · Fine history`} close={() => setFineDetailsPlayer(null)}>

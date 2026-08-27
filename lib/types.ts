@@ -18,6 +18,28 @@ export type Expense = { id: string; expense_date: string; category: string; amou
 
 export type Attendance = { id: string; player_id: string; attendance_date: string; status: string; late_minutes: number; fine_amount: number };
 
+export type ScheduledMatchStatus = "PLANNED" | "RECORDED";
+
+export type ScheduledMatch = {
+  id: string;
+  matchNo: number;
+  teamA: string[];
+  teamB: string[];
+  status: ScheduledMatchStatus;
+  recordedMatchId: string | null;
+};
+
+export type ScheduledMatchRow = {
+  id: string;
+  match_no: number;
+  team_a_player_1: string;
+  team_a_player_2: string;
+  team_b_player_1: string;
+  team_b_player_2: string;
+  status: ScheduledMatchStatus;
+  recorded_match_id: string | null;
+};
+
 export type Team = "A" | "B";
 
 export type StatsRange = "DAILY" | "WEEKLY" | "MONTHLY";

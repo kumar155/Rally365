@@ -18,7 +18,9 @@ import { isVoided, matchNumber, teamNames, teamOf, winnerOf, winnerScores } from
 import { groupSelect } from "../lib/queries";
 import { toggleSelection } from "../lib/selection";
 import { supabase } from "../lib/supabase";
-import type { Attendance, Expense, Match, Player, StatsRange, Team } from "../lib/types";
+import type {
+  Attendance, Expense, Match, Player, ScheduledMatch, ScheduledMatchRow, StatsRange, Team
+} from "../lib/types";
 import { MatchCard } from "./components/MatchCard";
 import { Modal } from "./components/Modal";
 import { PlayerChipGrid } from "./components/PlayerChipGrid";
@@ -55,10 +57,12 @@ export default function Home() {
   const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
   const [duoMatches, setDuoMatches] = useState<DuoMatch[]>([]);
   const [duoSpinning, setDuoSpinning] = useState(false);
+  const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<ScheduledMatch | null>(null);
+  const [homeSchedule, setHomeSchedule] = useState<ScheduledMatch[]>([]);
   const [duoGenerated, setDuoGenerated] = useState(false);
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(localMonthKey()); const [statsRange, setStatsRange] = useState<StatsRange>("DAILY");
   const [statsDate, setStatsDate] = useState(localDateKey);
   const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
@@ -92,6 +96,42 @@ export default function Home() {
     applyRows<Expense>(e, setExpenses);
     applyRows<Attendance>(a, setAttendance);
     if (!r.error && r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
+
+    const { data: ds, error: dse } = await supabase
+      .from("duo_schedules")
+      .select("id")
+      .eq("group_id", g.id)
+      .eq("schedule_date", localDateKey())
+      .eq("status", "ACTIVE")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dse) {
+      setError(dse.message);
+    } else if (ds) {
+      const { data: dsm, error: dsme } = await supabase
+        .from("duo_schedule_matches")
+        .select("id,match_no,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2,status,recorded_match_id")
+        .eq("schedule_id", ds.id)
+        .order("match_no");
+
+      if (dsme) {
+        setError(dsme.message);
+      } else {
+        setHomeSchedule(((dsm || []) as ScheduledMatchRow[]).map(x => ({
+          id: x.id,
+          matchNo: x.match_no,
+          teamA: [x.team_a_player_1, x.team_a_player_2],
+          teamB: [x.team_b_player_1, x.team_b_player_2],
+          status: x.status,
+          recordedMatchId: x.recorded_match_id
+        })));
+      }
+    } else {
+      setHomeSchedule([]);
+    }
+
     setLoading(false);
   }, [applyRows]);
 
@@ -178,6 +218,25 @@ export default function Home() {
 
   const duoName = (ids: string[]) => ids.map(name).join(" & ");
 
+  const exportScheduleToHome = () => {
+    if (duoMatches.length !== DUO_MATCH_COUNT) {
+      setError(`Generate a ${DUO_MATCH_COUNT}-match schedule first.`);
+      return;
+    }
+    setPinAction("duos");
+    setPin("");
+    setError("");
+    setModal("pin");
+  };
+
+  const recordScheduledMatch = (scheduled: ScheduledMatch) => {
+    setScheduledMatchToRecord(scheduled);
+    setTab("today");
+    setSelected([...scheduled.teamA, ...scheduled.teamB]);
+    setWinnerTeam("");
+    setModal("match");
+  };
+
   const generateDuosForToday = () => {
     if (duoPlayers.length < DUO_MIN_PLAYERS) {
       setError(`Select at least ${DUO_MIN_PLAYERS} players to generate duos.`);
@@ -221,8 +280,21 @@ export default function Home() {
       return;
     }
 
+    if (scheduledMatchToRecord) {
+      const { error: scheduleError } = await supabase
+        .from("duo_schedule_matches")
+        .update({ status: "RECORDED", recorded_match_id: m.id })
+        .eq("id", scheduledMatchToRecord.id);
+
+      if (scheduleError) {
+        setError(scheduleError.message);
+        return;
+      }
+    }
+
     setSelected([]);
     setWinnerTeam("");
+    setScheduledMatchToRecord(null);
     setModal(null);
     await load();
   };
@@ -233,9 +305,45 @@ export default function Home() {
       return;
     }
 
+    if (pinAction === "duos") {
+      if (duoMatches.length !== DUO_MATCH_COUNT) {
+        setError(`Generate a ${DUO_MATCH_COUNT}-match schedule first.`);
+        return;
+      }
+
+      const payload = duoMatches.map(match => ({
+        match_no: match.id,
+        teamA: match.teamA,
+        teamB: match.teamB
+      }));
+
+      const { data, error: publishError } = await supabase.rpc("publish_duo_schedule_with_pin", {
+        p_group_id: groupId,
+        p_pin: pin,
+        p_schedule_date: localDateKey(),
+        p_matches: payload
+      });
+
+      if (publishError) {
+        setError(publishError.message);
+        return;
+      }
+
+      if (!data) {
+        setError("Could not publish today's schedule.");
+        return;
+      }
+
+      setPin("");
+      setError("");
+      setModal(null);
+      setTab("today");
+      await load();
+      return;
+    }
+
     if (pinAction === "edit" && targetMatch) {
       const enteredPin = pin;
-
       const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
         p_group_id: groupId,
         p_pin: enteredPin,
@@ -407,7 +515,30 @@ export default function Home() {
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
       {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {validMatches.length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="primary-button" onClick={() => { setWinnerTeam(""); setModal("match"); }}><Plus size={21} /> New match</button>
+        <button className="primary-button" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={21} /> New match</button>
+        {homeSchedule.length > 0 && <div className="home-schedule-export">
+          <div className="section-title">
+            <span>Today's scheduled duos</span>
+            <span>{homeSchedule.length} matches</span>
+          </div>
+          <div className="match-list">
+            {homeSchedule.map(m => <button
+              key={m.id}
+              type="button"
+              className="match-card home-schedule-card"
+              disabled={m.status === "RECORDED"}
+              onClick={() => m.status === "PLANNED" && recordScheduledMatch(m)}
+            >
+              <div className="match-number">M{m.matchNo}</div>
+              <div className="teams">
+                <div><strong className="scheduled-team-name">{duoName(m.teamA)}</strong></div>
+                <div><strong className="scheduled-team-name">{duoName(m.teamB)}</strong></div>
+              </div>
+              <span className="scheduled-record-label">{m.status === "RECORDED" ? "Recorded" : "Record"}</span>
+            </button>)}
+          </div>
+        </div>}
+
         <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
         <div className="match-list">
           {matches.length === 0 && <div className="empty-card">No matches yet.</div>}
@@ -642,7 +773,11 @@ export default function Home() {
           <div className="duo-note">Rotation rule: a player can play up to {DUO_MAX_CONSECUTIVE} matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>
 
           <div className="duo-schedule-list">
-            {duoMatches.map((match, index) => <div className="duo-match-card" key={match.id}>
+            {duoMatches.map((match, index) => <button
+              className="duo-match-card"
+              key={match.id}
+              type="button"
+            >
               <div className="duo-match-number">M{index + 1}</div>
               <div className="duo-match-team">
                 <span>{duoName(match.teamA)}</span>
@@ -651,8 +786,13 @@ export default function Home() {
               <div className="duo-match-team right">
                 <span>{duoName(match.teamB)}</span>
               </div>
-            </div>)}
+            </button>)}
           </div>
+
+          <button className="primary-button duo-home-button" onClick={exportScheduleToHome}>
+            <History size={18} />
+            Send schedule to Today's Matches
+          </button>
         </div>}
       </>}
 
@@ -673,6 +813,10 @@ export default function Home() {
 
     {modal === "match" && <Modal title="New match" close={() => setModal(null)}>
       <p className="helper">First two selected = Team A. Next two = Team B.</p>
+      {scheduledMatchToRecord && <div className="scheduled-record-banner">
+        <b>Scheduled match</b>
+        <span>Select the winner and save the result. You can also close this and create a different match.</span>
+      </div>}
       <PlayerChipGrid players={players} selected={selected} toggle={id => setSelected(x => toggleSelection(x, id, 4))} showOrder />
       <div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>
       {selected.length === 4 && <WinnerSelect

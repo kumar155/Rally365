@@ -53,3 +53,7 @@
 
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}
+
+/* Align the monthly fine report header with its rows so labels are not clipped */
+.stats-table.monthly-fines .table-head{grid-template-columns:28px 1fr 44px 48px 52px 18px}
+.stats-table.monthly-fines .table-head span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

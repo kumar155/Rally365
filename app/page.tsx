@@ -39,6 +39,10 @@ export default function Home() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
+  const [homeDate, setHomeDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
   const [finePlayer, setFinePlayer] = useState(""); const [fineType, setFineType] = useState<"late" | "missed">("late"); const [minutes, setMinutes] = useState("");
   const [fineDate, setFineDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
@@ -117,6 +121,24 @@ export default function Home() {
 
   const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
+
+  const localDateKey = (date: Date) => {
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  };
+
+  const homeMatches = useMemo(
+    () => matches.filter(m => localDateKey(new Date(m.played_at)) === homeDate),
+    [matches, homeDate]
+  );
+
+  const moveHomeDate = (direction: number) => {
+    const d = new Date(`${homeDate}T12:00:00`);
+    d.setDate(d.getDate() + direction);
+    setHomeDate(localDateKey(d));
+  };
 
   const validMatches = useMemo(
     () => matches.filter(m => m.status !== "VOIDED"),
@@ -483,10 +505,17 @@ export default function Home() {
   };
 
   const exportScheduleToHome = () => {
-    if (duoMatches.length !== 6) {
-      setError("Generate a 6-match schedule first.");
+    const validMatches = duoMatches.filter(match =>
+      match.teamA.length === 2 &&
+      match.teamB.length === 2 &&
+      [...match.teamA, ...match.teamB].every(id => id && id !== "?")
+    );
+
+    if (validMatches.length === 0) {
+      setError("No valid 2-vs-2 duos are available to export.");
       return;
     }
+
     setPinAction("duos");
     setPin("");
     setError("");
@@ -596,16 +625,22 @@ export default function Home() {
     }
 
     if (pinAction === "duos") {
-      if (duoMatches.length !== 6) {
-        setError("Generate a 6-match schedule first.");
+      const validMatches = duoMatches.filter(match =>
+        match.teamA.length === 2 &&
+        match.teamB.length === 2 &&
+        [...match.teamA, ...match.teamB].every(id => id && id !== "?")
+      );
+
+      if (validMatches.length === 0) {
+        setError("No valid 2-vs-2 duos are available to export.");
         return;
       }
 
       const d = new Date();
       const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-      const payload = duoMatches.map(match => ({
-        match_no: match.id,
+      const payload = validMatches.map((match, index) => ({
+        match_no: index + 1,
         teamA: match.teamA,
         teamB: match.teamB
       }));
@@ -820,9 +855,17 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">TODAY</div><h1>Today's games</h1><p>{players.length} players · {matches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
         <button className="primary-button" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={21} /> New match</button>
-        {homeSchedule.length > 0 && <div className="home-schedule-export">
+        <div className="home-date-filter">
+          <button type="button" className="period-arrow" onClick={() => moveHomeDate(-1)} aria-label="Previous date">‹</button>
+          <label className="date-picker-control">
+            <span>DATE</span>
+            <input type="date" value={homeDate} onChange={e => e.target.value && setHomeDate(e.target.value)} />
+          </label>
+          <button type="button" className="period-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date">›</button>
+        </div>
+        {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
             <span>Today's scheduled duos</span>
             <span>{homeSchedule.length} matches</span>
@@ -845,9 +888,9 @@ export default function Home() {
           </div>
         </div>}
 
-        <div className="section-title"><span>Match history</span><span>{matches.length}</span></div>
-        <div className="match-list">{matches.length === 0 && <div className="empty-card">No matches yet.</div>}
-          {matches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{matches.length - i}</div><div className="teams">
+        <div className="section-title"><span>Match history</span><span>{homeMatches.length}</span></div>
+        <div className="match-list">{homeMatches.length === 0 && <div className="empty-card">No matches for this date.</div>}
+          {homeMatches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
                 <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : "home-team-loss"}>{team(m, "A")}</strong></div>
                 <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
@@ -1134,7 +1177,7 @@ export default function Home() {
 
           <button className="primary-button duo-home-button" onClick={exportScheduleToHome}>
             <History size={18} />
-            Send schedule to Today's Matches
+            Send valid duos to Today's Matches
           </button>
         </div>}
       </>}

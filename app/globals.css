@@ -233,7 +233,9 @@
 .scheduled-record-label{font-size:10px;font-weight:900;color:#15985c;text-transform:uppercase;letter-spacing:.06em}
 .duo-home-button{margin-top:12px}
 
-
+.home-date-filter{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 16px}
+.home-date-filter .date-picker-control{flex:1}
+.home-date-filter .period-arrow{display:flex;align-items:center;justify-content:center;min-width:42px;height:42px}
 
 /* Keep the app contained and prevent oversized media from breaking layout */
 .app-shell img{max-width:100%}

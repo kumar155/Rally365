@@ -1,0 +1,14 @@
+{
+  "appId": "com.rally365.app",
+  "appName": "Rally365",
+  "webDir": "out",
+  "android": {
+    "path": "../mobile/android"
+  },
+  "ios": {
+    "path": "../mobile/ios"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -14,6 +14,8 @@ Rally365 is a mobile-first shared badminton app for everyday ad-hoc doubles.
 
 ## 1. Install
 
+Use Node.js 22 or later. The current Supabase client packages require Node 22+.
+
 ```bash
 npm install
 ```
@@ -43,6 +45,26 @@ Open http://localhost:3000
 npm run build
 npm start
 ```
+
+## Mobile apps (Android and iOS)
+
+Rally365 is also packaged as a Capacitor hybrid app. The Android and iOS projects in
+`../mobile/android/` and `../mobile/ios/` use the same statically exported Next.js UI and Supabase backend.
+
+```bash
+# Rebuild the web UI and copy it into both native projects
+npm run mobile:sync
+
+# Open the Android project in Android Studio (requires Android Studio)
+npm run mobile:android
+
+# Open the iOS project in Xcode (macOS with Xcode and CocoaPods required)
+npm run mobile:ios
+```
+
+Build release artifacts from the native IDEs after setting your signing credentials.
+The default Capacitor bundle identifier is `com.rally365.app`; change it in
+`capacitor.config.json` and the native project identifiers before publishing.
 
 ## 5. Push to GitHub
 

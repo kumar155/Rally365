@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
   MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, RotateCw
@@ -992,7 +993,14 @@ export default function Home() {
         </div>}
 
         <div className="section-title"><span>Match history</span><span>{homeMatches.length}</span></div>
-        <div className="match-list">{homeMatches.length === 0 && <div className="empty-card">No matches for this date.</div>}
+        <div className="match-list">{homeMatches.length === 0 && <div className="empty-rally-card">
+          <div className="rally-illustration-image">
+            <Image src="/badminton-court-clean.png" alt="Empty badminton court" width={1280} height={356} sizes="(max-width: 560px) 100vw, 560px" priority />
+          </div>
+          <div className="empty-rally-title">No matches yet</div>
+          <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
+          <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
+        </div>}
           {homeMatches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
                 <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : "home-team-loss"}>{team(m, "A")}</strong></div>
                 <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div>

@@ -34,7 +34,8 @@ export default function Home() {
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
   const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
-  const [adminOK, setAdminOK] = useState(false); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
+  const [adminOK, setAdminOK] = useState(false);
+  const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [statsDate, setStatsDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -208,6 +209,108 @@ export default function Home() {
     const nextDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     setStatsDate(nextDate);
   };
+
+  // Players screen is always ALL-TIME.
+  // It intentionally uses validMatches, never filteredMatches/homeDate/statsDate.
+  const allTimePlayerStats = useMemo(() => players.map(p => {
+    const ms = validMatches.filter(m =>
+      m.match_players.some(x => x.player_id === p.id)
+    );
+
+    let w = 0;
+    let pf = 0;
+    let pa = 0;
+
+    ms.forEach(m => {
+      const playerTeam = m.match_players.find(x => x.player_id === p.id)?.team;
+      const own = playerTeam === "A" ? m.team_a_score : m.team_b_score;
+      const opp = playerTeam === "A" ? m.team_b_score : m.team_a_score;
+
+      pf += own;
+      pa += opp;
+
+      if (own > opp) w++;
+    });
+
+    return {
+      ...p,
+      played: ms.length,
+      w,
+      l: ms.length - w,
+      winRate: ms.length ? Math.round((w / ms.length) * 100) : 0,
+      diff: pf - pa,
+    };
+  }).sort(
+    (a, b) => b.w - a.w || b.winRate - a.winRate || b.played - a.played
+  ), [players, validMatches]);
+
+  const selectedPlayerDetails = useMemo(() => {
+    if (!playerDetailsId) return null;
+
+    const player = players.find(p => p.id === playerDetailsId);
+    if (!player) return null;
+
+    const playerMatches = validMatches.filter(m =>
+      m.match_players.some(x => x.player_id === playerDetailsId)
+    );
+
+    let wins = 0;
+
+    playerMatches.forEach(m => {
+      const playerTeam = m.match_players.find(x => x.player_id === playerDetailsId)?.team;
+      if (!playerTeam) return;
+      const own = playerTeam === "A" ? m.team_a_score : m.team_b_score;
+      const opp = playerTeam === "A" ? m.team_b_score : m.team_a_score;
+
+      if (own > opp) wins++;
+    });
+
+    const partnerMap = new Map<string, {
+      matches: number;
+      wins: number;
+    }>();
+
+    playerMatches.forEach(m => {
+      const playerTeam = m.match_players.find(x => x.player_id === playerDetailsId)?.team;
+      if (!playerTeam) return;
+
+      const own = playerTeam === "A" ? m.team_a_score : m.team_b_score;
+      const opp = playerTeam === "A" ? m.team_b_score : m.team_a_score;
+      const teammates = m.match_players
+        .filter(x => x.team === playerTeam && x.player_id !== playerDetailsId);
+
+      teammates.forEach(teammate => {
+        const current = partnerMap.get(teammate.player_id) || {
+          matches: 0, wins: 0
+        };
+
+        current.matches++;
+        if (own > opp) current.wins++;
+        partnerMap.set(teammate.player_id, current);
+      });
+    });
+
+    const partners = Array.from(partnerMap.entries()).map(([id, data]) => ({
+      id,
+      name: name(id),
+      ...data,
+      losses: data.matches - data.wins,
+      winRate: Math.round((data.wins / data.matches) * 100),
+    })).sort((a, b) =>
+      b.winRate - a.winRate ||
+      b.matches - a.matches ||
+      b.wins - a.wins
+    );
+
+    return {
+      ...player,
+      played: playerMatches.length,
+      wins,
+      losses: playerMatches.length - wins,
+      winRate: playerMatches.length ? Math.round((wins / playerMatches.length) * 100) : 0,
+      partners,
+    };
+  }, [playerDetailsId, players, validMatches]);
 
   const stats = useMemo(() => players.map(p => {
     const ms = filteredMatches.filter(m => m.status !== "VOIDED" && m.match_players.some(x => x.player_id === p.id));
@@ -1182,7 +1285,7 @@ export default function Home() {
         </div>}
       </>}
 
-      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>Names are fixed to protect historical statistics.</p></div><div className="player-grid">{players.map(p => { const s = stats.find(x => x.id === p.id)!; return <div className="player-card" key={p.id}><div className="avatar">{p.name.slice(0, 1)}</div><div><b>{p.name}</b><small>{s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></div> })}</div></>}
+      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All-time performance across the complete match history.</p></div><div className="player-grid">{allTimePlayerStats.map(s => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className="avatar">{s.name.slice(0, 1)}</div><div><b>{s.name}</b><small>{s.played} matches · {s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></button> })}</div></>}
     </section>
     <nav className="bottom-nav" style={{
       display: "grid",
@@ -1298,6 +1401,40 @@ export default function Home() {
 
     {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
 
+
+    {playerDetailsId && selectedPlayerDetails && <Modal
+      title={`${selectedPlayerDetails.name} · All-time`}
+      close={() => setPlayerDetailsId(null)}
+    >
+      <div className="money-grid four player-stat-boxes">
+        <div className="player-stat-neutral"><b>{selectedPlayerDetails.played}</b><small>Matches</small></div>
+        <div className="player-stat-win"><b>{selectedPlayerDetails.wins}</b><small>Wins</small></div>
+        <div className="player-stat-loss"><b>{selectedPlayerDetails.losses}</b><small>Losses</small></div>
+        <div className="player-stat-rate"><b>{selectedPlayerDetails.winRate}%</b><small>Win rate</small></div>
+      </div>
+
+      <div className="section-title"><span>Best duo partners</span><span>Historical only</span></div><p className="helper">Based only on actual team history. This does not affect daily Duo generation.</p>
+
+      {selectedPlayerDetails.partners.length === 0 ? (
+        <div className="empty-card">No duo history yet.</div>
+      ) : (
+        <div className="duo-history">
+          {selectedPlayerDetails.partners.map((partner, index) => (
+            <div className="duo-history-row" key={partner.id}>
+              <span className={`duo-rank rank-${index + 1}`}>{index + 1}</span>
+              <div className="duo-partner-info">
+                <b>{partner.name}</b>
+                <small>{partner.matches} together</small>
+              </div>
+              <div className="duo-record">
+                <b>{partner.winRate}%</b>
+                <small>{partner.wins}W · {partner.losses}L</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>}
 
     {fineDetailsPlayer && <Modal title={`${name(fineDetailsPlayer)} · Fine history`} close={() => setFineDetailsPlayer(null)}>
       <div className="fine-history">

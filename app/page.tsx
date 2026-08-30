@@ -27,6 +27,9 @@ export default function Home() {
   const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
   const [duoMatches, setDuoMatches] = useState<{ id: number; teamA: string[]; teamB: string[] }[]>([]);
   const [duoSpinning, setDuoSpinning] = useState(false);
+  const [duoScheduleLocked, setDuoScheduleLocked] = useState(false);
+  const [duoModifyAuthorized, setDuoModifyAuthorized] = useState(false);
+
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [homeSchedule, setHomeSchedule] = useState<{ id: string; matchNo: number; teamA: string[]; teamB: string[]; status: "PLANNED" | "RECORDED"; recordedMatchId: string | null }[]>([]);
   const [duoGenerated, setDuoGenerated] = useState(false);
@@ -34,7 +37,7 @@ export default function Home() {
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false);
   const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [statsDate, setStatsDate] = useState(() => {
@@ -642,14 +645,23 @@ export default function Home() {
       return;
     }
 
+    if (duoGenerated && !duoModifyAuthorized) {
+      setPinAction("duos-modify");
+      setPin("");
+      setError("");
+      setModal("pin");
+      return;
+    }
+
     setError("");
     setDuoSpinning(true);
     setDuoGenerated(false);
 
-    // Give the wheel a short physical spin before revealing the schedule.
     window.setTimeout(() => {
       setDuoMatches(generateDuoSchedule(duoPlayers));
       setDuoGenerated(true);
+      setDuoScheduleLocked(true);
+      setDuoModifyAuthorized(false);
       setDuoSpinning(false);
     }, 1100);
   };
@@ -725,6 +737,31 @@ export default function Home() {
   const verify = async () => {
     if (!groupId || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
       setError("Admin PIN must be exactly 6 digits");
+      return;
+    }
+
+    if (pinAction === "duos-modify") {
+      const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
+        p_group_id: groupId,
+        p_pin: pin,
+      });
+
+      if (pinError) {
+        setError(pinError.message);
+        return;
+      }
+
+      if (!pinValid) {
+        setError("Invalid admin PIN");
+        return;
+      }
+
+      setDuoModifyAuthorized(true);
+      setDuoScheduleLocked(false);
+      setDuoGenerated(false);
+      setPin("");
+      setError("");
+      setModal(null);
       return;
     }
 
@@ -1095,8 +1132,8 @@ export default function Home() {
 
         <div className="section-title"><span>Admin actions</span><LockKeyhole size={14} /></div>
         <div className="admin-actions">
-          <button onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button>
-          <button onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button>
+          <button className="player-stat-win" onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button>
+          <button className="player-stat-rate" onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button>
         </div>
 
         <div className="section-title"><span>Monthly fine report</span><span>Fines only</span></div>
@@ -1115,10 +1152,10 @@ export default function Home() {
         </div>
 
         <div className="money-grid four">
-          <div><b>{money(monthTotal)}</b><small>Total fines</small></div>
-          <div><b>{money(monthLate)}</b><small>Late fines</small></div>
-          <div><b>{money(monthMissed)}</b><small>Missed fines</small></div>
-          <div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
+          <div className="player-stat-neutral"><b>{money(monthTotal)}</b><small>Total fines</small></div>
+          <div className="player-stat-loss"><b>{money(monthLate)}</b><small>Late fines</small></div>
+          <div className="player-stat-loss"><b>{money(monthMissed)}</b><small>Missed fines</small></div>
+          <div className="player-stat-loss"><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
         </div>
 
         <div className="stats-table monthly-fines">
@@ -1140,12 +1177,13 @@ export default function Home() {
             <div className="expense-icon">₹</div>
             <div className="teams">
               <div><strong>{e.category}</strong><span>{money(Number(e.amount))}</span></div>
-              <small>{e.description || e.expense_date}</small>
+              {e.description && <small>{e.description}</small>}
+              <small className="expense-date">{new Date(e.expense_date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small>
             </div>
           </div>)}
         </div>
 
-        <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
+        {/* <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
         <div className="stats-table">
           <div className="fine-player-header">
             <span>#</span>
@@ -1169,7 +1207,7 @@ export default function Home() {
             <span className="fine-total">{money(s.total)}</span>
             <ChevronRight size={17} />
           </button>)}
-        </div>
+        </div> */}
       </>}
 
       {tab === "duos" && <>
@@ -1189,12 +1227,22 @@ export default function Home() {
                   key={p.id}
                   className={`duo-player-row ${added ? "added" : ""}`}
                   onClick={() => {
+                    if (duoGenerated && !duoModifyAuthorized) {
+                      setPinAction("duos-modify");
+                      setPin("");
+                      setError("");
+                      setModal("pin");
+                      return;
+                    }
                     setDuoPlayers(current =>
                       current.includes(p.id)
                         ? current.filter(id => id !== p.id)
                         : [...current, p.id]
                     );
-                    setDuoGenerated(false);
+                    if (duoGenerated) {
+                      setDuoGenerated(false);
+                      setDuoScheduleLocked(false);
+                    }
                   }}
                 >
                   <span className="avatar small">{p.name.slice(0, 1)}</span>
@@ -1214,8 +1262,18 @@ export default function Home() {
                     <span className="duo-order">{index + 1}</span>
                     <span>{name(id)}</span>
                     <button aria-label={`Remove ${name(id)}`} onClick={() => {
+                      if (duoGenerated && !duoModifyAuthorized) {
+                        setPinAction("duos-modify");
+                        setPin("");
+                        setError("");
+                        setModal("pin");
+                        return;
+                      }
                       setDuoPlayers(current => current.filter(x => x !== id));
-                      setDuoGenerated(false);
+                      if (duoGenerated) {
+                        setDuoGenerated(false);
+                        setDuoScheduleLocked(false);
+                      }
                     }}><UserMinus size={14} /></button>
                   </div>)}
             </div>
@@ -1255,7 +1313,7 @@ export default function Home() {
           onClick={generateDuosForToday}
         >
           <RotateCw size={18} className={duoSpinning ? "spin-icon" : ""} />
-          {duoSpinning ? "Shuffling players…" : "Generate Duos for today"}
+          {duoSpinning ? "Shuffling players…" : duoGenerated ? "Generate new schedule · Admin PIN" : "Generate Duos for today"}
         </button>
 
         {duoPlayers.length > 0 && duoPlayers.length < 4 &&
@@ -1264,7 +1322,7 @@ export default function Home() {
 
         {duoGenerated && <div className="duo-schedule">
           <div className="section-title">
-            <span>Today's 6-match schedule</span>
+            <span>{duoScheduleLocked ? "🔒 Schedule locked" : "Today's 6-match schedule"}</span>
             <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           </div>
           <div className="duo-note">Rotation rule: a player can play up to 2 matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>

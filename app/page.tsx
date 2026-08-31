@@ -17,7 +17,7 @@ const CODE = "RALLY365";
 const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
 
 export default function Home() {
-  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "duos">("today");
+  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "achievements" | "duos">("today");
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -39,7 +39,12 @@ export default function Home() {
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
   const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false);
-  const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null); const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
+  const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null);
+  const [achievementPlayerId, setAchievementPlayerId] = useState<string | null>(null);
+  const [achievementCardIndex, setAchievementCardIndex] = useState(0);
+  const achievementTouchStart = useRef<number | null>(null);
+  const achievementTouchCurrent = useRef<number | null>(null);
+ const [fineDetailsPlayer, setFineDetailsPlayer] = useState<string | null>(null); const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7)); const [statsRange, setStatsRange] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
   const [statsDate, setStatsDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -216,6 +221,7 @@ export default function Home() {
 
   // Players screen is always ALL-TIME.
   // It intentionally uses validMatches, never filteredMatches/homeDate/statsDate.
+
   const allTimePlayerStats = useMemo(() => players.map(p => {
     const ms = validMatches.filter(m =>
       m.match_players.some(x => x.player_id === p.id)
@@ -247,6 +253,120 @@ export default function Home() {
   }).sort(
     (a, b) => b.w - a.w || b.winRate - a.winRate || b.played - a.played
   ), [players, validMatches]);
+
+  const achievementData = useMemo(() => {
+    const result: Record<string, any> = {};
+    const matchRows = validMatches;
+
+    for (const s of allTimePlayerStats as any[]) {
+      const played = Number(s.played || 0);
+      const wins = Number(s.w || 0);
+      const losses = Number(s.l || 0);
+
+      const playerMatches = matchRows
+        .filter((m: any) => m.match_players?.some((mp: any) => mp.player_id === s.id))
+        .sort((a: any, b: any) => String(a.played_at || "").localeCompare(String(b.played_at || "")));
+
+      let bestStreak = 0, streak = 0;
+      for (const m of playerMatches) {
+        const me = m.match_players?.find((mp: any) => mp.player_id === s.id);
+        if (!me) continue;
+        const own = me.team === "A" ? Number(m.team_a_score) : Number(m.team_b_score);
+        const opp = me.team === "A" ? Number(m.team_b_score) : Number(m.team_a_score);
+        const won = own > opp;
+        if (won) { streak++; bestStreak = Math.max(bestStreak, streak); }
+        else streak = 0;
+      }
+
+      const partners = new Map<string, { matches: number; wins: number }>();
+      const opponents = new Map<string, { wins: number; losses: number; history: string[] }>();
+
+      for (const m of playerMatches) {
+        const rows = m.match_players || [];
+        const me = rows.find((mp: any) => mp.player_id === s.id);
+        if (!me) continue;
+        const myTeam = me.team;
+        const partner = rows.find((mp: any) => mp.player_id !== s.id && mp.team === myTeam);
+        if (partner) {
+          const p = partners.get(partner.player_id) || { matches: 0, wins: 0 };
+          p.matches++;
+          const ownScore = me.team === "A" ? Number(m.team_a_score) : Number(m.team_b_score);
+          const opponentScore = me.team === "A" ? Number(m.team_b_score) : Number(m.team_a_score);
+          const won = ownScore > opponentScore;
+          if (won) p.wins++;
+          partners.set(partner.player_id, p);
+        }
+        for (const opponentPlayer of rows.filter((mp: any) => mp.team !== myTeam)) {
+          const o = opponents.get(opponentPlayer.player_id) || { wins: 0, losses: 0, history: [] };
+          const ownScore = me.team === "A" ? Number(m.team_a_score) : Number(m.team_b_score);
+          const opponentScore = me.team === "A" ? Number(m.team_b_score) : Number(m.team_a_score);
+          const won = ownScore > opponentScore;
+          if (won) o.wins++; else o.losses++;
+          o.history.push(won ? "W" : "L");
+          opponents.set(opponentPlayer.player_id, o);
+        }
+      }
+
+      const partnerList = Array.from(partners.entries()).map(([id, d]) => ({
+        id, name: name(id), ...d, losses: d.matches - d.wins,
+        winRate: d.matches ? Math.round(d.wins / d.matches * 100) : 0
+      })).sort((a,b) => b.matches-a.matches || b.wins-a.wins);
+
+      const opponentList = Array.from(opponents.entries()).map(([id,d]) => ({
+        id, name: name(id), ...d
+      })).sort((a,b) => b.wins-a.wins);
+
+      const differentPartners = partnerList.length;
+      const dynamic = partnerList.find(p => p.matches >= 5);
+      const perfect = partnerList.find(p => p.matches >= 5 && p.losses === 0);
+      const wall = opponentList.find(o => o.wins >= 5);
+      const comeback = opponentList.find(o => {
+        const h = o.history;
+        let firstLoss = h.indexOf("L");
+        if (firstLoss < 0) return false;
+        return h.slice(firstLoss + 1).filter((x: string) => x === "W").length >= 2 && h.slice(0, firstLoss + 1).filter((x: string) => x === "L").length >= 2;
+      });
+
+      const achievements = [
+        ["first-match","🏸","First Match",played >= 1,played,"Play your first recorded match"],
+        ["first-win","🏆","First Win",wins >= 1,wins,"Record your first win"],
+        ["10-matches","🏸","10 Matches",played >= 10,played,"Reach 10 recorded matches"],
+        ["25-matches","🏸","25 Matches",played >= 25,played,"Reach 25 recorded matches"],
+        ["50-matches","🏸","50 Matches",played >= 50,played,"Reach 50 recorded matches"],
+        ["10-wins","🏆","10 Wins",wins >= 10,wins,"Reach 10 recorded wins"],
+        ["25-wins","🏆","25 Wins",wins >= 25,wins,"Reach 25 recorded wins"],
+        ["hot-streak","🔥","5-Win Streak",bestStreak >= 5,bestStreak,"Win 5 recorded matches consecutively"],
+        ["dynamic-duo","🤝","Dynamic Duo",!!dynamic,dynamic?.matches || 0,"Play 5 matches with the same partner"],
+        ["winning-duo","🏆","Winning Duo",!!dynamic && (dynamic.wins >= 5),dynamic?.wins || 0,"Win 5 matches with the same partner"],
+        ["perfect-pair","🔥","Perfect Pair",!!perfect,perfect?.matches || 0,"Win 5 matches together without a loss"],
+        ["wall","🧱","Wall",!!wall,wall?.wins || 0,"Win 5 matches against the same opponent"],
+        ["comeback-king","🔥","Comeback King",!!comeback,comeback?.wins || 0,"Lose to an opponent twice, then beat them twice"],
+        ["versatile","🌀","Versatile",differentPartners >= 5,differentPartners,"Play with 5 different partners"],
+      ].map(([id, icon, title, unlocked, progress, description]) => ({ id, icon, title, unlocked, progress, description }));
+
+      const milestones = [
+        ["matches-1","🏸","First Match",played,1],
+        ["matches-5","🏸","5 Matches",played,5],
+        ["matches-10","🏸","10 Matches",played,10],
+        ["matches-25","🏸","25 Matches",played,25],
+        ["matches-50","🏸","50 Matches",played,50],
+        ["matches-100","🏸","100 Matches",played,100],
+        ["wins-1","🏆","First Win",wins,1],
+        ["wins-5","🏆","5 Wins",wins,5],
+        ["wins-10","🏆","10 Wins",wins,10],
+        ["wins-25","🏆","25 Wins",wins,25],
+        ["wins-50","🏆","50 Wins",wins,50],
+        ["wins-100","🏆","100 Wins",wins,100],
+        ["partners-1","🤝","First Duo",differentPartners,1],
+        ["partners-5","🤝","5 Different Partners",differentPartners,5],
+        ["partners-10","🤝","10 Different Partners",differentPartners,10],
+      ].map(([id, icon, title, current, target]) => ({ id, icon, title, current, target, unlocked: Number(current) >= Number(target) }));
+
+      result[s.id] = { stats: s, achievements, milestones, partnerList, opponentList };
+    }
+    return result;
+  }, [allTimePlayerStats, validMatches, name]);
+
 
   const selectedPlayerDetails = useMemo(() => {
     if (!playerDetailsId) return null;
@@ -1132,8 +1252,8 @@ export default function Home() {
 
         <div className="section-title"><span>Admin actions</span><LockKeyhole size={14} /></div>
         <div className="admin-actions">
-          <button className="player-stat-win" onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button>
-          <button className="player-stat-rate" onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button>
+          <button className="money-action-purple money-stat-action" onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button>
+          <button className="money-action-purple money-stat-action" onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button>
         </div>
 
         <div className="section-title"><span>Monthly fine report</span><span>Fines only</span></div>
@@ -1152,10 +1272,10 @@ export default function Home() {
         </div>
 
         <div className="money-grid four">
-          <div className="player-stat-neutral"><b>{money(monthTotal)}</b><small>Total fines</small></div>
-          <div className="player-stat-loss"><b>{money(monthLate)}</b><small>Late fines</small></div>
-          <div className="player-stat-loss"><b>{money(monthMissed)}</b><small>Missed fines</small></div>
-          <div className="player-stat-loss"><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
+          <div><b>{money(monthTotal)}</b><small>Total fines</small></div>
+          <div><b>{money(monthLate)}</b><small>Late fines</small></div>
+          <div><b>{money(monthMissed)}</b><small>Missed fines</small></div>
+          <div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
         </div>
 
         <div className="stats-table monthly-fines">
@@ -1183,7 +1303,7 @@ export default function Home() {
           </div>)}
         </div>
 
-        {/* <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
+        <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
         <div className="stats-table">
           <div className="fine-player-header">
             <span>#</span>
@@ -1207,7 +1327,7 @@ export default function Home() {
             <span className="fine-total">{money(s.total)}</span>
             <ChevronRight size={17} />
           </button>)}
-        </div> */}
+        </div>
       </>}
 
       {tab === "duos" && <>
@@ -1351,14 +1471,115 @@ export default function Home() {
         </div>}
       </>}
 
-      {tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All-time performance across the complete match history.</p></div><div className="player-grid">{allTimePlayerStats.map(s => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className="avatar">{s.name.slice(0, 1)}</div><div><b>{s.name}</b><small>{s.played} matches · {s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></button> })}</div></>}
+      
+{tab === "achievements" && (() => {
+  const selectedId = achievementPlayerId || allTimePlayerStats[0]?.id;
+  const selected = selectedId ? achievementData[selectedId] : null;
+  if (!selected) return <div className="page-heading"><div className="eyebrow">JOURNEY</div><h1>Achievements</h1><p>No recorded match history yet.</p></div>;
+  const s = selected.stats;
+  return <div className="achievements-screen">
+    <div className="page-heading">
+      <div className="eyebrow">JOURNEY</div>
+      <h1>Achievements</h1>
+      <p>Milestones and achievements from recorded match history.</p>
+    </div>
+    <div className="achievement-player-pills" aria-label="Select player">
+      {allTimePlayerStats.map((p: any) => (
+        <button
+          key={p.id}
+          className={`achievement-player-pill ${p.id===selectedId ? "active" : ""}`}
+          onClick={()=>{ setAchievementPlayerId(p.id); setAchievementCardIndex(0); }}
+        >
+          {p.name}
+        </button>
+      ))}
+    </div>
+    <div className="achievements-layout">
+      <main className="achievement-journey">
+        <div className="journey-header">
+          <div><div className="eyebrow">PLAYER JOURNEY</div><h2>{s.name}</h2><p>{s.played} matches · {s.w}W · {s.l}L</p></div>
+          <div className="journey-total"><b>{selected.achievements.filter((a:any)=>a.unlocked).length}</b><small>achievements</small></div>
+        </div>
+
+        <section className="milestone-section">
+          <div className="section-title"><span>🛣️ Milestones</span><span>Progress</span></div>
+          <div className="milestone-track">
+            {selected.milestones.map((m:any)=><div className={`milestone-node ${m.unlocked ? "complete" : ""}`} key={m.id}>
+              <div className="milestone-dot">{m.unlocked ? "✓" : m.icon}</div>
+              <b>{m.title}</b>
+              <small>{Math.min(m.current,m.target)}/{m.target}</small>
+            </div>)}
+          </div>
+        </section>
+
+        <section>
+          <div className="section-title">
+            <span>🏆 Achievements</span>
+            <span>{Math.min(achievementCardIndex + 1, selected.achievements.length)}/{selected.achievements.length}</span>
+          </div>
+          {selected.achievements.length > 0 && (() => {
+            const a = selected.achievements[Math.min(achievementCardIndex, selected.achievements.length - 1)];
+            const next = () => setAchievementCardIndex(i => Math.min(i + 1, selected.achievements.length - 1));
+            const previous = () => setAchievementCardIndex(i => Math.max(i - 1, 0));
+            return <div className="achievement-swipe-wrap">
+              <div
+                className={`achievement-swipe-card achievement-theme-${a.id} ${a.unlocked ? "unlocked" : "locked"}`}
+                onTouchStart={(e)=>{ achievementTouchStart.current=e.touches[0].clientX; achievementTouchCurrent.current=e.touches[0].clientX; }}
+                onTouchMove={(e)=>{ achievementTouchCurrent.current=e.touches[0].clientX; }}
+                onTouchEnd={()=>{
+                  const start=achievementTouchStart.current;
+                  const current=achievementTouchCurrent.current;
+                  if(start !== null && current !== null && Math.abs(current-start) > 55){
+                    if(current < start) next(); else previous();
+                  }
+                  achievementTouchStart.current=null; achievementTouchCurrent.current=null;
+                }}
+                role="group"
+                aria-label={`${a.title}, achievement ${achievementCardIndex+1} of ${selected.achievements.length}`}
+              >
+                <div className="achievement-swipe-status">{a.unlocked ? "✓ UNLOCKED" : "IN PROGRESS"}</div>
+                <div className="achievement-swipe-icon">{a.icon}</div>
+                <div className="achievement-swipe-title">{a.title}</div>
+                <div className="achievement-swipe-description">{a.description}</div>
+                <div className="achievement-swipe-progress">{a.unlocked ? "Achievement earned" : `${a.progress || 0} progress`}</div>
+              </div>
+              <div className="achievement-swipe-controls">
+                <button type="button" onClick={previous} disabled={achievementCardIndex===0} aria-label="Previous achievement">‹</button>
+                <div className="achievement-swipe-dots">
+                  {selected.achievements.map((_:any,i:number)=><span key={i} className={i===achievementCardIndex ? "active" : ""} />)}
+                </div>
+                <button type="button" onClick={next} disabled={achievementCardIndex===selected.achievements.length-1} aria-label="Next achievement">›</button>
+              </div>
+              <small className="achievement-swipe-hint">Swipe left or right to explore</small>
+            </div>;
+          })()}
+        </section>
+
+        <section>
+          <div className="section-title"><span>🔥 Rivalry moments</span><span>History</span></div>
+          <div className="duo-history-grid">
+            {selected.opponentList.slice(0,4).map((o:any)=><div className={`duo-history-card ${o.wins>=5 ? "rivalry-wall" : o.wins>=2 && o.losses>=2 ? "rivalry-comeback" : "rivalry-progress"}`} key={o.id}>
+              <div className="rivalry-icon">{o.wins>=5 ? "🧱" : o.wins>=2 && o.losses>=2 ? "🔥" : "⚔️"}</div>
+              <b>vs {o.name}</b>
+              <small>{o.wins}W · {o.losses}L</small>
+              <span>{o.wins>=5 ? "Wall" : o.wins>=2 && o.losses>=2 ? "Comeback path" : "Rivalry in progress"}</span>
+            </div>)}
+            {!selected.opponentList.length && <div className="empty-state">No recorded rivalry history yet.</div>}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>;
+})()}
+
+{tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All-time performance across the complete match history.</p></div><div className="player-grid">{allTimePlayerStats.map(s => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className="avatar">{s.name.slice(0, 1)}</div><div><b>{s.name}</b><small>{s.played} matches · {s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></button> })}</div></>}
     </section>
     <nav className="bottom-nav" style={{
       display: "grid",
-      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+      gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
       width: "100%",
       minWidth: 0
-    }}><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "duos" ? "active" : ""} onClick={() => setTab("duos")}><Shuffle /><span>Duos</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button></nav>
+    }}><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "duos" ? "active" : ""} onClick={() => setTab("duos")}><Shuffle /><span>Duos</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button><button className={tab === "achievements" ? "active" : ""} onClick={() => setTab("achievements")}><Trophy /><span>Achievements</span></button></nav>
 
     {modal === "match" && <Modal title="New match" close={() => setModal(null)}><p className="helper">First two selected = Team A. Next two = Team B.</p>
       {scheduledMatchToRecord && <div className="scheduled-record-banner">

@@ -291,5 +291,377 @@
 }
 
 .expense-date{display:block;font-size:12px;opacity:.68;margin-top:3px;line-height:1.3}
-.money-action-purple{background:#7c3aed!important;border-color:#7c3aed!important;color:#fff!important;min-height:52px;font-size:16px;font-weight:800;border-radius:14px;box-shadow:0 4px 12px rgba(124,58,237,.18)}
-.money-action-purple:hover{background:#6d28d9!important;border-color:#6d28d9!important}
+
+.money-stat-action{
+  min-height:76px;
+  border:1px solid #ddd3f4!important;
+  background:#f5f1fb!important;
+  color:#33254f!important;
+  border-radius:16px;
+  padding:13px 10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  font-size:13px;
+  font-weight:800;
+  box-shadow:none;
+}
+.money-stat-action svg{width:21px;height:21px;color:#7c3aed}
+.money-stat-action:hover{background:#eee7fa!important;border-color:#cfc0ed!important}
+
+.achievements-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
+.achievement-players{background:#fff;border:1px solid #e2ebe5;border-radius:18px;padding:12px;position:sticky;top:14px}
+.achievement-panel-title{font-size:10px;font-weight:900;letter-spacing:.12em;color:#829189;padding:5px 8px 10px}
+.achievement-player{width:100%;display:flex;align-items:center;gap:9px;border:1px solid transparent;background:transparent;border-radius:13px;padding:9px;text-align:left;cursor:pointer}
+.achievement-player:hover{background:#f7faf8}
+.achievement-player.active{background:#f1f7f3;border-color:#d6e5da}
+.achievement-avatar{width:34px;height:34px;border-radius:10px;background:#edf4ef;display:grid;place-items:center;font-weight:900;color:#52675b}
+.achievement-player-copy{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}
+.achievement-player-copy b{font-size:13px}.achievement-player-copy small{font-size:10px;color:#7c8c84;white-space:nowrap}
+.achievement-count{font-size:10px;color:#7c8c84;white-space:nowrap}
+.achievement-journey{min-width:0}
+.journey-header{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2ebe5;border-radius:18px;padding:18px 20px;margin-bottom:14px}
+.journey-header h2{margin:2px 0 3px;font-size:24px}.journey-header p{margin:0;color:#7c8c84;font-size:12px}
+.journey-total{min-width:86px;text-align:center;background:#f5f1fb;border:1px solid #ddd3f4;border-radius:14px;padding:10px}.journey-total b{display:block;font-size:22px;color:#6d28d9}.journey-total small{font-size:10px;color:#7c8c84}
+.milestone-section{background:#fff;border:1px solid #e2ebe5;border-radius:18px;padding:16px;margin-bottom:14px}
+.milestone-track{display:flex;overflow-x:auto;gap:0;padding:16px 4px 8px}
+.milestone-node{min-width:105px;flex:1;text-align:center;position:relative;padding-top:3px}
+.milestone-node:not(:last-child)::after{content:"";position:absolute;height:2px;background:#e3e9e5;top:20px;left:50%;right:-50%;z-index:0}
+.milestone-node.complete:not(:last-child)::after{background:#b8d9c3}
+.milestone-dot{width:38px;height:38px;border-radius:50%;background:#f3f5f4;border:2px solid #dfe6e1;margin:0 auto 7px;display:grid;place-items:center;position:relative;z-index:1;font-size:14px}
+.milestone-node.complete .milestone-dot{background:#eaf7ef;border-color:#9fceb0;color:#21834b;font-weight:900}
+.milestone-node b{display:block;font-size:10px}.milestone-node small{display:block;color:#87948d;font-size:9px;margin-top:2px}
+.achievement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.achievement-card{display:flex;align-items:center;gap:11px;text-align:left;background:#fff;border:1px solid #e2ebe5;border-radius:16px;padding:13px;min-height:86px}
+.achievement-card.unlocked{border-color:#d5e6db}.achievement-card.locked{opacity:.62;background:#fafbfa}
+.achievement-icon{width:40px;height:40px;border-radius:12px;background:#f5f1fb;display:grid;place-items:center;font-size:21px;flex:0 0 auto}
+.achievement-card-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.achievement-card-copy b{font-size:12px}.achievement-card-copy small{font-size:10px;color:#7c8c84;line-height:1.3}.achievement-card-copy span{font-size:9px;font-weight:800;color:#6d28d9}
+@media(max-width:800px){.milestone-node{min-width:92px}}
+@media(max-width:520px){.achievement-grid{grid-template-columns:1fr}.journey-header{padding:14px}.journey-header h2{font-size:20px}}
+
+/* Six-item navigation: always one horizontal row. */
+.bottom-nav{
+  grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  width:min(560px,100%) !important;
+  min-width:0 !important;
+  height:72px;
+  overflow:hidden;
+}
+.bottom-nav button{
+  min-width:0;
+  white-space:nowrap;
+  padding:5px 2px;
+  font-size:9px;
+  gap:3px;
+}
+.bottom-nav button span{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
+}
+.bottom-nav svg{width:19px;height:19px;flex:0 0 auto}
+
+/* Achievement cards get enough horizontal room for title + description. */
+.achievement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.achievement-card{min-width:0}
+@media(max-width:520px){
+  .bottom-nav{height:68px}
+  .bottom-nav button{font-size:8px;padding-left:1px;padding-right:1px}
+  .bottom-nav svg{width:18px;height:18px}
+  .achievement-grid{grid-template-columns:1fr}
+}
+
+/* Achievements: compact player selector above the journey. */
+.achievement-player-pills{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:0 0 14px;
+}
+.achievement-player-pill{
+  border:1px solid #dfe8e2;
+  background:#fff;
+  color:#53665c;
+  border-radius:999px;
+  min-height:38px;
+  padding:8px 15px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;
+}
+.achievement-player-pill:hover{background:#f5faf7}
+.achievement-player-pill.active{
+  background:#eaf7ef;
+  border-color:#9fceb0;
+  color:#167c49;
+}
+.achievement-player-pill:active{transform:scale(.98)}
+.achievements-layout{
+  display:block;
+}
+@media(max-width:520px){
+  .achievement-player-pills{gap:7px;margin-bottom:12px}
+  .achievement-player-pill{min-height:36px;padding:7px 13px;font-size:11px}
+}
+
+/* Achievements: one-card-at-a-time swipe deck. */
+.achievement-swipe-wrap{max-width:520px;margin:0 auto 18px;display:flex;flex-direction:column;align-items:center}
+.achievement-swipe-card{
+  width:100%;
+  min-height:300px;
+  border:1px solid #dfe8e2;
+  border-radius:24px;
+  background:#fff;
+  padding:30px 26px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  user-select:none;
+  touch-action:pan-y;
+  animation:achievementCardIn .24s ease;
+}
+.achievement-swipe-card.unlocked{border-color:#b9ddc5;background:linear-gradient(180deg,#fff 0%,#f5fbf7 100%)}
+.achievement-swipe-card.locked{background:#fafbfa}
+.achievement-swipe-status{font-size:10px;font-weight:900;letter-spacing:.12em;color:#7b8c83;margin-bottom:20px}
+.achievement-swipe-card.unlocked .achievement-swipe-status{color:#21834b}
+.achievement-swipe-icon{width:86px;height:86px;border-radius:26px;background:#f5f1fb;display:grid;place-items:center;font-size:42px;margin-bottom:18px}
+.achievement-swipe-title{font-size:25px;font-weight:900;color:#173126;margin-bottom:8px}
+.achievement-swipe-description{max-width:340px;font-size:13px;line-height:1.55;color:#718078}
+.achievement-swipe-progress{margin-top:20px;padding:8px 13px;border-radius:999px;background:#f1f4f2;color:#5f7068;font-size:10px;font-weight:800}
+.achievement-swipe-controls{width:100%;display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.achievement-swipe-controls>button{width:42px;height:42px;border-radius:50%;border:1px solid #dfe8e2;background:#fff;color:#53665c;font-size:28px;line-height:1;cursor:pointer}
+.achievement-swipe-controls>button:disabled{opacity:.28;cursor:default}
+.achievement-swipe-dots{display:flex;align-items:center;justify-content:center;gap:4px;max-width:350px;overflow:hidden}
+.achievement-swipe-dots span{width:5px;height:5px;border-radius:50%;background:#d9e1dc}
+.achievement-swipe-dots span.active{width:18px;border-radius:999px;background:#7c3aed}
+.achievement-swipe-hint{margin-top:6px;color:#95a09a;font-size:9px}
+@keyframes achievementCardIn{from{opacity:.45;transform:translateX(18px) scale(.98)}to{opacity:1;transform:translateX(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.achievement-swipe-card{animation:none}}
+
+/* Achievement cards: richer story-like backgrounds, one card at a time. */
+.achievement-swipe-card{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background:#fff;
+}
+.achievement-swipe-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  opacity:.95;
+  background:
+    radial-gradient(circle at 15% 15%,rgba(124,58,237,.12),transparent 34%),
+    radial-gradient(circle at 88% 82%,rgba(34,139,94,.10),transparent 38%),
+    linear-gradient(145deg,#ffffff 0%,#f7faf8 100%);
+}
+.achievement-swipe-card.unlocked::before{
+  background:
+    radial-gradient(circle at 12% 10%,rgba(255,193,7,.20),transparent 32%),
+    radial-gradient(circle at 88% 88%,rgba(34,139,94,.16),transparent 40%),
+    linear-gradient(145deg,#fffdf6 0%,#f2faf5 100%);
+}
+.achievement-theme-first-match::before,
+.achievement-theme-10-matches::before,
+.achievement-theme-25-matches::before,
+.achievement-theme-50-matches::before{
+  background:
+    radial-gradient(circle at 18% 18%,rgba(59,130,246,.15),transparent 34%),
+    linear-gradient(145deg,#f7fbff,#f2f7fc);
+}
+.achievement-theme-first-win::before,
+.achievement-theme-10-wins::before,
+.achievement-theme-25-wins::before{
+  background:
+    radial-gradient(circle at 82% 15%,rgba(245,158,11,.20),transparent 35%),
+    linear-gradient(145deg,#fffaf0,#fff7e8);
+}
+.achievement-theme-hot-streak::before,
+.achievement-theme-perfect-pair::before,
+.achievement-theme-comeback-king::before{
+  background:
+    radial-gradient(circle at 78% 18%,rgba(239,68,68,.16),transparent 36%),
+    radial-gradient(circle at 12% 85%,rgba(245,158,11,.14),transparent 38%),
+    linear-gradient(145deg,#fff9f7,#fff5ed);
+}
+.achievement-theme-dynamic-duo::before,
+.achievement-theme-winning-duo::before,
+.achievement-theme-versatile::before{
+  background:
+    radial-gradient(circle at 16% 18%,rgba(16,185,129,.16),transparent 34%),
+    radial-gradient(circle at 88% 82%,rgba(124,58,237,.12),transparent 38%),
+    linear-gradient(145deg,#f5fcf8,#f8f5fc);
+}
+.achievement-theme-wall::before{
+  background:
+    radial-gradient(circle at 85% 20%,rgba(100,116,139,.17),transparent 34%),
+    linear-gradient(145deg,#f8fafc,#eef2f5);
+}
+.achievement-swipe-icon{
+  border:1px solid rgba(124,58,237,.10);
+  box-shadow:0 8px 24px rgba(28,43,35,.06);
+}
+.achievement-swipe-card.unlocked .achievement-swipe-icon{
+  background:rgba(255,255,255,.78);
+}
+.achievement-swipe-description{max-width:360px}
+.achievement-swipe-progress{background:rgba(255,255,255,.72);border:1px solid rgba(223,232,226,.9)}
+
+/* Rivalry moments: restore a proper responsive card layout. */
+.duo-history-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 16px;
+}
+.duo-history-card{
+  min-width:0;
+  min-height:88px;
+  background:#fff;
+  border:1px solid #e2ebe5;
+  border-radius:16px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:5px;
+}
+.duo-history-card b{font-size:13px;color:#20352b}
+.duo-history-card small{font-size:11px;color:#7b8b83}
+.duo-history-card span{
+  align-self:flex-start;
+  margin-top:2px;
+  padding:5px 8px;
+  border-radius:999px;
+  background:#f5f1fb;
+  color:#655083;
+  font-size:9px;
+  font-weight:800;
+}
+@media(max-width:520px){
+  .duo-history-grid{grid-template-columns:1fr}
+  .achievement-swipe-card{min-height:280px;padding:26px 20px}
+}
+
+/* Rich rivalry cards */
+.duo-history-card{
+  position:relative;
+  overflow:hidden;
+  min-height:150px;
+  padding:18px;
+  align-items:flex-start;
+  justify-content:flex-end;
+  isolation:isolate;
+  animation:rivalryCardIn .45s ease both;
+}
+.duo-history-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  background:
+    radial-gradient(circle at 85% 15%,rgba(124,58,237,.18),transparent 34%),
+    radial-gradient(circle at 12% 90%,rgba(16,185,129,.12),transparent 38%),
+    linear-gradient(145deg,#ffffff,#f4f8f5);
+}
+.duo-history-card::after{
+  content:"";
+  position:absolute;
+  width:150px;height:150px;
+  right:-55px;top:-65px;
+  border-radius:50%;
+  background:rgba(255,255,255,.45);
+  z-index:-1;
+}
+.duo-history-card.rivalry-wall::before{
+  background:
+    radial-gradient(circle at 82% 12%,rgba(71,85,105,.25),transparent 38%),
+    radial-gradient(circle at 10% 90%,rgba(148,163,184,.15),transparent 40%),
+    linear-gradient(145deg,#f8fafc,#e8edf2);
+}
+.duo-history-card.rivalry-comeback::before{
+  background:
+    radial-gradient(circle at 84% 14%,rgba(239,68,68,.23),transparent 38%),
+    radial-gradient(circle at 12% 88%,rgba(245,158,11,.19),transparent 42%),
+    linear-gradient(145deg,#fffaf5,#fff0e8);
+}
+.duo-history-card.rivalry-progress::before{
+  background:
+    radial-gradient(circle at 85% 14%,rgba(59,130,246,.18),transparent 38%),
+    radial-gradient(circle at 12% 88%,rgba(124,58,237,.12),transparent 42%),
+    linear-gradient(145deg,#f8fbff,#f2f4fb);
+}
+.rivalry-icon{
+  position:absolute;
+  top:17px;
+  left:18px;
+  width:64px;
+  height:64px;
+  display:grid;
+  place-items:center;
+  font-size:39px;
+  filter:drop-shadow(0 5px 8px rgba(25,35,30,.10));
+  animation:rivalryIconFloat 2.8s ease-in-out infinite;
+}
+.rivalry-wall .rivalry-icon{animation:rivalryIconPulse 2.2s ease-in-out infinite}
+.rivalry-comeback .rivalry-icon{animation:rivalryIconPulse 1.7s ease-in-out infinite}
+.duo-history-card b{font-size:15px;position:relative}
+.duo-history-card small{font-size:11px;position:relative}
+.duo-history-card span{
+  position:relative;
+  margin-top:3px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(255,255,255,.85);
+  color:#56675f;
+  font-size:10px;
+  font-weight:900;
+}
+@keyframes rivalryIconFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
+@keyframes rivalryIconPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes rivalryCardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){
+  .duo-history-card,.rivalry-icon{animation:none}
+}
+@media(max-width:520px){
+  .duo-history-card{min-height:140px}
+  .rivalry-icon{font-size:35px;width:58px;height:58px}
+}
+
+/* Rivalry card overlap fix: reserve space for the large animated icon. */
+.duo-history-card{
+  padding:82px 18px 18px;
+  justify-content:flex-start;
+}
+.rivalry-icon{
+  top:14px;
+  left:18px;
+  width:68px;
+  height:68px;
+  pointer-events:none;
+}
+.duo-history-card b,
+.duo-history-card small,
+.duo-history-card span{
+  position:relative;
+  z-index:1;
+}
+@media(max-width:520px){
+  .duo-history-card{
+    padding:78px 16px 16px;
+  }
+  .rivalry-icon{
+    width:62px;
+    height:62px;
+    left:16px;
+    top:13px;
+  }
+}

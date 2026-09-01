@@ -1575,12 +1575,12 @@ export default function Home() {
           <div className="section-title"><span>🔥 Rivalry moments</span><span>History</span></div>
           <div className="duo-history-grid">
             {selected.opponentList.slice(0,4).map((o:any)=><div className={`duo-history-card ${o.wins>=5 ? "rivalry-wall" : o.wins>=2 && o.losses>=2 ? "rivalry-comeback" : "rivalry-progress"}`} key={o.id}>
-              <div className="rivalry-icon">{o.wins>=5 ? "🛡️" : o.wins>=2 && o.losses>=2 ? "🔥" : "⚔️"}</div>
+              <div className="rivalry-icon" aria-hidden="true">{o.wins>=5 ? "🛡️" : o.wins>=2 && o.losses>=2 ? "🔥" : "⚔️"}</div>
               <div className="rivalry-card-copy">
                 <b>vs {o.name}</b>
                 <span>{o.wins>=5 ? "🛡️ Wall" : o.wins>=2 && o.losses>=2 ? "🔥 Comeback" : "⚔️ Rivalry"}</span>
                 <small>{o.matches} encounters</small>
-                {o.wins>=5 ? <em>Unbeaten streak</em> : o.wins>=2 && o.losses>=2 ? <em>Comeback wins</em> : <em>{o.lastEncounter ? `Last: ${matchTimestamp(o.lastEncounter)}` : "Rivalry in progress"}</em>}
+                {o.wins>=5 ? <em>Unbeaten<br/>streak</em> : o.wins>=2 && o.losses>=2 ? <em>Comeback wins</em> : <em>{o.lastEncounter ? `Last: ${matchTimestamp(o.lastEncounter)}` : "Rivalry in progress"}</em>}
               </div>
             </div>)}
             {!selected.opponentList.length && <div className="empty-state">No recorded rivalry history yet.</div>}

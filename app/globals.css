@@ -738,3 +738,116 @@
     min-height:145px;
   }
 }
+
+/* Rivalry Moments — visual reference treatment.
+   Large hero icon + compact right-side contextual story. */
+.duo-history-card{
+  position:relative;
+  min-height:184px;
+  padding:18px 14px 16px 112px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-start;
+  overflow:hidden;
+}
+.duo-history-card::after{
+  width:170px;
+  height:170px;
+  right:-58px;
+  top:-72px;
+  opacity:.72;
+}
+.rivalry-icon{
+  position:absolute;
+  z-index:0;
+  left:8px;
+  top:18px;
+  width:112px;
+  height:132px;
+  display:grid;
+  place-items:center;
+  font-size:76px;
+  line-height:1;
+  filter:drop-shadow(0 8px 8px rgba(35,45,40,.16));
+  transform-origin:center bottom;
+}
+.rivalry-card-copy{
+  position:relative;
+  z-index:2;
+  margin-left:0;
+  width:100%;
+  max-width:150px;
+  gap:4px;
+}
+.rivalry-card-copy b{
+  font-size:13px;
+  line-height:1.15;
+  color:#173126;
+}
+.rivalry-card-copy span{
+  align-self:flex-start;
+  white-space:nowrap;
+  padding:4px 7px;
+  font-size:8px;
+  line-height:1;
+  background:rgba(255,255,255,.82);
+  backdrop-filter:blur(4px);
+}
+.rivalry-card-copy small{
+  font-size:9px;
+  line-height:1.2;
+  color:#718078;
+}
+.rivalry-card-copy em{
+  font-size:9px;
+  line-height:1.15;
+  color:#53665c;
+  font-weight:900;
+}
+.rivalry-wall .rivalry-icon{animation:rivalryShield 1.55s ease-in-out infinite}
+.rivalry-comeback .rivalry-icon{animation:rivalryFire 1.05s ease-in-out infinite}
+.rivalry-progress .rivalry-icon{animation:rivalryDuel 1.35s ease-in-out infinite}
+
+@keyframes rivalryShield{
+  0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}
+  50%{transform:translateY(-6px) rotate(2deg) scale(1.05)}
+}
+@keyframes rivalryFire{
+  0%,100%{transform:translateY(2px) scale(1)}
+  50%{transform:translateY(-8px) scale(1.1)}
+}
+@keyframes rivalryDuel{
+  0%,100%{transform:translateX(0) rotate(-2deg)}
+  50%{transform:translateX(5px) rotate(2deg)}
+}
+
+@media(max-width:520px){
+  .duo-history-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  .duo-history-card{
+    min-height:190px;
+    padding:18px 10px 13px 88px;
+    border-radius:16px;
+  }
+  .rivalry-icon{
+    left:1px;
+    top:20px;
+    width:92px;
+    height:125px;
+    font-size:65px;
+  }
+  .rivalry-card-copy{
+    max-width:118px;
+    gap:4px;
+  }
+  .rivalry-card-copy b{font-size:12px}
+  .rivalry-card-copy span{font-size:7px;padding:4px 6px}
+  .rivalry-card-copy small,.rivalry-card-copy em{font-size:8px}
+}
+@media(prefers-reduced-motion:reduce){
+  .rivalry-wall .rivalry-icon,
+  .rivalry-comeback .rivalry-icon,
+  .rivalry-progress .rivalry-icon{animation:none}
+}

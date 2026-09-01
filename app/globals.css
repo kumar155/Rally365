@@ -851,3 +851,23 @@
   .rivalry-comeback .rivalry-icon,
   .rivalry-progress .rivalry-icon{animation:none}
 }
+
+/* Rivalry Moments final visual tuning */
+.rivalry-card-copy{
+  top:20%;
+}
+.rivalry-icon{
+  font-size:70px;
+  animation-duration:1.85s !important;
+}
+.rivalry-wall .rivalry-icon,
+.rivalry-comeback .rivalry-icon,
+.rivalry-progress .rivalry-icon{
+  animation-duration:1.85s !important;
+}
+@media(max-width:520px){
+  .rivalry-icon{
+    font-size:70px;
+    animation-duration:1.85s !important;
+  }
+}

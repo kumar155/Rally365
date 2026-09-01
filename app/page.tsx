@@ -114,14 +114,16 @@ export default function Home() {
       if (dsme) {
         setError(dsme.message);
       } else {
-        setHomeSchedule((dsm || []).map(x => ({
-          id: x.id,
-          matchNo: x.match_no,
-          teamA: [x.team_a_player_1, x.team_a_player_2],
-          teamB: [x.team_b_player_1, x.team_b_player_2],
-          status: x.status as "PLANNED" | "RECORDED",
-          recordedMatchId: x.recorded_match_id
-        })));
+        setHomeSchedule((dsm || [])
+          .filter(x => x.status === "PLANNED")
+          .map(x => ({
+            id: x.id,
+            matchNo: x.match_no,
+            teamA: [x.team_a_player_1, x.team_a_player_2],
+            teamB: [x.team_b_player_1, x.team_b_player_2],
+            status: "PLANNED" as const,
+            recordedMatchId: x.recorded_match_id
+          })));
       }
     } else {
       setHomeSchedule([]);
@@ -856,6 +858,7 @@ export default function Home() {
         setError(scheduleError.message);
         return;
       }
+      setHomeSchedule(current => current.filter(item => item.id !== scheduledMatchToRecord.id));
     }
 
     setSelected([]);
@@ -1150,15 +1153,14 @@ export default function Home() {
               key={m.id}
               type="button"
               className="match-card home-schedule-card"
-              disabled={m.status === "RECORDED"}
-              onClick={() => m.status === "PLANNED" && recordScheduledMatch(m)}
+              onClick={() => recordScheduledMatch(m)}
             >
               <div className="match-number">M{m.matchNo}</div>
               <div className="teams">
                 <div><strong className="scheduled-team-name">{duoName(m.teamA)}</strong></div>
                 <div><strong className="scheduled-team-name">{duoName(m.teamB)}</strong></div>
               </div>
-              <span className="scheduled-record-label">{m.status === "RECORDED" ? "Recorded" : "Record"}</span>
+              <span className="scheduled-record-label">Record</span>
             </button>)}
           </div>
         </div>}

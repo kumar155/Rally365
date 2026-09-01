@@ -725,3 +725,16 @@
   .rivalry-card-copy span{font-size:8px;padding:4px 7px}
   .rivalry-card-copy small,.rivalry-card-copy em{font-size:9px}
 }
+
+/* Mobile Rivalry Moments: always keep the 2 x 2 tile layout. */
+@media (max-width:520px){
+  .duo-history-grid{
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  .duo-history-card{
+    min-width:0;
+    min-height:145px;
+  }
+}

@@ -15,7 +15,9 @@ type Attendance = { id: string; player_id: string; attendance_date: string; stat
 
 const CODE = "RALLY365";
 const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
-const matchTimestamp = (value: string) => {
+
+const matchTimestamp = (value: string | null | undefined) => {
+  if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("en-IN", {
@@ -74,37 +76,6 @@ export default function Home() {
     const { data: g, error: ge } = await supabase.from("groups").select("id,name,join_code").eq("join_code", CODE).single();
     if (ge || !g) { setError(ge?.message || "Group not found"); setLoading(false); return }
     setGroupId(g.id);
-
-    // Fixed guest players: they are real player rows so match_players can
-    // reference them exactly like regular players. Create them once per group.
-    const { data: existingGuests, error: guestReadError } = await supabase
-      .from("players")
-      .select("id,name")
-      .eq("group_id", g.id)
-      .in("name", ["Guest1", "Guest2"]);
-
-    if (guestReadError) {
-      setError(guestReadError.message);
-      setLoading(false);
-      return;
-    }
-
-    const guestNames = new Set((existingGuests || []).map(x => x.name));
-    const missingGuests = ["Guest1", "Guest2"]
-      .filter(n => !guestNames.has(n))
-      .map(name => ({ group_id: g.id, name }));
-
-    if (missingGuests.length) {
-      const { error: guestInsertError } = await supabase
-        .from("players")
-        .insert(missingGuests);
-      if (guestInsertError) {
-        setError(guestInsertError.message);
-        setLoading(false);
-        return;
-      }
-    }
-
     const [p, m, e, a, r] = await Promise.all([
       supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
       supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
@@ -143,16 +114,14 @@ export default function Home() {
       if (dsme) {
         setError(dsme.message);
       } else {
-        setHomeSchedule((dsm || [])
-          .filter(x => x.status === "PLANNED")
-          .map(x => ({
-            id: x.id,
-            matchNo: x.match_no,
-            teamA: [x.team_a_player_1, x.team_a_player_2],
-            teamB: [x.team_b_player_1, x.team_b_player_2],
-            status: "PLANNED" as const,
-            recordedMatchId: x.recorded_match_id
-          })));
+        setHomeSchedule((dsm || []).map(x => ({
+          id: x.id,
+          matchNo: x.match_no,
+          teamA: [x.team_a_player_1, x.team_a_player_2],
+          teamB: [x.team_b_player_1, x.team_b_player_2],
+          status: x.status as "PLANNED" | "RECORDED",
+          recordedMatchId: x.recorded_match_id
+        })));
       }
     } else {
       setHomeSchedule([]);
@@ -322,7 +291,7 @@ export default function Home() {
       }
 
       const partners = new Map<string, { matches: number; wins: number }>();
-      const opponents = new Map<string, { wins: number; losses: number; history: string[] }>();
+      const opponents = new Map<string, { wins: number; losses: number; matches: number; history: string[]; lastEncounter: string | null }>();
 
       for (const m of playerMatches) {
         const rows = m.match_players || [];
@@ -340,11 +309,13 @@ export default function Home() {
           partners.set(partner.player_id, p);
         }
         for (const opponentPlayer of rows.filter((mp: any) => mp.team !== myTeam)) {
-          const o = opponents.get(opponentPlayer.player_id) || { wins: 0, losses: 0, history: [] };
+          const o = opponents.get(opponentPlayer.player_id) || { wins: 0, losses: 0, matches: 0, history: [], lastEncounter: null };
           const ownScore = me.team === "A" ? Number(m.team_a_score) : Number(m.team_b_score);
           const opponentScore = me.team === "A" ? Number(m.team_b_score) : Number(m.team_a_score);
           const won = ownScore > opponentScore;
           if (won) o.wins++; else o.losses++;
+          o.matches++;
+          o.lastEncounter = m.played_at || o.lastEncounter;
           o.history.push(won ? "W" : "L");
           opponents.set(opponentPlayer.player_id, o);
         }
@@ -774,7 +745,7 @@ export default function Home() {
     return schedule;
   };
 
-  const exportScheduleToHome = async () => {
+  const exportScheduleToHome = () => {
     const validMatches = duoMatches.filter(match =>
       match.teamA.length === 2 &&
       match.teamB.length === 2 &&
@@ -786,95 +757,10 @@ export default function Home() {
       return;
     }
 
-    if (!groupId) {
-      setError("Group is not ready.");
-      return;
-    }
-
-    const d = new Date();
-    const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-    // If there are already planned duos for today, publishing would replace/
-    // modify today's schedule, so require the normal admin PIN flow.
-    const { data: activeSchedule, error: scheduleLookupError } = await supabase
-      .from("duo_schedules")
-      .select("id")
-      .eq("group_id", groupId)
-      .eq("schedule_date", scheduleDate)
-      .eq("status", "ACTIVE")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (scheduleLookupError) {
-      setError(scheduleLookupError.message);
-      return;
-    }
-
-    let hasPlannedToday = false;
-    if (activeSchedule) {
-      const { count, error: plannedLookupError } = await supabase
-        .from("duo_schedule_matches")
-        .select("id", { count: "exact", head: true })
-        .eq("schedule_id", activeSchedule.id)
-        .eq("status", "PLANNED");
-
-      if (plannedLookupError) {
-        setError(plannedLookupError.message);
-        return;
-      }
-      hasPlannedToday = (count || 0) > 0;
-    }
-
-    if (hasPlannedToday) {
-      setPinAction("duos");
-      setPin("");
-      setError("");
-      setModal("pin");
-      return;
-    }
-
-    // Nothing is currently scheduled for today, so this is a first publish
-    // rather than a modification. Publish directly without asking for PIN.
-    const { data: schedule, error: scheduleInsertError } = await supabase
-      .from("duo_schedules")
-      .insert({
-        group_id: groupId,
-        schedule_date: scheduleDate,
-        status: "ACTIVE"
-      })
-      .select("id")
-      .single();
-
-    if (scheduleInsertError || !schedule) {
-      setError(scheduleInsertError?.message || "Could not create today's schedule.");
-      return;
-    }
-
-    const rows = validMatches.map((match, index) => ({
-      schedule_id: schedule.id,
-      match_no: index + 1,
-      team_a_player_1: match.teamA[0],
-      team_a_player_2: match.teamA[1],
-      team_b_player_1: match.teamB[0],
-      team_b_player_2: match.teamB[1],
-      status: "PLANNED"
-    }));
-
-    const { error: matchInsertError } = await supabase
-      .from("duo_schedule_matches")
-      .insert(rows);
-
-    if (matchInsertError) {
-      // Best-effort cleanup of the empty schedule header if child insertion fails.
-      await supabase.from("duo_schedules").delete().eq("id", schedule.id);
-      setError(matchInsertError.message);
-      return;
-    }
-
+    setPinAction("duos");
+    setPin("");
     setError("");
-    setTab("today");
-    await load();
+    setModal("pin");
   };
 
   const recordScheduledMatch = (scheduled: { id: string; teamA: string[]; teamB: string[] }) => {
@@ -970,8 +856,6 @@ export default function Home() {
         setError(scheduleError.message);
         return;
       }
-
-      setHomeSchedule(current => current.filter(item => item.id !== scheduledMatchToRecord.id));
     }
 
     setSelected([]);
@@ -1266,14 +1150,15 @@ export default function Home() {
               key={m.id}
               type="button"
               className="match-card home-schedule-card"
-              onClick={() => recordScheduledMatch(m)}
+              disabled={m.status === "RECORDED"}
+              onClick={() => m.status === "PLANNED" && recordScheduledMatch(m)}
             >
               <div className="match-number">M{m.matchNo}</div>
               <div className="teams">
                 <div><strong className="scheduled-team-name">{duoName(m.teamA)}</strong></div>
                 <div><strong className="scheduled-team-name">{duoName(m.teamB)}</strong></div>
               </div>
-              <span className="scheduled-record-label">Record</span>
+              <span className="scheduled-record-label">{m.status === "RECORDED" ? "Recorded" : "Record"}</span>
             </button>)}
           </div>
         </div>}
@@ -1290,7 +1175,6 @@ export default function Home() {
           {homeMatches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
                 <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : "home-team-loss"}>{team(m, "A")}</strong></div>
                 <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div>
-                <small className="match-timestamp">{matchTimestamp(m.played_at)}</small>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
               </div>{m.status !== "VOIDED" && <button
                   className="edit-link"
@@ -1689,10 +1573,13 @@ export default function Home() {
           <div className="section-title"><span>🔥 Rivalry moments</span><span>History</span></div>
           <div className="duo-history-grid">
             {selected.opponentList.slice(0,4).map((o:any)=><div className={`duo-history-card ${o.wins>=5 ? "rivalry-wall" : o.wins>=2 && o.losses>=2 ? "rivalry-comeback" : "rivalry-progress"}`} key={o.id}>
-              <div className="rivalry-icon">{o.wins>=5 ? "🧱" : o.wins>=2 && o.losses>=2 ? "🔥" : "⚔️"}</div>
-              <b>vs {o.name}</b>
-              <small>{o.wins}W · {o.losses}L</small>
-              <span>{o.wins>=5 ? "Wall" : o.wins>=2 && o.losses>=2 ? "Comeback path" : "Rivalry in progress"}</span>
+              <div className="rivalry-icon">{o.wins>=5 ? "🛡️" : o.wins>=2 && o.losses>=2 ? "🔥" : "⚔️"}</div>
+              <div className="rivalry-card-copy">
+                <b>vs {o.name}</b>
+                <span>{o.wins>=5 ? "🛡️ Wall" : o.wins>=2 && o.losses>=2 ? "🔥 Comeback" : "⚔️ Rivalry"}</span>
+                <small>{o.matches} encounters</small>
+                {o.wins>=5 ? <em>Unbeaten streak</em> : o.wins>=2 && o.losses>=2 ? <em>Comeback wins</em> : <em>{o.lastEncounter ? `Last: ${matchTimestamp(o.lastEncounter)}` : "Rivalry in progress"}</em>}
+              </div>
             </div>)}
             {!selected.opponentList.length && <div className="empty-state">No recorded rivalry history yet.</div>}
           </div>
@@ -1715,14 +1602,7 @@ export default function Home() {
       {scheduledMatchToRecord && <div className="scheduled-record-banner">
         <b>Scheduled match</b>
         <span>Select the winner and save the result. You can also close this and create a different match.</span>
-      </div>}<div className="selection-grid">{players.map(p => {
-        const selectionIndex = selected.indexOf(p.id);
-        const isGuest = p.name === "Guest1" || p.name === "Guest2";
-        const selectedTeamClass = selectionIndex >= 0 ? (selectionIndex < 2 ? "selected team-a-selected" : "selected team-b-selected") : "";
-        return <button key={p.id} className={`player-chip ${isGuest ? "guest-player" : ""} ${selectedTeamClass}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>
-          {p.name}{selectionIndex >= 0 && <small>{selectionIndex + 1}</small>}
-        </button>
-      })}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
+      </div>}<div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
         <div className="helper">Who won?</div>
         <div className="winner-options">
           <button

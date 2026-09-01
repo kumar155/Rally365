@@ -666,75 +666,62 @@
   }
 }
 
-/* Rivalry Moments: keep 2x2 tiles on mobile. */
+/* Rivalry Moments: larger/faster animated icons with balanced tile spacing. */
+.duo-history-card{
+  padding-right:26px;
+}
+.rivalry-icon{
+  width:82px;
+  height:82px;
+  font-size:52px;
+  top:10px;
+  left:16px;
+  animation-duration:1.55s;
+}
+.rivalry-wall .rivalry-icon{animation-duration:1.25s}
+.rivalry-comeback .rivalry-icon{animation-duration:1.05s}
 @media(max-width:520px){
-  .duo-history-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-    gap:8px;
-  }
   .duo-history-card{
-    min-height:145px;
-    padding:76px 12px 12px;
-    border-radius:15px;
+    padding-right:14px;
   }
   .rivalry-icon{
-    width:56px;
-    height:56px;
-    left:12px;
-    top:11px;
-    font-size:32px;
+    width:66px;
+    height:66px;
+    font-size:43px;
+    left:11px;
+    top:9px;
   }
-  .duo-history-card b{font-size:12px;line-height:1.2}
-  .duo-history-card small{font-size:10px}
-  .duo-history-card span{font-size:8px;padding:5px 7px}
+  .rivalry-wall .rivalry-icon{animation-duration:1.25s}
+  .rivalry-comeback .rivalry-icon{animation-duration:1.05s}
 }
 
-/* New Match: selected players share the same team color. */
-.player-chip.team-a-selected{
-  border-color:#15985c;
-  background:#e4f6ec;
-  color:#11824d;
+.rivalry-card-copy{
+  margin-left:96px;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:5px;
 }
-.player-chip.team-b-selected{
-  border-color:#d9a3a3;
-  background:#fff0f0;
-  color:#b64242;
-}
-.player-chip.team-a-selected small{background:#15985c}
-.player-chip.team-b-selected small{background:#d94d4d}
-
-/* New Match selection colors: Team A = purple, Team B = yellow.
-   These colors represent team assignment only, not win/loss state. */
-.player-chip.team-a-selected{
-  border-color:#7c3aed;
-  background:#f1e8ff;
-  color:#6530b8;
-}
-.player-chip.team-b-selected{
-  border-color:#d6a900;
-  background:#fff6c9;
-  color:#7a6200;
-}
-.player-chip.team-a-selected small{background:#7c3aed}
-.player-chip.team-b-selected small{background:#d6a900}
-
-.match-timestamp{
-  display:block;
-  margin-top:3px;
-  color:#8a9891;
+.rivalry-card-copy b{font-size:15px;line-height:1.2}
+.rivalry-card-copy span{
+  margin:0;
+  padding:5px 9px;
   font-size:9px;
-  font-weight:600;
-  letter-spacing:.01em;
 }
-
-/* Match timestamps use secondary text color. */
-.match-timestamp{
-  color:var(--muted-text, #7b8c83) !important;
+.rivalry-card-copy small{
+  color:#718078;
+  font-size:10px;
 }
-
-/* Fixed guest players in New Match. */
-.player-chip.guest-player:not(.team-a-selected):not(.team-b-selected){
-  border-style:dashed;
-  background:#faf8ff;
-  color:#67567e;
+.rivalry-card-copy em{
+  font-style:normal;
+  color:#53665c;
+  font-size:10px;
+  font-weight:800;
+}
+@media(max-width:520px){
+  .rivalry-card-copy{margin-left:74px}
+  .rivalry-card-copy b{font-size:12px}
+  .rivalry-card-copy span{font-size:8px;padding:4px 7px}
+  .rivalry-card-copy small,.rivalry-card-copy em{font-size:9px}
 }

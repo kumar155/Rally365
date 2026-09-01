@@ -665,3 +665,76 @@
     top:13px;
   }
 }
+
+/* Rivalry Moments: keep 2x2 tiles on mobile. */
+@media(max-width:520px){
+  .duo-history-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px;
+  }
+  .duo-history-card{
+    min-height:145px;
+    padding:76px 12px 12px;
+    border-radius:15px;
+  }
+  .rivalry-icon{
+    width:56px;
+    height:56px;
+    left:12px;
+    top:11px;
+    font-size:32px;
+  }
+  .duo-history-card b{font-size:12px;line-height:1.2}
+  .duo-history-card small{font-size:10px}
+  .duo-history-card span{font-size:8px;padding:5px 7px}
+}
+
+/* New Match: selected players share the same team color. */
+.player-chip.team-a-selected{
+  border-color:#15985c;
+  background:#e4f6ec;
+  color:#11824d;
+}
+.player-chip.team-b-selected{
+  border-color:#d9a3a3;
+  background:#fff0f0;
+  color:#b64242;
+}
+.player-chip.team-a-selected small{background:#15985c}
+.player-chip.team-b-selected small{background:#d94d4d}
+
+/* New Match selection colors: Team A = purple, Team B = yellow.
+   These colors represent team assignment only, not win/loss state. */
+.player-chip.team-a-selected{
+  border-color:#7c3aed;
+  background:#f1e8ff;
+  color:#6530b8;
+}
+.player-chip.team-b-selected{
+  border-color:#d6a900;
+  background:#fff6c9;
+  color:#7a6200;
+}
+.player-chip.team-a-selected small{background:#7c3aed}
+.player-chip.team-b-selected small{background:#d6a900}
+
+.match-timestamp{
+  display:block;
+  margin-top:3px;
+  color:#8a9891;
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.01em;
+}
+
+/* Match timestamps use secondary text color. */
+.match-timestamp{
+  color:var(--muted-text, #7b8c83) !important;
+}
+
+/* Fixed guest players in New Match. */
+.player-chip.guest-player:not(.team-a-selected):not(.team-b-selected){
+  border-style:dashed;
+  background:#faf8ff;
+  color:#67567e;
+}

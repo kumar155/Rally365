@@ -354,6 +354,67 @@ export default function Home() {
         return h.slice(firstLoss + 1).filter((x: string) => x === "W").length >= 2 && h.slice(0, firstLoss + 1).filter((x: string) => x === "L").length >= 2;
       });
 
+      const winsByPartner = partnerList.map(p => p.wins);
+      const maxPartnerMatches = partnerList.reduce((max, p) => Math.max(max, p.matches), 0);
+      const maxPartnerWins = partnerList.reduce((max, p) => Math.max(max, p.wins), 0);
+      const maxOpponentWins = opponentList.reduce((max, o) => Math.max(max, o.wins), 0);
+      const winningPartners = partnerList.filter(p => p.wins > p.losses).length;
+      const playersToBeat = Math.max(0, players.length - 1);
+      const opponentsWithWins = opponentList.filter(o => o.wins > 0).length;
+      const opponentsWithWinningRecord = opponentList.filter(o => o.wins > o.losses).length;
+
+      // Pattern-based milestones are calculated from the complete recorded history.
+      const hasLossThenTwoWins = opponentList.some(o => {
+        const h = o.history;
+        for (let i = 0; i < h.length; i++) {
+          if (h[i] !== "L") continue;
+          let winsAfter = 0;
+          for (let j = i + 1; j < h.length; j++) {
+            if (h[j] === "W") winsAfter++;
+          }
+          if (winsAfter >= 2) return true;
+        }
+        return false;
+      });
+      const hasThreeLossesThenWin = opponentList.some(o => {
+        let lossesBefore = 0;
+        for (const r of o.history) {
+          if (r === "L") lossesBefore++;
+          else if (r === "W" && lossesBefore >= 3) return true;
+        }
+        return false;
+      });
+      const hasImmediateRevenge = opponentList.some(o => {
+        const h = o.history;
+        for (let i = 1; i < h.length; i++) if (h[i - 1] === "L" && h[i] === "W") return true;
+        return false;
+      });
+      const hasThreeWinsAfterLosingStreak = (() => {
+        let losses = 0;
+        for (const m of playerMatches) {
+          const me = m.match_players?.find((mp: any) => mp.player_id === s.id);
+          if (!me) continue;
+          const own = me.team === "A" ? Number(m.team_a_score) : Number(m.team_b_score);
+          const opp = me.team === "A" ? Number(m.team_b_score) : Number(m.team_a_score);
+          if (own > opp) {
+            if (losses >= 2) return true;
+            losses = 0;
+          } else losses++;
+        }
+        return false;
+      })();
+      const maxOpponentsInDay = (() => {
+        const byDay = new Map<string, Set<string>>();
+        for (const m of playerMatches) {
+          const me = m.match_players?.find((mp: any) => mp.player_id === s.id);
+          if (!me) continue;
+          const day = String(m.played_at || "").slice(0, 10);
+          const set = byDay.get(day) || new Set<string>();
+          for (const op of (m.match_players || []).filter((mp: any) => mp.team !== me.team)) set.add(op.player_id);
+          byDay.set(day, set);
+        }
+        return Math.max(0, ...Array.from(byDay.values()).map(x => x.size));
+      })();
       const achievements = [
         ["first-match","🏸","First Match",played >= 1,played,"Play your first recorded match"],
         ["first-win","🏆","First Win",wins >= 1,wins,"Record your first win"],
@@ -369,6 +430,26 @@ export default function Home() {
         ["wall","🧱","Wall",!!wall,wall?.wins || 0,"Win 5 matches against the same opponent"],
         ["comeback-king","🔥","Comeback King",!!comeback,comeback?.wins || 0,"Lose to an opponent twice, then beat them twice"],
         ["versatile","🌀","Versatile",differentPartners >= 5,differentPartners,"Play with 5 different partners"],
+        ["human-wall","🦾","Human Wall",bestStreak >= 5,bestStreak,"Win 5 matches in a row"],
+        ["on-fire","🔥","On Fire",bestStreak >= 7,bestStreak,"Win 7 matches in a row"],
+        ["problem-player","😈","Problem Player",maxOpponentWins >= 5,maxOpponentWins,"Beat the same opponent 5 times"],
+        ["clean-sweep","🧹","Clean Sweep",opponentsWithWins >= playersToBeat,opponentsWithWins,"Beat every other player at least once"],
+        ["social-butterfly","🤝","Social Butterfly",differentPartners >= 6,differentPartners,"Partner with all 6 other players"],
+        ["bromance","👯","Bromance Unlocked",maxPartnerMatches >= 10,maxPartnerMatches,"Play 10 matches with the same partner"],
+        ["unfinished-business","💀","Unfinished Business",hasLossThenTwoWins,hasLossThenTwoWins ? 1 : 0,"Lose to a player, then beat them twice"],
+        ["boomerang","🪃","Boomerang",hasImmediateRevenge,hasImmediateRevenge ? 1 : 0,"Lose to someone, then beat them in the very next encounter"],
+        ["ice-cold","🧊","Ice Cold",hasThreeWinsAfterLosingStreak,hasThreeWinsAfterLosingStreak ? 1 : 0,"Win after a losing streak"],
+        ["main-character","🐐","Main Character",wins >= 10,wins,"Reach 10 career wins"],
+        ["court-royalty","👑","Court Royalty",wins >= 25,wins,"Reach 25 career wins"],
+        ["old-guard","🧙","Old Guard",played >= 50,played,"Play 50 recorded matches"],
+        ["silent-assassin","🥷","Silent Assassin",bestStreak >= 5,bestStreak,"Win 5 matches consecutively without a loss"],
+        ["target-acquired","🎯","Target Acquired",maxOpponentsInDay >= 3,maxOpponentsInDay,"Beat 3 different opponents in one day"],
+        ["no-comfort-zone","🔄","No Comfort Zone",differentPartners >= 4,differentPartners,"Partner with 4 different players"],
+        ["team-player","🫡","Team Player",winningPartners >= 5,winningPartners,"Win with 5 different partners"],
+        ["chemistry-test","🧪","Chemistry Test",winningPartners >= 3,winningPartners,"Win with 3 different partners"],
+        ["public-enemy","🚨","Public Enemy",opponentsWithWinningRecord >= 3,opponentsWithWinningRecord,"Have a winning record against 3 different players"],
+        ["revenge-arc","🩸","Revenge Arc",hasThreeLossesThenWin,hasThreeLossesThenWin ? 1 : 0,"Beat someone after losing to them 3 times"],
+        ["everyones-problem","🏆","Everyone's Problem",opponentsWithWins >= playersToBeat,opponentsWithWins,"Have at least one win against every other player"],
       ].map(([id, icon, title, unlocked, progress, description]) => ({ id, icon, title, unlocked, progress, description }));
 
       const milestones = [
@@ -386,7 +467,27 @@ export default function Home() {
         ["wins-100","🏆","100 Wins",wins,100],
         ["partners-1","🤝","First Duo",differentPartners,1],
         ["partners-5","🤝","5 Different Partners",differentPartners,5],
-        ["partners-10","🤝","10 Different Partners",differentPartners,10],
+        ["partners-6","🤝","All 6 Partners",differentPartners,6],
+        ["human-wall","🦾","Human Wall",bestStreak,5],
+        ["on-fire","🔥","On Fire",bestStreak,7],
+        ["problem-player","😈","Problem Player",maxOpponentWins,5],
+        ["clean-sweep","🧹","Clean Sweep",opponentsWithWins,playersToBeat],
+        ["social-butterfly","🤝","Social Butterfly",differentPartners,6],
+        ["bromance","👯","Bromance Unlocked",maxPartnerMatches,10],
+        ["unfinished-business","💀","Unfinished Business",hasLossThenTwoWins ? 1 : 0,1],
+        ["boomerang","🪃","Boomerang",hasImmediateRevenge ? 1 : 0,1],
+        ["ice-cold","🧊","Ice Cold",hasThreeWinsAfterLosingStreak ? 1 : 0,1],
+        ["main-character","🐐","Main Character",wins,10],
+        ["court-royalty","👑","Court Royalty",wins,25],
+        ["old-guard","🧙","Old Guard",played,50],
+        ["silent-assassin","🥷","Silent Assassin",bestStreak,5],
+        ["target-acquired","🎯","Target Acquired",maxOpponentsInDay,3],
+        ["no-comfort-zone","🔄","No Comfort Zone",differentPartners,4],
+        ["team-player","🫡","Team Player",winningPartners,5],
+        ["chemistry-test","🧪","Chemistry Test",winningPartners,3],
+        ["public-enemy","🚨","Public Enemy",opponentsWithWinningRecord,3],
+        ["revenge-arc","🩸","Revenge Arc",hasThreeLossesThenWin ? 1 : 0,1],
+        ["everyones-problem","🏆","Everyone's Problem",opponentsWithWins,playersToBeat],
       ].map(([id, icon, title, current, target]) => ({ id, icon, title, current, target, unlocked: Number(current) >= Number(target) }));
 
       result[s.id] = { stats: s, achievements, milestones, partnerList, opponentList };
@@ -1585,11 +1686,11 @@ export default function Home() {
       <main className="achievement-journey">
         <div className="journey-header">
           <div><div className="eyebrow">PLAYER JOURNEY</div><h2>{s.name}</h2><p>{s.played} matches · {s.w}W · {s.l}L</p></div>
-          <div className="journey-total"><b>{selected.achievements.filter((a:any)=>a.unlocked).length}</b><small>achievements</small></div>
+          <div className="journey-total"><b>{selected.milestones.filter((m:any)=>m.unlocked).length}</b><small>achieved</small></div>
         </div>
 
         <section className="milestone-section">
-          <div className="section-title"><span>🛣️ Milestones</span><span>Progress</span></div>
+          <div className="section-title"><span>🛣️ Milestones ({selected.milestones.length})</span><span>Progress</span></div>
           <div className="milestone-track">
             {selected.milestones.map((m:any)=><div className={`milestone-node ${m.unlocked ? "complete" : ""}`} key={m.id}>
               <div className="milestone-dot">{m.unlocked ? "✓" : m.icon}</div>
@@ -1597,49 +1698,6 @@ export default function Home() {
               <small>{Math.min(m.current,m.target)}/{m.target}</small>
             </div>)}
           </div>
-        </section>
-
-        <section>
-          <div className="section-title">
-            <span>🏆 Achievements</span>
-            <span>{Math.min(achievementCardIndex + 1, selected.achievements.length)}/{selected.achievements.length}</span>
-          </div>
-          {selected.achievements.length > 0 && (() => {
-            const a = selected.achievements[Math.min(achievementCardIndex, selected.achievements.length - 1)];
-            const next = () => setAchievementCardIndex(i => Math.min(i + 1, selected.achievements.length - 1));
-            const previous = () => setAchievementCardIndex(i => Math.max(i - 1, 0));
-            return <div className="achievement-swipe-wrap">
-              <div
-                className={`achievement-swipe-card achievement-theme-${a.id} ${a.unlocked ? "unlocked" : "locked"}`}
-                onTouchStart={(e)=>{ achievementTouchStart.current=e.touches[0].clientX; achievementTouchCurrent.current=e.touches[0].clientX; }}
-                onTouchMove={(e)=>{ achievementTouchCurrent.current=e.touches[0].clientX; }}
-                onTouchEnd={()=>{
-                  const start=achievementTouchStart.current;
-                  const current=achievementTouchCurrent.current;
-                  if(start !== null && current !== null && Math.abs(current-start) > 55){
-                    if(current < start) next(); else previous();
-                  }
-                  achievementTouchStart.current=null; achievementTouchCurrent.current=null;
-                }}
-                role="group"
-                aria-label={`${a.title}, achievement ${achievementCardIndex+1} of ${selected.achievements.length}`}
-              >
-                <div className="achievement-swipe-status">{a.unlocked ? "✓ UNLOCKED" : "IN PROGRESS"}</div>
-                <div className="achievement-swipe-icon">{a.icon}</div>
-                <div className="achievement-swipe-title">{a.title}</div>
-                <div className="achievement-swipe-description">{a.description}</div>
-                <div className="achievement-swipe-progress">{a.unlocked ? "Achievement earned" : `${a.progress || 0} progress`}</div>
-              </div>
-              <div className="achievement-swipe-controls">
-                <button type="button" onClick={previous} disabled={achievementCardIndex===0} aria-label="Previous achievement">‹</button>
-                <div className="achievement-swipe-dots">
-                  {selected.achievements.map((_:any,i:number)=><span key={i} className={i===achievementCardIndex ? "active" : ""} />)}
-                </div>
-                <button type="button" onClick={next} disabled={achievementCardIndex===selected.achievements.length-1} aria-label="Next achievement">›</button>
-              </div>
-              <small className="achievement-swipe-hint">Swipe left or right to explore</small>
-            </div>;
-          })()}
         </section>
 
         <section>
@@ -1655,6 +1713,24 @@ export default function Home() {
               </div>
             </div>)}
             {!selected.opponentList.length && <div className="empty-state">No recorded rivalry history yet.</div>}
+          </div>
+        </section>
+
+        <section className="achievement-cards-section">
+          <div className="section-title">
+            <span>🏆 Achievements</span>
+            <span>{selected.achievements.filter((a:any)=>a.unlocked).length}/{selected.achievements.length}</span>
+          </div>
+          <div className="achievement-cards-grid">
+            {selected.achievements.map((a:any) => (
+              <article key={a.id} className={`achievement-grid-card achievement-theme-${a.id} ${a.unlocked ? "unlocked" : "locked"}`}>
+                <div className="achievement-grid-status">{a.unlocked ? "✓ UNLOCKED" : "IN PROGRESS"}</div>
+                <div className="achievement-grid-icon">{a.icon}</div>
+                <div className="achievement-grid-title">{a.title}</div>
+                <div className="achievement-grid-description">{a.description}</div>
+                <div className="achievement-grid-progress">{a.unlocked ? "Achievement earned" : `${a.progress || 0} progress`}</div>
+              </article>
+            ))}
           </div>
         </section>
       </main>

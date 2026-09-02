@@ -891,3 +891,17 @@
   background:#d6a900 !important;
   color:#fff !important;
 }
+
+.match-timestamp{
+  display:block;
+  margin-top:3px;
+  color:var(--muted-text,#7b8c83);
+  font-size:9px;
+  font-weight:600;
+}
+
+/* Scheduled match delete action */
+.home-schedule-card{cursor:pointer;padding-right:44px}
+.scheduled-delete-button{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:1px solid #e5d8d8;border-radius:10px;background:#fff;display:grid;place-items:center;color:#b24b4b;cursor:pointer;z-index:2}
+.scheduled-delete-button:hover{background:#fff4f4;border-color:#d99a9a}
+.scheduled-delete-button:active{transform:translateY(-50%) scale(.96)}

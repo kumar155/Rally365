@@ -28,6 +28,16 @@ const matchTimestamp = (value: string | null | undefined) => {
   });
 };
 
+const matchHistoryTime = (value: string | null | undefined) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 export default function Home() {
   const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "achievements" | "duos">("today");
   const [players, setPlayers] = useState<Player[]>([]);
@@ -43,13 +53,14 @@ export default function Home() {
   const [duoModifyAuthorized, setDuoModifyAuthorized] = useState(false);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
+  const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
   const [homeSchedule, setHomeSchedule] = useState<{ id: string; matchNo: number; teamA: string[]; teamB: string[]; status: "PLANNED" | "RECORDED"; recordedMatchId: string | null }[]>([]);
   const [duoGenerated, setDuoGenerated] = useState(false);
   const [scoreA, setScoreA] = useState(""); const [scoreB, setScoreB] = useState("");
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify" | "duos-delete">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false);
   const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null);
   const [achievementPlayerId, setAchievementPlayerId] = useState<string | null>(null);
@@ -765,6 +776,35 @@ export default function Home() {
     setModal("pin");
   };
 
+  const requestDeleteScheduledMatch = (scheduled: { id: string; matchNo: number }) => {
+    setScheduledMatchToDelete(scheduled);
+    setPinAction("duos-delete");
+    setPin("");
+    setError("");
+    setModal("pin");
+  };
+
+  const deleteScheduledMatch = async () => {
+    if (!groupId || !scheduledMatchToDelete) return;
+
+    const { error: deleteError } = await supabase
+      .from("duo_schedule_matches")
+      .delete()
+      .eq("id", scheduledMatchToDelete.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setHomeSchedule(current => current.filter(item => item.id !== scheduledMatchToDelete.id));
+    setScheduledMatchToDelete(null);
+    setPin("");
+    setModal(null);
+    setError("");
+    await load();
+  };
+
   const recordScheduledMatch = (scheduled: { id: string; teamA: string[]; teamB: string[] }) => {
     setScheduledMatchToRecord(scheduled);
     setTab("today");
@@ -874,6 +914,26 @@ export default function Home() {
   const verify = async () => {
     if (!groupId || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
       setError("Admin PIN must be exactly 6 digits");
+      return;
+    }
+
+    if (pinAction === "duos-delete") {
+      const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
+        p_group_id: groupId,
+        p_pin: pin,
+      });
+
+      if (pinError) {
+        setError(pinError.message);
+        return;
+      }
+
+      if (!pinValid) {
+        setError("Invalid admin PIN");
+        return;
+      }
+
+      await deleteScheduledMatch();
       return;
     }
 
@@ -1149,11 +1209,13 @@ export default function Home() {
             <span>{homeSchedule.length} matches</span>
           </div>
           <div className="match-list">
-            {homeSchedule.map(m => <button
+            {homeSchedule.map(m => <div
               key={m.id}
-              type="button"
               className="match-card home-schedule-card"
+              role="button"
+              tabIndex={0}
               onClick={() => recordScheduledMatch(m)}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recordScheduledMatch(m); } }}
             >
               <div className="match-number">M{m.matchNo}</div>
               <div className="teams">
@@ -1161,7 +1223,16 @@ export default function Home() {
                 <div><strong className="scheduled-team-name">{duoName(m.teamB)}</strong></div>
               </div>
               <span className="scheduled-record-label">Record</span>
-            </button>)}
+              <button
+                type="button"
+                className="scheduled-delete-button"
+                title="Delete scheduled match"
+                aria-label={`Delete scheduled match M${m.matchNo}`}
+                onClick={e => { e.stopPropagation(); requestDeleteScheduledMatch(m); }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>)}
           </div>
         </div>}
 
@@ -1176,7 +1247,7 @@ export default function Home() {
         </div>}
           {homeMatches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
                 <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : "home-team-loss"}>{team(m, "A")}</strong></div>
-                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div>
+                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
               </div>{m.status !== "VOIDED" && <button
                   className="edit-link"

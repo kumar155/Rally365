@@ -871,3 +871,23 @@
     animation-duration:1.85s !important;
   }
 }
+
+/* New Match team selection colors — independent of win/lose colors. */
+.player-chip.team-a-selected{
+  background:#f1e8ff !important;
+  border-color:#7c3aed !important;
+  color:#6530b8 !important;
+}
+.player-chip.team-a-selected small{
+  background:#7c3aed !important;
+  color:#fff !important;
+}
+.player-chip.team-b-selected{
+  background:#fff6c9 !important;
+  border-color:#d6a900 !important;
+  color:#7a6200 !important;
+}
+.player-chip.team-b-selected small{
+  background:#d6a900 !important;
+  color:#fff !important;
+}

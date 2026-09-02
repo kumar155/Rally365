@@ -1604,7 +1604,13 @@ export default function Home() {
       {scheduledMatchToRecord && <div className="scheduled-record-banner">
         <b>Scheduled match</b>
         <span>Select the winner and save the result. You can also close this and create a different match.</span>
-      </div>}<div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${selected.includes(p.id) ? "selected" : ""}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>{p.name}{selected.includes(p.id) && <small>{selected.indexOf(p.id) + 1}</small>}</button>)}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
+      </div>}<div className="selection-grid">{players.map(p => {
+        const selectionIndex = selected.indexOf(p.id);
+        const teamClass = selectionIndex >= 0 ? (selectionIndex < 2 ? "team-a-selected" : "team-b-selected") : "";
+        return <button key={p.id} className={`player-chip ${selectionIndex >= 0 ? "selected" : ""} ${teamClass}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>
+          {p.name}{selectionIndex >= 0 && <small>{selectionIndex + 1}</small>}
+        </button>;
+      })}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
         <div className="helper">Who won?</div>
         <div className="winner-options">
           <button

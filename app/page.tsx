@@ -1494,7 +1494,7 @@ export default function Home() {
   if (loading) return <main className="center">Loading Rally365…</main>;
 
   return <main className="app-shell">
-    <header className="topbar"><div className="brand-lockup"><img src="/rally365-shuttle.png" alt="" className="brand-shuttle" /><div className="brand-text"><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
+    <header className="topbar"><div className="brand-lockup"><div className="brand-text"><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div><img src="/rally365-shuttle.png" alt="" className="brand-shuttle" /></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 

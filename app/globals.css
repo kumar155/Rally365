@@ -1144,3 +1144,10 @@
 .topbar .group-pill{border-color:#dce7df;background:#f7faf8;color:#476154;}
 .topbar .group-pill svg{color:#39a878;}
 @media(max-width:420px){.topbar{height:78px;padding:8px 10px}.brand-shuttle{width:38px;height:48px}.brand-text .brand{font-size:23px}.brand-text .subtitle{font-size:10px}.topbar .group-pill{font-size:10px;padding:6px 8px;}}
+
+
+/* Final Rally365 header lockup: wordmark first, shuttle after it; shuttle-only mark, no bat. */
+.topbar .brand-lockup{display:flex;align-items:center;gap:8px;min-width:0;height:100%;overflow:visible;border-radius:0;}
+.topbar .brand-text{display:flex;flex-direction:column;justify-content:center;min-width:0;}
+.topbar .brand-shuttle{display:block;width:42px;height:52px;object-fit:contain;object-position:center;flex:0 0 auto;}
+@media(max-width:420px){.topbar .brand-shuttle{width:38px;height:48px;}.topbar .brand-text .brand{font-size:23px;}.topbar .brand-text .subtitle{font-size:10px;}}

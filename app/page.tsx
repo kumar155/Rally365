@@ -1094,6 +1094,34 @@ export default function Home() {
     setModal("match");
   };
 
+  const clearDuoDraft = async () => {
+    if (!groupId) return;
+
+    setError("");
+    setDuoSpinning(false);
+    setDuoMatches([]);
+    setDuoGenerated(false);
+    setDuoPlayers([]);
+    setDuoDraftGeneratedAt(null);
+    setDuoDraftStatus(null);
+    setDuoScheduleLocked(false);
+    setDuoModifyAuthorized(false);
+
+    const d = new Date();
+    const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const { error: clearError } = await supabase
+      .from("duo_schedule_drafts")
+      .delete()
+      .eq("group_id", groupId)
+      .eq("schedule_date", scheduleDate)
+      .eq("status", "DRAFT");
+
+    if (clearError) {
+      setError(clearError.message);
+      await load();
+    }
+  };
+
   const generateDuosForToday = async () => {
     if (duoPlayers.length < 4) {
       setError("Select at least 4 players to generate duos.");
@@ -1773,6 +1801,13 @@ export default function Home() {
 
         {duoPlayers.length > 0 && duoPlayers.length < 4 &&
           <div className="duo-note">Select at least 4 players. No player is scheduled for more than 2 matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
+        }
+
+        {(duoPlayers.length > 0 || duoMatches.length > 0) && !duoSpinning && (duoDraftStatus !== "PUBLISHED") &&
+          <button type="button" className="secondary-button duo-clear-button" onClick={clearDuoDraft}>
+            Clear draft schedule
+            <small>Clear today's draft and player selections</small>
+          </button>
         }
 
         {duoSpinning ? <div className="duo-draw-placeholder" role="status" aria-live="polite">

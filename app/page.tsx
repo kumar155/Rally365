@@ -1498,8 +1498,8 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="primary-button" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={21} /> New match</button>
+      {tab === "today" && <><div className="hero-action-area"><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+        <button className="floating-new-match" aria-label="New match" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></div>
         <div className="home-date-filter">
           <button type="button" className="period-arrow" onClick={() => moveHomeDate(-1)} aria-label="Previous date">‹</button>
           <label className="date-picker-control">

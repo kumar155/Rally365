@@ -955,3 +955,47 @@
   .achievement-grid-description{font-size:8px;line-height:1.35;-webkit-line-clamp:3}
   .achievement-grid-progress{font-size:7px;padding:5px 7px}
 }
+
+/* Duos player selection: single list with the same clear selected-state treatment as New Match. */
+.duo-player-selection-panel{width:100%;margin-bottom:18px}
+.duo-selection-helper{margin:-4px 0 10px;color:#718078;font-size:11px}
+.duo-player-list{width:100%}
+.duo-player-row{min-height:56px;transition:background .16s ease,border-color .16s ease}
+.duo-player-row.added{
+  background:#eaf7f0 !important;
+  border-color:#cfe8da;
+}
+.duo-player-row.added .avatar.small{
+  background:#d8f0e3;
+  color:#15985c;
+}
+.duo-player-row.added .duo-add-icon{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#15985c;
+  color:#fff;
+}
+.duo-player-row:not(.added) .duo-add-icon{color:#7d8b85}
+@media(max-width:720px){
+  .duo-player-selection-panel{margin-bottom:14px}
+  .duo-selection-helper{font-size:10px}
+}
+
+
+/* Duos schedule presentation: no wheel/animation; keep generated schedules visible. */
+.spin-wheel-wrap,.spin-pointer,.spin-wheel{display:none!important}
+.duo-home-button{display:flex;align-items:center;justify-content:center;gap:10px;text-align:left}
+.duo-home-button-copy{display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2}
+.duo-home-button-copy strong{font-size:14px}
+.duo-home-button-copy small{font-size:11px;font-weight:600;opacity:.88}
+.duo-home-status{display:flex;align-items:flex-start;gap:9px;margin-top:10px;padding:11px 13px;border:1px solid #cfe2ff;border-radius:12px;background:#eef6ff;color:#284d79;font-size:12px;line-height:1.45}
+.duo-home-status strong{font-weight:900}
+.duo-home-status-icon{font-size:16px;line-height:1.1;flex:0 0 auto}
+.duo-home-status.empty{background:#f2f8f4;border-color:#d5e8dc;color:#316347}
+@media(max-width:520px){
+  .duo-home-button-copy strong{font-size:13px}
+  .duo-home-button-copy small{font-size:10px}
+}

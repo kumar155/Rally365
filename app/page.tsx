@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, RotateCw
+  MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, Check
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -51,6 +51,9 @@ export default function Home() {
   const [duoSpinning, setDuoSpinning] = useState(false);
   const [duoScheduleLocked, setDuoScheduleLocked] = useState(false);
   const [duoModifyAuthorized, setDuoModifyAuthorized] = useState(false);
+  const [duoDraftGeneratedAt, setDuoDraftGeneratedAt] = useState<string | null>(null);
+  const [duoDraftStatus, setDuoDraftStatus] = useState<"DRAFT" | "PUBLISHED" | null>(null);
+  const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -103,15 +106,50 @@ export default function Home() {
     const now = new Date();
     const todayScheduleDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    const { data: ds, error: dse } = await supabase
-      .from("duo_schedules")
-      .select("id")
-      .eq("group_id", g.id)
-      .eq("schedule_date", todayScheduleDate)
-      .eq("status", "ACTIVE")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data: ds, error: dse }, { data: draft, error: dre }] = await Promise.all([
+      supabase
+        .from("duo_schedules")
+        .select("id")
+        .eq("group_id", g.id)
+        .eq("schedule_date", todayScheduleDate)
+        .eq("status", "ACTIVE")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("duo_schedule_drafts")
+        .select("id,status,player_ids,matches,generated_at,published_at")
+        .eq("group_id", g.id)
+        .eq("schedule_date", todayScheduleDate)
+        .order("generated_at", { ascending: false })
+        .limit(20)
+    ]);
+
+    setTodayPublishedScheduleExists(Boolean(ds));
+    if (dre) setError(dre.message);
+    if (draft && !dre) {
+      const draftRows = Array.isArray(draft) ? draft : [];
+      const preferredDraft = draftRows[0];
+      if (preferredDraft) {
+        const draftPlayers = Array.isArray(preferredDraft.player_ids) ? preferredDraft.player_ids.filter((id: unknown): id is string => typeof id === "string") : [];
+        const draftMatches = Array.isArray(preferredDraft.matches) ? preferredDraft.matches.map((m: any, index: number) => ({
+          id: Number(m.id) || index + 1,
+          teamA: Array.isArray(m.teamA) ? m.teamA : [],
+          teamB: Array.isArray(m.teamB) ? m.teamB : []
+        })) : [];
+        setDuoPlayers(draftPlayers);
+        setDuoMatches(draftMatches);
+        setDuoGenerated(draftMatches.length > 0);
+        setDuoDraftGeneratedAt(preferredDraft.generated_at || null);
+        setDuoDraftStatus(preferredDraft.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT");
+        setDuoScheduleLocked(preferredDraft.status === "PUBLISHED");
+        setDuoModifyAuthorized(false);
+      }
+    } else {
+      setDuoDraftGeneratedAt(null);
+      setDuoDraftStatus(null);
+      setDuoScheduleLocked(false);
+    }
 
     if (dse) {
       setError(dse.message);
@@ -150,6 +188,8 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedules", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedule_matches" }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
@@ -859,7 +899,33 @@ export default function Home() {
     return schedule;
   };
 
-  const exportScheduleToHome = () => {
+  const saveDuoDraft = async (schedule: { id: number; teamA: string[]; teamB: string[] }[]) => {
+    if (!groupId) return false;
+    const d = new Date();
+    const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const generatedAt = new Date().toISOString();
+    const { error: draftError } = await supabase
+      .from("duo_schedule_drafts")
+      .insert({
+        group_id: groupId,
+        schedule_date: scheduleDate,
+        status: "DRAFT",
+        player_ids: duoPlayers,
+        matches: schedule,
+        generated_at: generatedAt,
+        updated_at: generatedAt
+      });
+    if (draftError) {
+      setError(draftError.message);
+      return false;
+    }
+    setDuoDraftGeneratedAt(generatedAt);
+    setDuoDraftStatus("DRAFT");
+    setDuoScheduleLocked(false);
+    return true;
+  };
+
+  const exportScheduleToHome = async () => {
     const validMatches = duoMatches.filter(match =>
       match.teamA.length === 2 &&
       match.teamB.length === 2 &&
@@ -871,10 +937,106 @@ export default function Home() {
       return;
     }
 
+    // No PIN is required when there is no active published schedule with
+    // remaining planned matches. This covers both the first publish of the
+    // day and publishing a fresh schedule after today's planned matches are
+    // all recorded/deleted. If planned matches still remain, replacement is
+    // PIN-protected.
+    if (!todayPublishedScheduleExists || homeSchedule.length === 0) {
+      await publishFirstDuoSchedule(validMatches);
+      return;
+    }
+
     setPinAction("duos");
     setPin("");
     setError("");
     setModal("pin");
+  };
+
+  const publishFirstDuoSchedule = async (validMatches: typeof duoMatches) => {
+    if (!groupId) return;
+
+    const d = new Date();
+    const scheduleDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const payload = validMatches.map((match, index) => ({
+      match_no: index + 1,
+      teamA: match.teamA,
+      teamB: match.teamB
+    }));
+
+    setError("");
+
+    const { data: schedule, error: scheduleError } = await supabase
+      .from("duo_schedules")
+      .insert({ group_id: groupId, schedule_date: scheduleDate, status: "ACTIVE" })
+      .select("id")
+      .single();
+
+    if (scheduleError || !schedule) {
+      setError(scheduleError?.message || "Could not create today's schedule.");
+      return;
+    }
+
+    const rows = payload.map(match => ({
+      schedule_id: schedule.id,
+      match_no: match.match_no,
+      team_a_player_1: match.teamA[0],
+      team_a_player_2: match.teamA[1],
+      team_b_player_1: match.teamB[0],
+      team_b_player_2: match.teamB[1],
+      status: "PLANNED"
+    }));
+
+    const { error: matchesError } = await supabase.from("duo_schedule_matches").insert(rows);
+    if (matchesError) {
+      // Do not leave a schedule header behind if its matches could not be created.
+      await supabase.from("duo_schedules").delete().eq("id", schedule.id);
+      setError(matchesError.message);
+      return;
+    }
+
+    // Once the new schedule is safely populated, retire the previous active
+    // schedule header. Existing RECORDED child matches remain untouched.
+    const { error: retireError } = await supabase
+      .from("duo_schedules")
+      .update({ status: "REPLACED" })
+      .eq("group_id", groupId)
+      .eq("schedule_date", scheduleDate)
+      .eq("status", "ACTIVE")
+      .neq("id", schedule.id);
+
+    if (retireError) {
+      setError(retireError.message);
+      return;
+    }
+
+    const { data: latestDraft, error: latestDraftError } = await supabase
+      .from("duo_schedule_drafts")
+      .select("id")
+      .eq("group_id", groupId)
+      .eq("schedule_date", scheduleDate)
+      .eq("status", "DRAFT")
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { error: draftPublishError } = latestDraftError || !latestDraft
+      ? { error: latestDraftError || new Error("Draft schedule not found.") }
+      : await supabase
+          .from("duo_schedule_drafts")
+          .update({ status: "PUBLISHED", published_at: new Date().toISOString(), published_schedule_id: schedule.id, updated_at: new Date().toISOString() })
+          .eq("id", latestDraft.id);
+    if (draftPublishError) {
+      setError(draftPublishError.message);
+      return;
+    }
+
+    setTodayPublishedScheduleExists(true);
+    setDuoDraftStatus("PUBLISHED");
+    setDuoDraftGeneratedAt(new Date().toISOString());
+    setDuoScheduleLocked(true);
+    setDuoGenerated(true);
+    setTab("today");
+    await load();
   };
 
   const requestDeleteScheduledMatch = (scheduled: { id: string; matchNo: number }) => {
@@ -916,31 +1078,21 @@ export default function Home() {
     setModal("match");
   };
 
-  const generateDuosForToday = () => {
+  const generateDuosForToday = async () => {
     if (duoPlayers.length < 4) {
       setError("Select at least 4 players to generate duos.");
       return;
     }
 
-    if (duoGenerated && !duoModifyAuthorized) {
-      setPinAction("duos-modify");
-      setPin("");
-      setError("");
-      setModal("pin");
-      return;
-    }
-
     setError("");
-    setDuoSpinning(true);
-    setDuoGenerated(false);
-
-    window.setTimeout(() => {
-      setDuoMatches(generateDuoSchedule(duoPlayers));
-      setDuoGenerated(true);
-      setDuoScheduleLocked(true);
-      setDuoModifyAuthorized(false);
-      setDuoSpinning(false);
-    }, 1100);
+    setDuoSpinning(false);
+    const generated = generateDuoSchedule(duoPlayers);
+    setDuoMatches(generated);
+    setDuoGenerated(true);
+    setDuoScheduleLocked(false);
+    setDuoDraftStatus("DRAFT");
+    setDuoModifyAuthorized(false);
+    await saveDuoDraft(generated);
   };
 
   const saveMatch = async () => {
@@ -999,6 +1151,7 @@ export default function Home() {
         setError(scheduleError.message);
         return;
       }
+
       setHomeSchedule(current => current.filter(item => item.id !== scheduledMatchToRecord.id));
     }
 
@@ -1101,6 +1254,26 @@ export default function Home() {
         return;
       }
 
+      const publishedScheduleId = typeof data === "object" && data?.schedule_id ? data.schedule_id : null;
+      const { data: latestDraft } = await supabase
+        .from("duo_schedule_drafts")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("schedule_date", scheduleDate)
+        .eq("status", "DRAFT")
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestDraft) {
+        await supabase
+          .from("duo_schedule_drafts")
+          .update({ status: "PUBLISHED", published_at: new Date().toISOString(), published_schedule_id: publishedScheduleId, updated_at: new Date().toISOString() })
+          .eq("id", latestDraft.id);
+      }
+
+      setTodayPublishedScheduleExists(true);
+      setDuoDraftStatus("PUBLISHED");
+      setDuoScheduleLocked(true);
       setPin("");
       setError("");
       setModal(null);
@@ -1525,103 +1698,46 @@ export default function Home() {
           <p>Pick today's players and let Rally365 balance the doubles schedule.</p>
         </div>
 
-        <div className="duos-layout">
-          <div className="duos-panel">
-            <div className="section-title"><span>1 · All players</span><span>{players.length}</span></div>
-            <div className="duo-player-list">
-              {players.map(p => {
-                const added = duoPlayers.includes(p.id);
-                return <button
-                  key={p.id}
-                  className={`duo-player-row ${added ? "added" : ""}`}
-                  onClick={() => {
-                    if (duoGenerated && !duoModifyAuthorized) {
-                      setPinAction("duos-modify");
-                      setPin("");
-                      setError("");
-                      setModal("pin");
-                      return;
-                    }
-                    setDuoPlayers(current =>
-                      current.includes(p.id)
-                        ? current.filter(id => id !== p.id)
-                        : [...current, p.id]
-                    );
-                    if (duoGenerated) {
-                      setDuoGenerated(false);
-                      setDuoScheduleLocked(false);
-                    }
-                  }}
-                >
-                  <span className="avatar small">{p.name.slice(0, 1)}</span>
-                  <span className="duo-player-name">{p.name}</span>
-                  <span className="duo-add-icon">{added ? <UserMinus size={16} /> : <UserPlus size={16} />}</span>
-                </button>
-              })}
-            </div>
+        <div className="duos-panel duo-player-selection-panel">
+          <div className="section-title">
+            <span>Select players for today's duos</span>
+            <span>{duoPlayers.length} selected</span>
           </div>
-
-          <div className="duos-panel">
-            <div className="section-title"><span>2 · Today's draw</span><span>{duoPlayers.length} selected</span></div>
-            <div className="duo-selected-list">
-              {duoPlayers.length === 0
-                ? <div className="empty-card">Select players from the list.</div>
-                : duoPlayers.map((id, index) => <div className="duo-selected-row" key={id}>
-                    <span className="duo-order">{index + 1}</span>
-                    <span>{name(id)}</span>
-                    <button aria-label={`Remove ${name(id)}`} onClick={() => {
-                      if (duoGenerated && !duoModifyAuthorized) {
-                        setPinAction("duos-modify");
-                        setPin("");
-                        setError("");
-                        setModal("pin");
-                        return;
-                      }
-                      setDuoPlayers(current => current.filter(x => x !== id));
-                      if (duoGenerated) {
-                        setDuoGenerated(false);
-                        setDuoScheduleLocked(false);
-                      }
-                    }}><UserMinus size={14} /></button>
-                  </div>)}
-            </div>
-          </div>
-        </div>
-
-        <div className={`spin-wheel-wrap ${duoSpinning ? "spinning" : ""} ${duoGenerated ? "wheel-ready" : ""}`}>
-          <div className="spin-pointer"></div>
-          <div
-            className="spin-wheel"
-            style={{
-              ["--slice-count" as string]: Math.max(1, duoPlayers.length),
-              ["--wheel-angle" as string]: `${duoPlayers.length ? 360 / duoPlayers.length : 360}deg`
-            }}
-          >
-            {duoPlayers.length === 0 ? (
-              <div className="wheel-empty">Add players<br />to the draw</div>
-            ) : (
-              duoPlayers.map((id, index) => {
-                const angle = (360 / duoPlayers.length) * index + (180 / duoPlayers.length);
-                return <div
-                  className="wheel-label"
-                  key={id}
-                  style={{ ["--label-angle" as string]: `${angle}deg` }}
-                >
-                  <span>{name(id)}</span>
-                </div>
-              })
-            )}
-            <div className="wheel-center"><Shuffle size={20} /><span>DUOS</span></div>
+          <div className="duo-selection-helper">Tap a player to select or unselect</div>
+          <div className="duo-player-list">
+            {players.map(p => {
+              const added = duoPlayers.includes(p.id);
+              return <button
+                key={p.id}
+                type="button"
+                className={`duo-player-row ${added ? "added" : ""}`}
+                onClick={() => {
+                  setDuoPlayers(current =>
+                    current.includes(p.id)
+                      ? current.filter(id => id !== p.id)
+                      : [...current, p.id]
+                  );
+                  if (duoGenerated) {
+                    setDuoGenerated(false);
+                    setDuoScheduleLocked(false);
+                  }
+                }}
+              >
+                <span className="avatar small">{p.name.slice(0, 1)}</span>
+                <span className="duo-player-name">{p.name}</span>
+                <span className="duo-add-icon">{added ? <Check size={19} strokeWidth={3} /> : <UserPlus size={17} />}</span>
+              </button>
+            })}
           </div>
         </div>
 
         <button
           className="primary-button duo-generate-button"
-          disabled={duoPlayers.length < 4 || duoSpinning}
+          disabled={duoPlayers.length < 4}
           onClick={generateDuosForToday}
         >
-          <RotateCw size={18} className={duoSpinning ? "spin-icon" : ""} />
-          {duoSpinning ? "Shuffling players…" : duoGenerated ? "Generate new schedule · Admin PIN" : "Generate Duos for today"}
+          <Shuffle size={18} />
+          {duoGenerated ? "Generate new draft schedule" : "Generate Duos for today"}
         </button>
 
         {duoPlayers.length > 0 && duoPlayers.length < 4 &&
@@ -1630,9 +1746,10 @@ export default function Home() {
 
         {duoGenerated && <div className="duo-schedule">
           <div className="section-title">
-            <span>{duoScheduleLocked ? "🔒 Schedule locked" : "Today's 6-match schedule"}</span>
-            <span>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+            <span>{duoScheduleLocked ? "🔒 Schedule locked · Published" : "📝 Draft schedule"}</span>
+            <span>{duoDraftGeneratedAt ? `Generated ${new Date(duoDraftGeneratedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           </div>
+          <div className="duo-note">{duoScheduleLocked ? "A published schedule is locked on Home. You can still generate a new draft here without PIN." : "Draft only — other players can see this plan and you can regenerate it without PIN."}</div>
           <div className="duo-note">Rotation rule: a player can play up to 2 matches consecutively, but never a third. The generator also rotates partners and opponents where possible.</div>
 
           <div className="duo-schedule-list">
@@ -1654,8 +1771,28 @@ export default function Home() {
 
           <button className="primary-button duo-home-button" onClick={exportScheduleToHome}>
             <History size={18} />
-            Send valid duos to Today's Matches
+            <span className="duo-home-button-copy">
+              <strong>{todayPublishedScheduleExists && homeSchedule.length > 0
+                ? "Replace Today's published duos"
+                : "Publish new duos to Today's Matches"}</strong>
+              <small>{todayPublishedScheduleExists && homeSchedule.length > 0
+                ? "Home already has published schedules. This action requires admin PIN."
+                : homeSchedule.length === 0 && todayPublishedScheduleExists
+                  ? "Home has no scheduled matches left. You can publish this new schedule without PIN."
+                  : "Home has no published schedule yet. First publish does not require PIN."}</small>
+            </span>
           </button>
+          <div className={`duo-home-status ${homeSchedule.length > 0 ? "has-schedule" : "empty"}`}>
+            <span className="duo-home-status-icon">ⓘ</span>
+            <span>
+              <strong>Home status:</strong>{" "}
+              {homeSchedule.length > 0
+                ? `${homeSchedule.length} scheduled ${homeSchedule.length === 1 ? "match is" : "matches are"} currently published. These will be replaced with this new schedule after confirmation.`
+                : todayPublishedScheduleExists
+                  ? "No scheduled matches are left on Home. This new schedule can be published without PIN."
+                  : "No published schedule is on Home yet. This schedule can be published without PIN."}
+            </span>
+          </div>
         </div>}
       </>}
 

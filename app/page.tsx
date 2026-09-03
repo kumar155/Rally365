@@ -144,11 +144,27 @@ export default function Home() {
         setDuoDraftStatus(preferredDraft.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT");
         setDuoScheduleLocked(preferredDraft.status === "PUBLISHED");
         setDuoModifyAuthorized(false);
+      } else {
+        // No draft exists for the current date. Never carry yesterday's
+        // generated schedule into a new day.
+        setDuoPlayers([]);
+        setDuoMatches([]);
+        setDuoGenerated(false);
+        setDuoDraftGeneratedAt(null);
+        setDuoDraftStatus(null);
+        setDuoScheduleLocked(false);
+        setDuoModifyAuthorized(false);
       }
     } else {
+      // No draft exists for the current date (or the query failed). Keep the
+      // Duos screen date-scoped instead of showing an earlier day's schedule.
+      setDuoPlayers([]);
+      setDuoMatches([]);
+      setDuoGenerated(false);
       setDuoDraftGeneratedAt(null);
       setDuoDraftStatus(null);
       setDuoScheduleLocked(false);
+      setDuoModifyAuthorized(false);
     }
 
     if (dse) {
@@ -1209,7 +1225,6 @@ export default function Home() {
 
       setDuoModifyAuthorized(true);
       setDuoScheduleLocked(false);
-      setDuoGenerated(false);
       setPin("");
       setError("");
       setModal(null);
@@ -1696,6 +1711,10 @@ export default function Home() {
           <div className="eyebrow">DAILY DRAW</div>
           <h1>Generate duos</h1>
           <p>Pick today's players and let Rally365 balance the doubles schedule.</p>
+          <div className="duo-date-box" aria-label="Today's date">
+            <span className="duo-date-label">TODAY</span>
+            <strong>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</strong>
+          </div>
         </div>
 
         <div className="duos-panel duo-player-selection-panel">
@@ -1717,10 +1736,6 @@ export default function Home() {
                       ? current.filter(id => id !== p.id)
                       : [...current, p.id]
                   );
-                  if (duoGenerated) {
-                    setDuoGenerated(false);
-                    setDuoScheduleLocked(false);
-                  }
                 }}
               >
                 <span className="avatar small">{p.name.slice(0, 1)}</span>
@@ -1737,14 +1752,14 @@ export default function Home() {
           onClick={generateDuosForToday}
         >
           <Shuffle size={18} />
-          {duoGenerated ? "Generate new draft schedule" : "Generate Duos for today"}
+          {duoMatches.length > 0 ? "Generate new draft schedule" : "Generate Duos for today"}
         </button>
 
         {duoPlayers.length > 0 && duoPlayers.length < 4 &&
           <div className="duo-note">Select at least 4 players. No player is scheduled for more than 2 matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
         }
 
-        {duoGenerated && <div className="duo-schedule">
+        {duoMatches.length > 0 ? <div className="duo-schedule">
           <div className="section-title">
             <span>{duoScheduleLocked ? "🔒 Schedule locked · Published" : "📝 Draft schedule"}</span>
             <span>{duoDraftGeneratedAt ? `Generated ${new Date(duoDraftGeneratedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
@@ -1793,6 +1808,10 @@ export default function Home() {
                   : "No published schedule is on Home yet. This schedule can be published without PIN."}
             </span>
           </div>
+        </div> : <div className="duo-empty-state">
+          <div className="duo-empty-icon">🏸</div>
+          <strong>No schedule for today</strong>
+          <span>Generate a new Duos schedule to create today's plan.</span>
         </div>}
       </>}
 

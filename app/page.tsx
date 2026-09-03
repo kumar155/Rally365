@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, X, Trash2, UserMinus, UserPlus, Shuffle, Check
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -1101,10 +1101,26 @@ export default function Home() {
     }
 
     setError("");
-    setDuoSpinning(false);
+    const isRegenerating = duoMatches.length > 0;
+
+    // When regenerating, clear the old schedule immediately and show a
+    // three-second draw state so the new schedule feels like a fresh daily draw.
+    if (isRegenerating) {
+      setDuoMatches([]);
+      setDuoGenerated(false);
+      setDuoSpinning(true);
+      setDuoScheduleLocked(false);
+      setDuoDraftStatus("DRAFT");
+      setDuoModifyAuthorized(false);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } else {
+      setDuoSpinning(false);
+    }
+
     const generated = generateDuoSchedule(duoPlayers);
     setDuoMatches(generated);
     setDuoGenerated(true);
+    setDuoSpinning(false);
     setDuoScheduleLocked(false);
     setDuoDraftStatus("DRAFT");
     setDuoModifyAuthorized(false);
@@ -1478,7 +1494,7 @@ export default function Home() {
   if (loading) return <main className="center">Loading Rally365…</main>;
 
   return <main className="app-shell">
-    <header className="topbar"><div><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
+    <header className="topbar"><div className="brand-lockup"><img src="/rally365-shuttle.png" alt="" className="brand-shuttle" /><div className="brand-text"><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
@@ -1759,7 +1775,11 @@ export default function Home() {
           <div className="duo-note">Select at least 4 players. No player is scheduled for more than 2 matches in a row. With 4–6 or 8 players, everyone is covered within the first 2 matches; with 7, the rotation starts immediately.</div>
         }
 
-        {duoMatches.length > 0 ? <div className="duo-schedule">
+        {duoSpinning ? <div className="duo-draw-placeholder" role="status" aria-live="polite">
+          <div className="duo-draw-spinner"><Shuffle size={28} /></div>
+          <strong>Drawing today’s duos…</strong>
+          <span>Rally365 is balancing partners and rotations.</span>
+        </div> : duoMatches.length > 0 ? <div className="duo-schedule">
           <div className="section-title">
             <span>{duoScheduleLocked ? "🔒 Schedule locked · Published" : "📝 Draft schedule"}</span>
             <span>{duoDraftGeneratedAt ? `Generated ${new Date(duoDraftGeneratedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
@@ -1894,7 +1914,7 @@ export default function Home() {
   </div>;
 })()}
 
-{tab === "players" && <><div className="page-heading"><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All-time performance across the complete match history.</p></div><div className="player-grid">{allTimePlayerStats.map(s => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className="avatar">{s.name.slice(0, 1)}</div><div><b>{s.name}</b><small>{s.played} matches · {s.w}W · {s.l}L · {s.winRate}%</small></div><CircleUserRound size={19} className="muted" /></button> })}</div></>}
+{tab === "players" && <><div className="players-heading"><div className="players-heading-icon"><UsersRound size={28} /></div><div><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All players in your club</p></div></div><div className="player-grid">{allTimePlayerStats.map((s, i) => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className={`avatar player-avatar avatar-color-${i % 8}`}>{s.name.slice(0, 1)}</div><div className="player-card-copy"><b>{s.name}</b><small><span>{s.played} matches</span><span className="stat-dot">•</span><span className="win-stat">{s.w}W</span><span className="stat-dot">•</span><span className="loss-stat">{s.l}L</span><span className="stat-dot">•</span><span>{s.winRate}%</span></small></div><CircleUserRound size={23} className="player-profile-icon" /></button> })}</div></>}
     </section>
     <nav className="bottom-nav" style={{
       display: "grid",

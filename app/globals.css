@@ -1023,3 +1023,124 @@
 .duo-date-box{margin-top:14px;display:flex;align-items:center;gap:10px;width:fit-content;padding:9px 13px;border:1px solid #cfe6d9;border-radius:12px;background:#eaf7f0;color:#166b45}
 .duo-date-label{font-size:9px;font-weight:900;letter-spacing:1px;color:#15985c;background:#fff;border:1px solid #cfe6d9;border-radius:7px;padding:5px 7px}
 .duo-date-box strong{font-size:12px;font-weight:800}
+
+/* Daily Duo regeneration draw state */
+.duo-draw-placeholder{
+  min-height: 230px;
+  margin-top: 16px;
+  padding: 32px 20px;
+  border: 1px solid #e6e8ef;
+  border-radius: 18px;
+  background: #fafbfc;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  text-align:center;
+  color:#475467;
+}
+.duo-draw-placeholder strong{font-size:18px;color:#252b36}
+.duo-draw-placeholder span{font-size:13px;color:#667085}
+.duo-draw-spinner{
+  width:62px;
+  height:62px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:4px solid #e8e9ee;
+  border-top-color:#7c3aed;
+  color:#7c3aed;
+  animation:duoDrawSpin .8s linear infinite;
+}
+@keyframes duoDrawSpin{to{transform:rotate(360deg)}}
+
+/* Rally365 final brand header + unique player avatar colors */
+.topbar{
+  height:92px;
+  padding:10px 14px;
+  background:#061b2b;
+  border-bottom:0;
+  box-shadow:0 3px 14px rgba(6,27,43,.16);
+}
+.brand-lockup{display:flex;align-items:center;min-width:0;height:100%;overflow:hidden;border-radius:12px}
+.brand-logo{display:block;width:240px;height:82px;object-fit:contain;object-position:left center}
+.topbar .group-pill{
+  flex:0 0 auto;
+  border-color:rgba(255,255,255,.24);
+  background:rgba(255,255,255,.08);
+  color:#eef8f3;
+}
+.topbar .group-pill svg{color:#39d47e}
+.player-avatar{color:#fff!important;border-radius:13px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 8px rgba(16,35,26,.08)}
+.avatar-color-0{background:linear-gradient(135deg,#18b978,#36d88a)!important}
+.avatar-color-1{background:linear-gradient(135deg,#237fe5,#4c9af2)!important}
+.avatar-color-2{background:linear-gradient(135deg,#7540d8,#a263ed)!important}
+.avatar-color-3{background:linear-gradient(135deg,#f26b19,#ff8b27)!important}
+.avatar-color-4{background:linear-gradient(135deg,#e92d83,#f75aa1)!important}
+.avatar-color-5{background:linear-gradient(135deg,#16b9d0,#35cfe3)!important}
+.avatar-color-6{background:linear-gradient(135deg,#f4ae19,#ffc12f)!important}
+.avatar-color-7{background:linear-gradient(135deg,#4aaf31,#65c94b)!important}
+@media(max-width:420px){
+  .topbar{height:82px;padding:8px 10px}
+  .brand-logo{width:195px;height:70px}
+  .topbar .group-pill{font-size:10px;padding:6px 8px}
+}
+
+
+/* Final Players screen polish */
+.players-heading{display:flex;align-items:center;gap:14px;padding:8px 2px 18px}
+.players-heading-icon{width:52px;height:52px;border-radius:16px;background:#e5f5ec;color:#1a8e59;display:grid;place-items:center;flex:0 0 auto}
+.players-heading .eyebrow{margin-bottom:1px}
+.players-heading h1{margin:0 0 2px;font-size:27px;letter-spacing:-.8px}
+.players-heading p{margin:0;color:#718078;font-size:13px}
+.player-grid{gap:10px}
+.player-card{min-height:82px;padding:14px 15px;border-radius:20px;border:1px solid #e5ece8;background:#fff;box-shadow:0 2px 9px rgba(16,35,26,.025);gap:15px}
+.player-card:hover{border-color:#d8e6de;box-shadow:0 4px 14px rgba(16,35,26,.05)}
+.player-avatar{width:48px;height:48px;border-radius:14px!important;font-size:19px;flex:0 0 auto}
+.player-card-copy{min-width:0;text-align:left}
+.player-card-copy b{font-size:16px;line-height:1.2}
+.player-card-copy small{display:flex;align-items:center;flex-wrap:wrap;gap:5px;color:#6f7e76;font-size:12px;margin-top:5px}
+.stat-dot{color:#a0aca6}
+.win-stat{color:#158754}
+.loss-stat{color:#c63b3b}
+.player-profile-icon{margin-left:auto;flex:0 0 auto;color:#71847b}
+@media(max-width:420px){
+ .players-heading{padding-bottom:15px}
+ .players-heading-icon{width:48px;height:48px;border-radius:15px}
+ .player-card{min-height:76px;padding:12px 13px;gap:12px}
+ .player-avatar{width:44px;height:44px}
+ .player-card-copy b{font-size:15px}
+ .player-card-copy small{font-size:11px;gap:4px}
+}
+
+/* Player initials: text-only color treatment */
+.player-avatar{
+  background:transparent!important;
+  box-shadow:none!important;
+  border:none!important;
+  border-radius:0!important;
+  color:inherit!important;
+}
+.avatar-color-0{color:#16a765!important;background:transparent!important}
+.avatar-color-1{color:#237fe5!important;background:transparent!important}
+.avatar-color-2{color:#7540d8!important;background:transparent!important}
+.avatar-color-3{color:#ed7100!important;background:transparent!important}
+.avatar-color-4{color:#e62d91!important;background:transparent!important}
+.avatar-color-5{color:#10aebd!important;background:transparent!important}
+.avatar-color-6{color:#e5a300!important;background:transparent!important}
+.avatar-color-7{color:#3fae22!important;background:transparent!important}
+
+
+/* Final header: shuttle beside the existing Rally365 text */
+.topbar{height:78px;padding:10px 14px;background:#fff;border-bottom:1px solid #e2eae5;box-shadow:none;}
+.brand-lockup{display:flex;align-items:center;min-width:0;height:100%;overflow:visible;border-radius:0;gap:8px;}
+.brand-shuttle{display:block;width:42px;height:52px;object-fit:contain;object-position:center;}
+.brand-text{display:flex;flex-direction:column;justify-content:center;min-width:0;}
+.brand-text .brand{font-size:24px;font-weight:900;letter-spacing:-1px;line-height:1.05;color:#10231a;}
+.brand-text .brand span{color:#19a463;}
+.brand-text .subtitle{font-size:11px;color:#789085;margin-top:3px;}
+.topbar .group-pill{border-color:#dce7df;background:#f7faf8;color:#476154;}
+.topbar .group-pill svg{color:#39a878;}
+@media(max-width:420px){.topbar{height:78px;padding:8px 10px}.brand-shuttle{width:38px;height:48px}.brand-text .brand{font-size:23px}.brand-text .subtitle{font-size:10px}.topbar .group-pill{font-size:10px;padding:6px 8px;}}

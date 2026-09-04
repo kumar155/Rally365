@@ -1096,7 +1096,7 @@ export default function Home() {
 
   const recordScheduledMatch = (scheduled: { id: string; teamA: string[]; teamB: string[] }) => {
     if (todayMatchesFrozen) {
-      setError("Adding matches is frozen for today. An admin must unfreeze today first.");
+      setError("Adding matches is locked for today. An admin must unlock today first.");
       return;
     }
     setScheduledMatchToRecord(scheduled);
@@ -1190,7 +1190,7 @@ export default function Home() {
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4 || !winnerTeam) return;
     if (todayMatchesFrozen) {
-      setError("Adding matches is frozen for today. An admin must unfreeze today first.");
+      setError("Adding matches is locked for today. An admin must unlock today first.");
       return;
     }
 
@@ -1274,7 +1274,7 @@ export default function Home() {
         p_group_id: groupId, p_pin: pin, p_freeze_date: today
       });
       if (unfreezeError) { setError(unfreezeError.message); return; }
-      if (!result) { setError("Could not unfreeze today."); return; }
+      if (!result) { setError("Could not unlock today."); return; }
       setTodayMatchesFrozen(false);
       setPin(""); setError(""); setModal(null);
       await load();
@@ -1588,8 +1588,8 @@ export default function Home() {
           <button type="button" className="period-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date">›</button>
         </div>
         {homeDate === localDateKey(new Date()) && <div className={`today-freeze-panel ${todayMatchesFrozen ? "frozen" : ""}`}>
-          <div><strong>{todayMatchesFrozen ? "Today is frozen" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches today." : "Anyone can freeze match entry for today."}</small></div>
-          {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unfreeze</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Freeze today</button>}
+          <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
+          {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
         </div>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
@@ -2051,7 +2051,7 @@ export default function Home() {
       </div>}
       <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
 
-    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>{pinAction === "unfreeze" ? "Enter the 6-digit admin PIN to unfreeze today." : "Enter the 6-digit admin PIN."}</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
+    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>{pinAction === "unfreeze" ? "Enter the 6-digit admin PIN to unlock today." : "Enter the 6-digit admin PIN."}</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
 
     {modal === "edit" && targetMatch && <Modal title="Edit Match" close={() => {

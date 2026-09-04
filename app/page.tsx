@@ -54,6 +54,7 @@ export default function Home() {
   const [duoDraftGeneratedAt, setDuoDraftGeneratedAt] = useState<string | null>(null);
   const [duoDraftStatus, setDuoDraftStatus] = useState<"DRAFT" | "PUBLISHED" | null>(null);
   const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
+  const [todayMatchesFrozen, setTodayMatchesFrozen] = useState(false);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -63,7 +64,7 @@ export default function Home() {
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | "">("");
   const [modal, setModal] = useState<null | "match" | "edit" | "remove" | "pin" | "fine" | "expense">(null);
   const [targetMatch, setTargetMatch] = useState<Match | null>(null);
-  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify" | "duos-delete">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
+  const [pin, setPin] = useState(""); const [verifiedEditPin, setVerifiedEditPin] = useState(""); const verifiedEditPinRef = useRef(""); const [pinAction, setPinAction] = useState<"edit" | "money" | "duos" | "duos-modify" | "duos-delete" | "unfreeze">("money"); const [moneyAction, setMoneyAction] = useState<"fine" | "expense">("fine");
   const [adminOK, setAdminOK] = useState(false);
   const [playerDetailsId, setPlayerDetailsId] = useState<string | null>(null);
   const [achievementPlayerId, setAchievementPlayerId] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export default function Home() {
     const now = new Date();
     const todayScheduleDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    const [{ data: ds, error: dse }, { data: draft, error: dre }] = await Promise.all([
+    const [{ data: ds, error: dse }, { data: draft, error: dre }, { data: freezeRow, error: freezeError }] = await Promise.all([
       supabase
         .from("duo_schedules")
         .select("id")
@@ -122,10 +123,18 @@ export default function Home() {
         .eq("group_id", g.id)
         .eq("schedule_date", todayScheduleDate)
         .order("generated_at", { ascending: false })
-        .limit(20)
+        .limit(20),
+      supabase
+        .from("match_day_freezes")
+        .select("id")
+        .eq("group_id", g.id)
+        .eq("freeze_date", todayScheduleDate)
+        .maybeSingle()
     ]);
 
     setTodayPublishedScheduleExists(Boolean(ds));
+    setTodayMatchesFrozen(Boolean(freezeRow));
+    if (freezeError) setError(freezeError.message);
     if (dre) setError(dre.message);
     if (draft && !dre) {
       const draftRows = Array.isArray(draft) ? draft : [];
@@ -206,6 +215,7 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedules", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedule_matches" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_day_freezes", filter: `group_id=eq.${groupId}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
@@ -1085,6 +1095,10 @@ export default function Home() {
   };
 
   const recordScheduledMatch = (scheduled: { id: string; teamA: string[]; teamB: string[] }) => {
+    if (todayMatchesFrozen) {
+      setError("Adding matches is frozen for today. An admin must unfreeze today first.");
+      return;
+    }
     setScheduledMatchToRecord(scheduled);
     setTab("today");
     setSelected([...scheduled.teamA, ...scheduled.teamB]);
@@ -1092,6 +1106,24 @@ export default function Home() {
     setScoreA("");
     setScoreB("");
     setModal("match");
+  };
+
+  const freezeToday = async () => {
+    if (!groupId) return;
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const { error: freezeError } = await supabase.rpc("freeze_match_day", { p_group_id: groupId, p_freeze_date: today });
+    if (freezeError) { setError(freezeError.message); return; }
+    setTodayMatchesFrozen(true);
+    setError("");
+    await load();
+  };
+
+  const requestUnfreezeToday = () => {
+    setPinAction("unfreeze");
+    setPin("");
+    setError("");
+    setModal("pin");
   };
 
   const clearDuoDraft = async () => {
@@ -1157,6 +1189,10 @@ export default function Home() {
 
   const saveMatch = async () => {
     if (!groupId || selected.length !== 4 || !winnerTeam) return;
+    if (todayMatchesFrozen) {
+      setError("Adding matches is frozen for today. An admin must unfreeze today first.");
+      return;
+    }
 
     // The database still uses its existing score columns for compatibility,
     // but the UI treats them only as internal W/L placeholders.
@@ -1228,6 +1264,20 @@ export default function Home() {
   const verify = async () => {
     if (!groupId || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
       setError("Admin PIN must be exactly 6 digits");
+      return;
+    }
+
+    if (pinAction === "unfreeze") {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const { data: result, error: unfreezeError } = await supabase.rpc("unfreeze_match_day_with_pin", {
+        p_group_id: groupId, p_pin: pin, p_freeze_date: today
+      });
+      if (unfreezeError) { setError(unfreezeError.message); return; }
+      if (!result) { setError("Could not unfreeze today."); return; }
+      setTodayMatchesFrozen(false);
+      setPin(""); setError(""); setModal(null);
+      await load();
       return;
     }
 
@@ -1526,8 +1576,9 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className="hero-action-area"><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
-        <button className="floating-new-match" aria-label="New match" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></div>
+      {tab === "today" && <><div className={`hero-action-area ${homeDate === localDateKey(new Date()) && !todayMatchesFrozen ? "" : "no-floating"}`}><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+        {homeDate === localDateKey(new Date()) && !todayMatchesFrozen && <><button className="floating-new-match" aria-label="New match" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></>}
+        </div>
         <div className="home-date-filter">
           <button type="button" className="period-arrow" onClick={() => moveHomeDate(-1)} aria-label="Previous date">‹</button>
           <label className="date-picker-control">
@@ -1536,6 +1587,10 @@ export default function Home() {
           </label>
           <button type="button" className="period-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date">›</button>
         </div>
+        {homeDate === localDateKey(new Date()) && <div className={`today-freeze-panel ${todayMatchesFrozen ? "frozen" : ""}`}>
+          <div><strong>{todayMatchesFrozen ? "Today is frozen" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches today." : "Anyone can freeze match entry for today."}</small></div>
+          {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unfreeze</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Freeze today</button>}
+        </div>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
             <span>Today's scheduled duos</span>
@@ -1544,9 +1599,9 @@ export default function Home() {
           <div className="match-list">
             {homeSchedule.map(m => <div
               key={m.id}
-              className="match-card home-schedule-card"
+              className={`match-card home-schedule-card ${todayMatchesFrozen ? "schedule-frozen" : ""}`}
               role="button"
-              tabIndex={0}
+              tabIndex={todayMatchesFrozen ? -1 : 0}
               onClick={() => recordScheduledMatch(m)}
               onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recordScheduledMatch(m); } }}
             >
@@ -1996,7 +2051,7 @@ export default function Home() {
       </div>}
       <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
 
-    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>Enter the 6-digit admin PIN.</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
+    {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>{pinAction === "unfreeze" ? "Enter the 6-digit admin PIN to unfreeze today." : "Enter the 6-digit admin PIN."}</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
 
     {modal === "edit" && targetMatch && <Modal title="Edit Match" close={() => {

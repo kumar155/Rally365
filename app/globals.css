@@ -1165,6 +1165,7 @@
 
 /* Floating New Match action on the Today card. */
 .hero-action-area{position:relative;margin-bottom:72px;}
+.hero-action-area.no-floating{margin-bottom:16px;}
 .floating-new-match{position:absolute;left:50%;bottom:-34px;transform:translateX(-50%);width:68px;height:68px;border-radius:50%;border:4px solid #fff;background:linear-gradient(135deg,#18b86e 0%,#1687f0 100%);color:#fff;display:grid;place-items:center;box-shadow:0 10px 24px rgba(25,110,85,.24);cursor:pointer;z-index:2;}
 .floating-new-match:hover{transform:translateX(-50%) translateY(-1px);}
 .floating-new-match:active{transform:translateX(-50%) translateY(1px);}
@@ -1175,3 +1176,17 @@
 .duo-clear-button{width:100%;margin-top:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid #e4c9c9;background:#fff7f7;color:#9f3d3d;border-radius:14px;padding:11px 16px;font-weight:800;font-size:14px;cursor:pointer}
 .duo-clear-button small{font-size:11px;font-weight:600;color:#a66b6b}
 .duo-clear-button:hover{background:#fff1f1}
+
+/* Match-day freeze controls */
+.today-freeze-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 14px;padding:12px 14px;border:1px solid #dce9e2;background:#f8fbf9;border-radius:16px}
+.today-freeze-panel>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.today-freeze-panel strong{font-size:13px;color:#183027}
+.today-freeze-panel small{font-size:11px;color:#71837a;line-height:1.35}
+.freeze-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:0 0 auto;border:1px solid #cfe3d7;background:#fff;color:#187b50;border-radius:11px;padding:8px 11px;font-size:12px;font-weight:800;cursor:pointer}
+.freeze-action:hover{background:#f0faf4}
+.today-freeze-panel.frozen{border-color:#ead6d6;background:#fff8f8}
+.today-freeze-panel.frozen strong{color:#9a3838}
+.freeze-action.admin{border-color:#e2caca;color:#9a3838;background:#fff}
+.freeze-action.admin:hover{background:#fff1f1}
+.home-schedule-card.schedule-frozen{opacity:.72;cursor:not-allowed}
+@media(max-width:520px){.today-freeze-panel{align-items:flex-start}.freeze-action{padding:8px 9px;font-size:11px}.today-freeze-panel small{max-width:210px}}

@@ -47,6 +47,9 @@ export default function Home() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [duoPlayers, setDuoPlayers] = useState<string[]>([]);
+  const [newDuoPlayerName, setNewDuoPlayerName] = useState("");
+  const [addingDuoPlayer, setAddingDuoPlayer] = useState(false);
+  const [duoPlayerMessage, setDuoPlayerMessage] = useState("");
   const [duoMatches, setDuoMatches] = useState<{ id: number; teamA: string[]; teamB: string[] }[]>([]);
   const [duoSpinning, setDuoSpinning] = useState(false);
   const [duoScheduleLocked, setDuoScheduleLocked] = useState(false);
@@ -1126,6 +1129,40 @@ export default function Home() {
     setModal("pin");
   };
 
+  const addPlayerFromDuos = async () => {
+    if (!groupId) return;
+
+    const playerName = newDuoPlayerName.trim();
+    if (!playerName) return;
+
+    const duplicate = players.some(p => p.name.trim().toLowerCase() === playerName.toLowerCase());
+    if (duplicate) {
+      setDuoPlayerMessage("Player already exists.");
+      return;
+    }
+
+    setAddingDuoPlayer(true);
+    setDuoPlayerMessage("");
+    setError("");
+
+    const { data, error: playerError } = await supabase
+      .from("players")
+      .insert({ group_id: groupId, name: playerName })
+      .select("id,name")
+      .single();
+
+    if (playerError || !data) {
+      setDuoPlayerMessage(playerError?.message || "Could not add player.");
+      setAddingDuoPlayer(false);
+      return;
+    }
+
+    setPlayers(current => [...current, data as Player].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewDuoPlayerName("");
+    setDuoPlayerMessage(`${data.name} added. You can select them for today's duos.`);
+    setAddingDuoPlayer(false);
+  };
+
   const clearDuoDraft = async () => {
     if (!groupId) return;
 
@@ -1814,6 +1851,33 @@ export default function Home() {
             <span className="duo-date-label">TODAY</span>
             <strong>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</strong>
           </div>
+        </div>
+
+        <div className="duos-panel duo-add-player-panel">
+          <div className="section-title">
+            <span>Add a new player</span>
+          </div>
+          <div className="duo-add-player-form">
+            <input
+              type="text"
+              value={newDuoPlayerName}
+              onChange={e => { setNewDuoPlayerName(e.target.value); setDuoPlayerMessage(""); }}
+              onKeyDown={e => { if (e.key === "Enter") addPlayerFromDuos(); }}
+              placeholder="Enter player name"
+              maxLength={50}
+              aria-label="New player name"
+            />
+            <button
+              type="button"
+              className="primary-button duo-add-player-button"
+              disabled={!newDuoPlayerName.trim() || addingDuoPlayer}
+              onClick={addPlayerFromDuos}
+            >
+              <UserPlus size={17} />
+              {addingDuoPlayer ? "Adding…" : "Add player"}
+            </button>
+          </div>
+          {duoPlayerMessage && <div className={`duo-player-message ${duoPlayerMessage.endsWith("exists.") ? "error" : ""}`}>{duoPlayerMessage}</div>}
         </div>
 
         <div className="duos-panel duo-player-selection-panel">

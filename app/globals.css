@@ -1190,3 +1190,17 @@
 .freeze-action.admin:hover{background:#fff1f1}
 .home-schedule-card.schedule-frozen{opacity:.72;cursor:not-allowed}
 @media(max-width:520px){.today-freeze-panel{align-items:flex-start}.freeze-action{padding:8px 9px;font-size:11px}.today-freeze-panel small{max-width:210px}}
+
+
+/* Duos: quick player creation */
+.duo-add-player-panel{width:100%;margin-bottom:14px}
+.duo-add-player-form{display:flex;gap:9px;align-items:center}
+.duo-add-player-form input{flex:1;min-width:0;border:1px solid #dce7df;background:#fff;border-radius:13px;padding:12px 13px;outline:none;font-size:13px}
+.duo-add-player-form input:focus{border-color:#15985c;box-shadow:0 0 0 3px rgba(21,152,92,.10)}
+.duo-add-player-button{width:auto;flex:0 0 auto;margin-top:0;padding:12px 14px;border-radius:13px;white-space:nowrap}
+.duo-player-message{margin-top:8px;padding:8px 10px;border-radius:10px;background:#eaf7f0;color:#18774a;font-size:11px;font-weight:700}
+.duo-player-message.error{background:#fff0f0;color:#a23a3a}
+@media(max-width:520px){
+  .duo-add-player-form{gap:7px}
+  .duo-add-player-button{padding:12px 11px;font-size:12px}
+}

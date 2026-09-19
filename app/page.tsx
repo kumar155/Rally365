@@ -1722,7 +1722,7 @@ export default function Home() {
                 <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
               </div>)}
             </div>
-            <small className="smart-insights-note">Based on your Rally365 match history.</small>
+            <small className="smart-insights-note">Based on your Rally365 match history.</small><button type="button" className="smart-ai-cta" onClick={() => { window.location.href = "/ai"; }}><Sparkles size={16} /> Ask Rally365 AI <ChevronRight size={16} /></button>
           </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">

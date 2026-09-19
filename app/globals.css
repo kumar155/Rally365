@@ -1229,3 +1229,32 @@
 .match-list .teams strong { font-weight:400; color:#10231a; }
 .home-match-history .teams strong { font-weight:600; }
 /* Home match history keeps winner/loser names color-coded. */
+
+/* Rally365 natural-query AI */
+.smart-ai-cta{margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:12px;padding:11px 14px;background:#e8f7ef;color:#12643c;font-weight:600;cursor:pointer;}
+.smart-ai-cta svg:last-child{margin-left:auto;}
+.ai-page{min-height:100dvh;background:#f7fbf9;display:flex;flex-direction:column;max-width:720px;margin:0 auto;}
+.ai-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e4eee9;}
+.ai-header h1{margin:2px 0 0;display:flex;align-items:center;gap:7px;font-size:22px;}
+.ai-header p{margin:2px 0 0;color:#718078;font-size:12px;}
+.ai-content{flex:1;padding:18px 16px 120px;overflow:auto;}
+.ai-hero{display:flex;gap:11px;align-items:flex-start;padding:14px;border-radius:16px;background:#e8f7ef;margin-bottom:16px;color:#174b34;}
+.ai-hero p{margin:3px 0 0;color:#587267;font-size:13px;line-height:1.45;}
+.ai-avatar,.ai-message-icon{display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#176a42;color:#fff;}
+.ai-avatar{width:38px;height:38px;}
+.ai-message-row{display:flex;align-items:flex-end;gap:7px;margin:10px 0;}
+.ai-message-row.user{justify-content:flex-end;}
+.ai-message{max-width:82%;padding:11px 13px;border-radius:15px;background:#fff;border:1px solid #e2ebe6;color:#26372f;font-size:14px;line-height:1.45;white-space:normal;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.ai-message-row.user .ai-message{background:#dff3e8;border-color:#dff3e8;}
+.ai-message-icon{width:26px;height:26px;background:#e9f3ee;color:#176a42;}
+.ai-thinking{color:#7b8b83;font-style:italic;}
+.ai-quick-list{display:grid;gap:8px;margin-top:18px;}
+.ai-quick-list>span{font-size:12px;color:#77867f;margin-bottom:2px;}
+.ai-quick-list button{display:flex;align-items:center;justify-content:space-between;text-align:left;border:1px solid #dce9e2;background:#fff;border-radius:12px;padding:11px 13px;color:#28503d;font-size:13px;cursor:pointer;}
+.ai-quick-list button span{font-size:20px;color:#80a291;}
+.ai-loading{text-align:center;color:#87958e;font-size:13px;padding:30px 0;}
+.ai-input-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(720px,100%);display:flex;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);border-top:1px solid #e1ebe5;backdrop-filter:blur(8px);}
+.ai-input-bar input{flex:1;min-width:0;border:1px solid #d9e6df;border-radius:13px;padding:11px 13px;outline:none;font-size:14px;background:#fbfdfc;}
+.ai-input-bar input:focus{border-color:#74ae91;}
+.ai-input-bar button{width:42px;height:42px;border:0;border-radius:12px;background:#176a42;color:#fff;display:grid;place-items:center;cursor:pointer;}
+.ai-input-bar button:disabled{opacity:.45;cursor:default;}

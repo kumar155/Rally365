@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
+  BarChart3, ChevronRight, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
   MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -58,6 +58,7 @@ export default function Home() {
   const [duoDraftStatus, setDuoDraftStatus] = useState<"DRAFT" | "PUBLISHED" | null>(null);
   const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
   const [todayMatchesFrozen, setTodayMatchesFrozen] = useState(false);
+  const [smartInsightsOpen, setSmartInsightsOpen] = useState(true);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -223,7 +224,7 @@ export default function Home() {
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
 
-  const name = (id: string): string => players.find((p) => p.id === id)?.name || "?";
+  const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
 
   const localDateKey = (date: Date) => {
@@ -1709,15 +1710,20 @@ export default function Home() {
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
           {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
         </div>}
-        {smartInsights.length > 0 && <section className="smart-insights-card">
-          <div className="smart-insights-heading"><div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div><Sparkles size={22} /></div>
-          <div className="smart-insights-grid">
-            {smartInsights.map((insight, index) => <div className="smart-insight" key={`${insight.title}-${index}`}>
-              <span className="smart-insight-icon">{insight.icon}</span>
-              <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
-            </div>)}
-          </div>
-          <small className="smart-insights-note">Based on your Rally365 match history.</small>
+        {smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
+          <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
+            <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
+            <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
+          </button>
+          {smartInsightsOpen && <>
+            <div className="smart-insights-grid">
+              {smartInsights.map((insight, index) => <div className="smart-insight" key={`${insight.title}-${index}`}>
+                <span className="smart-insight-icon">{insight.icon}</span>
+                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
+              </div>)}
+            </div>
+            <small className="smart-insights-note">Based on your Rally365 match history.</small>
+          </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
@@ -1753,7 +1759,7 @@ export default function Home() {
         </div>}
 
         <div className="section-title"><span>Match history</span><span>{homeMatches.length}</span></div>
-        <div className="match-list">{homeMatches.length === 0 && <div className="empty-rally-card">
+        <div className="match-list home-match-history">{homeMatches.length === 0 && <div className="empty-rally-card">
           <div className="rally-illustration-image">
             <Image src="/badminton-court-clean.png" alt="Empty badminton court" width={1280} height={356} sizes="(max-width: 560px) 100vw, 560px" priority />
           </div>

@@ -1209,6 +1209,12 @@
 .smart-insights-card{margin:0 0 16px;padding:16px;border:1px solid #dceae2;background:linear-gradient(135deg,#f4fbf7 0%,#f7fbff 100%);border-radius:20px;box-shadow:0 3px 12px rgba(16,35,26,.035)}
 .smart-insights-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;color:#17925a}
 .smart-insights-heading h2{margin:0;font-size:20px;letter-spacing:-.4px;color:#10231a}
+.smart-insights-heading{width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer;}
+.smart-insights-heading:focus-visible{outline:2px solid #15985c;outline-offset:4px;border-radius:8px}
+.smart-insights-toggle{display:flex;align-items:center;gap:8px;color:#17925a}
+.smart-insights-toggle svg:last-child{transition:transform .2s ease}
+.smart-insights-card.collapsed .smart-insights-toggle svg:last-child{transform:rotate(-90deg)}
+
 .smart-insights-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .smart-insight{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid #e2ece6;background:rgba(255,255,255,.82);border-radius:14px;min-width:0}
 .smart-insight-icon{font-size:20px;line-height:1.1;flex:0 0 auto}
@@ -1221,4 +1227,5 @@
 /* Match history: simple player names with alternating rows. */
 .match-list .match-card-alt { background:#f1f8f4; }
 .match-list .teams strong { font-weight:400; color:#10231a; }
+.home-match-history .teams strong { font-weight:600; }
 /* Home match history keeps winner/loser names color-coded. */

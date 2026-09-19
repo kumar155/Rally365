@@ -223,7 +223,7 @@ export default function Home() {
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
 
-  const name = (id: string) => players.find(p => p.id === id)?.name || "?";
+  const name = (id: string): string => players.find((p) => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
 
   const localDateKey = (date: Date) => {
@@ -1762,8 +1762,8 @@ export default function Home() {
           <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
         </div>}
           {homeMatches.map((m, i) => <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
-                <div><strong>{team(m, "A")}</strong></div>
-                <div><strong>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
+                <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{team(m, "A")}</strong></div>
+                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
               </div>{m.status !== "VOIDED" && <button
                   className="edit-link"

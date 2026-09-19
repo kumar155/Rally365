@@ -1204,3 +1204,22 @@
   .duo-add-player-form{gap:7px}
   .duo-add-player-button{padding:12px 11px;font-size:12px}
 }
+
+/* Rally365 Smart Insights — deterministic, zero-AI-cost intelligence layer */
+.smart-insights-card{margin:0 0 16px;padding:16px;border:1px solid #dceae2;background:linear-gradient(135deg,#f4fbf7 0%,#f7fbff 100%);border-radius:20px;box-shadow:0 3px 12px rgba(16,35,26,.035)}
+.smart-insights-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;color:#17925a}
+.smart-insights-heading h2{margin:0;font-size:20px;letter-spacing:-.4px;color:#10231a}
+.smart-insights-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.smart-insight{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid #e2ece6;background:rgba(255,255,255,.82);border-radius:14px;min-width:0}
+.smart-insight-icon{font-size:20px;line-height:1.1;flex:0 0 auto}
+.smart-insight strong{display:block;font-size:12px;color:#183027;margin-bottom:3px}
+.smart-insight p{margin:0;color:#66766e;font-size:11px;line-height:1.35}
+.smart-insights-note{display:block;margin-top:10px;color:#819088;font-size:10px}
+@media(max-width:520px){.smart-insights-card{padding:14px;border-radius:18px}.smart-insights-grid{grid-template-columns:1fr}.smart-insight{padding:10px}}
+
+
+/* Match history: simple player names with alternating rows. */
+.match-list .match-card-alt { background:#f1f8f4; }
+.match-list .teams strong { font-weight:400; color:#10231a; }
+.match-list .teams .home-team-win,
+.match-list .teams .home-team-loss { font-weight:400 !important; color:#10231a !important; }

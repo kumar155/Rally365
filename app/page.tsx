@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   BarChart3, ChevronRight, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -248,6 +248,87 @@ export default function Home() {
     () => matches.filter(m => m.status !== "VOIDED"),
     [matches]
   );
+
+  // Rally365 Smart Insights: deterministic insights from the existing match history.
+  // No external AI service or additional infrastructure is required.
+  const smartInsights = useMemo(() => {
+    const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
+    const insights: { icon: string; title: string; text: string }[] = [];
+
+    const recentByPlayer = players.map(p => {
+      const playerMatches = validMatches
+        .filter(m => m.match_players.some(x => x.player_id === p.id))
+        .sort((a, b) => new Date(b.played_at).getTime() - new Date(a.played_at).getTime())
+        .slice(0, 5);
+      const wins = playerMatches.filter(m => {
+        const side = m.match_players.find(x => x.player_id === p.id)?.team;
+        return side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
+      }).length;
+      return { p, matches: playerMatches.length, wins };
+    }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.matches - a.matches);
+
+    if (recentByPlayer.length) {
+      const top = recentByPlayer[0];
+      insights.push({ icon: "🔥", title: "Recent form", text: `${top.p.name} has ${top.wins} win${top.wins === 1 ? "" : "s"} in the last ${top.matches} match${top.matches === 1 ? "" : "es"}.` });
+    }
+
+    if (todayMatches.length) {
+      const duoWins = new Map<string, { name: string; wins: number }>();
+      todayMatches.forEach(m => {
+        if (m.team_a_score === m.team_b_score) return;
+        const winningTeam = m.team_a_score > m.team_b_score ? "A" : "B";
+        const pair = m.match_players.filter(x => x.team === winningTeam).map(x => name(x.player_id)).sort();
+        if (pair.length === 2) {
+          const key = pair.join("|");
+          const existing = duoWins.get(key) || { name: pair.join(" & "), wins: 0 };
+          existing.wins += 1;
+          duoWins.set(key, existing);
+        }
+      });
+      const topDuo = [...duoWins.values()].sort((a, b) => b.wins - a.wins)[0];
+      if (topDuo) {
+        insights.push({ icon: "🤝", title: "Winning duo today", text: `${topDuo.name} won ${topDuo.wins} match${topDuo.wins === 1 ? "" : "es"} together today.` });
+      }
+    }
+
+    const pairCounts = new Map<string, { label: string; matches: number }>();
+    validMatches.forEach(m => {
+      const rows = m.match_players || [];
+      const teams: Record<string, string[]> = { A: [], B: [] };
+      rows.forEach(x => { if (x.team === "A" || x.team === "B") teams[x.team].push(x.player_id); });
+      if (teams.A.length === 2 && teams.B.length === 2) {
+        const a = teams.A.map(id => name(id)).sort();
+        const b = teams.B.map(id => name(id)).sort();
+        const key = [...a, "vs", ...b].join("|");
+        const existing = pairCounts.get(key) || { label: `${a.join(" & ")} vs ${b.join(" & ")}`, matches: 0 };
+        existing.matches += 1;
+        pairCounts.set(key, existing);
+      }
+    });
+    const recurringMatchup = [...pairCounts.values()].sort((a, b) => b.matches - a.matches)[0];
+    if (recurringMatchup && recurringMatchup.matches >= 2) {
+      insights.push({ icon: "⚔️", title: "Recurring matchup", text: `${recurringMatchup.label} has met ${recurringMatchup.matches} times.` });
+    }
+
+    const playerWins = players.map(p => {
+      const wins = validMatches.reduce((count, m) => {
+        const side = m.match_players.find(x => x.player_id === p.id)?.team;
+        const won = side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
+        return count + (won ? 1 : 0);
+      }, 0);
+      return { p, wins };
+    });
+    const milestones = [5, 10, 25, 50];
+    const milestoneCandidates = milestones.flatMap(n => playerWins.filter(x => x.wins < n).map(x => ({ ...x, milestone: n })));
+    milestoneCandidates.sort((a, b) => (a.milestone - a.wins) - (b.milestone - b.wins) || b.wins - a.wins);
+    const closest = milestoneCandidates[0];
+    if (closest) {
+      const remaining = closest.milestone - closest.wins;
+      insights.push({ icon: "🏆", title: "Next milestone", text: `${closest.p.name} is ${remaining} win${remaining === 1 ? "" : "s"} away from ${closest.milestone} wins.` });
+    }
+
+    return insights.slice(0, 4);
+  }, [homeMatches, players, validMatches]);
 
   const filteredMatches = useMemo(() => {
     const anchor = new Date(`${statsDate}T00:00:00`);
@@ -1628,6 +1709,16 @@ export default function Home() {
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
           {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
         </div>}
+        {smartInsights.length > 0 && <section className="smart-insights-card">
+          <div className="smart-insights-heading"><div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div><Sparkles size={22} /></div>
+          <div className="smart-insights-grid">
+            {smartInsights.map((insight, index) => <div className="smart-insight" key={`${insight.title}-${index}`}>
+              <span className="smart-insight-icon">{insight.icon}</span>
+              <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
+            </div>)}
+          </div>
+          <small className="smart-insights-note">Based on your Rally365 match history.</small>
+        </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
             <span>Today's scheduled duos</span>
@@ -1670,9 +1761,9 @@ export default function Home() {
           <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
           <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
         </div>}
-          {homeMatches.map((m, i) => <div className={`match-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
-                <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : "home-team-loss"}>{team(m, "A")}</strong></div>
-                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : "home-team-loss"}>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
+          {homeMatches.map((m, i) => <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
+                <div><strong>{team(m, "A")}</strong></div>
+                <div><strong>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
               </div>{m.status !== "VOIDED" && <button
                   className="edit-link"
@@ -1731,7 +1822,7 @@ export default function Home() {
             {filteredMatches.map((m, i) => {
               const matchNumber = matches.length - matches.findIndex(x => x.id === m.id);
               const aWon = m.team_a_score > m.team_b_score;
-              return <div className="match-card" key={m.id}>
+              return <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""}`} key={m.id}>
                 <div className="match-number">M{matchNumber}</div>
                 <div className="teams">
                   <div>

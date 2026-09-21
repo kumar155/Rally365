@@ -30,6 +30,7 @@ export default function RallyAiPage() {
   ]);
   const [loading, setLoading] = useState(true);
   const [answering, setAnswering] = useState(false);
+  const [pendingPlayerQuestion, setPendingPlayerQuestion] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function RallyAiPage() {
     // player's generic insight.
     const mentionedPlayers = players.filter(p => q.includes(normalize(p.name)));
     const mentioned = mentionedPlayers[0];
-    const subject = mentioned || players[0];
+    const subject = mentioned;
 
     const playerMatches = (playerId: string) =>
       validMatches.filter(m => m.match_players.some(x => x.player_id === playerId));
@@ -154,6 +155,14 @@ export default function RallyAiPage() {
     const requestedCount = requestedCountMatch ? Math.max(1, Number(requestedCountMatch[1])) : null;
     const asksStats = /(stats|statistics|record|performance|win rate|wins|losses)/.test(q);
     const asksRecent = /(recent|latest|last|most recent)/.test(q);
+    const needsPlayer =
+      /(how am i|how is|how's|doing|performance|win rate|winning streak|streak|best partner|best duo|partnership|partner|pair|opponent|rival|recent matches|latest matches|last .* matches|stats|statistics|record)/.test(q) &&
+      !/(most wins|highest wins|top player|leader|leaderboard|how many|total|number of)/.test(q);
+
+    if (needsPlayer && !mentioned) {
+      setPendingPlayerQuestion(raw);
+      return "Which player would you like me to check? Please tell me the player's name.";
+    }
 
     if (requestedCount && subject && asksRecent && asksStats) {
       const scoped = playerMatches(subject.id).slice(0, requestedCount);
@@ -236,11 +245,17 @@ export default function RallyAiPage() {
     event?.preventDefault();
     const value = query.trim();
     if (!value || answering) return;
+
+    const normalizedValue = normalize(value);
+    const selectedPlayer = players.find(p => normalizedValue === normalize(p.name) || normalizedValue.includes(normalize(p.name)));
+    const questionToAnswer = pendingPlayerQuestion && selectedPlayer ? `${pendingPlayerQuestion} ${selectedPlayer.name}` : value;
+    if (pendingPlayerQuestion && selectedPlayer) setPendingPlayerQuestion(null);
+
     setMessages(current => [...current, { role: "user", text: value }]);
     setQuery("");
     setAnswering(true);
     window.setTimeout(() => {
-      setMessages(current => [...current, { role: "ai", text: answerQuery(value) }]);
+      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer) }]);
       setAnswering(false);
     }, 250);
   };
@@ -348,6 +363,8 @@ export default function RallyAiPage() {
       }
       .ai-input-bar {
         position: relative;
+        display: flex;
+        align-items: center;
         flex: 0 0 auto;
         width: 100%;
         box-sizing: border-box;

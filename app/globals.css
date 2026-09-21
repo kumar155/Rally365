@@ -1274,3 +1274,8 @@
   .smart-insight p{font-size:10.5px}
   .mvp-insight-card{padding:12px}
 }
+
+
+/* Floating Rally365 AI entry point. */
+.floating-ask-ai{position:fixed;right:max(14px,calc((100vw - 560px)/2 + 14px));bottom:82px;z-index:9;display:flex;align-items:center;gap:8px;padding:7px 11px 7px 7px;border:1px solid #d8c7ff;border-radius:999px;background:linear-gradient(135deg,#fff 0%,#f3edff 100%);color:#5425a7;text-decoration:none;box-shadow:0 8px 22px rgba(80,43,150,.18);transition:transform .16s ease,box-shadow .16s ease}.floating-ask-ai:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(80,43,150,.22)}.floating-ask-ai-icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#8b5cf6,#6d3ed8);color:#fff}.floating-ask-ai-copy{display:flex;align-items:baseline;gap:5px;padding-right:2px;line-height:1}.floating-ask-ai-copy b{font-size:8px;letter-spacing:.9px;color:#7c52c7}.floating-ask-ai-copy span{font-size:13px;font-weight:800}.player-avatar{overflow:hidden;position:relative}.player-avatar-image{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}.ai-input-bar{display:flex;align-items:center}
+@media(max-width:560px){.floating-ask-ai{right:12px;bottom:78px}.floating-ask-ai-icon{width:38px;height:38px}.floating-ask-ai-copy span{font-size:12px}}

@@ -262,6 +262,7 @@ export default function Home() {
     const eligiblePlayers = players.filter(p => !isGuest(p));
     const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
     const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
+    const isCurrentDay = homeDate === localDateKey(new Date());
     const playerName = (id: string): string => players.find(p => p.id === id)?.name || "?";
 
     const insights: { icon: string; title: string; text: string; tone: "warm" | "green" | "purple" | "blue" }[] = [];
@@ -388,7 +389,7 @@ export default function Home() {
     }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.matches - a.matches || a.p.name.localeCompare(b.p.name));
 
     return {
-      insights: insights.slice(0, 4),
+      insights: isCurrentDay ? insights.slice(0, 4) : [],
       mvp: mvpCandidates[0] || null,
       hasDateMatches: todayMatches.length > 0,
     };
@@ -463,6 +464,11 @@ export default function Home() {
 
   // Players screen is always ALL-TIME.
   // It intentionally uses validMatches, never filteredMatches/homeDate/statsDate.
+
+  const playerAvatarFile = (name: string) => {
+    const known = new Set(["Ashok", "Bhaskar", "Karthik", "Pradeep", "Ramesh", "Rohit"]);
+    return known.has(name.trim()) ? `/avatars/${encodeURIComponent(name.trim())}.png` : null;
+  };
 
   const allTimePlayerStats = useMemo(() => players.map(p => {
     const ms = validMatches.filter(m =>
@@ -1812,31 +1818,8 @@ export default function Home() {
                 <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
               </div>)}
             </div>
-            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
-            <Link
-              href="/ai"
-              className="ask-rally365-ai"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                marginTop: 14,
-                padding: "13px 15px",
-                borderRadius: 16,
-                border: "1px solid #dcc8ff",
-                background: "linear-gradient(135deg, #fbf8ff 0%, #f3edff 100%)",
-                color: "#5b2bbf",
-                textDecoration: "none",
-                fontWeight: 700,
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <Bot size={19} />
-                <span>Ask Rally365 AI</span>
-              </span>
-              <ChevronRight size={18} />
-            </Link>
+            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Today's insights update automatically as today's matches are recorded." : "No matches today yet. Insights will appear automatically when matches are recorded."}</small>
+
           </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
@@ -2279,8 +2262,13 @@ export default function Home() {
   </div>;
 })()}
 
-{tab === "players" && <><div className="players-heading"><div className="players-heading-icon"><UsersRound size={28} /></div><div><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All players in your club</p></div></div><div className="player-grid">{allTimePlayerStats.map((s, i) => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className={`avatar player-avatar avatar-color-${i % 8}`}>{s.name.slice(0, 1)}</div><div className="player-card-copy"><b>{s.name}</b><small><span>{s.played} matches</span><span className="stat-dot">•</span><span className="win-stat">{s.w}W</span><span className="stat-dot">•</span><span className="loss-stat">{s.l}L</span><span className="stat-dot">•</span><span>{s.winRate}%</span></small></div><CircleUserRound size={23} className="player-profile-icon" /></button> })}</div></>}
+{tab === "players" && <><div className="players-heading"><div className="players-heading-icon"><UsersRound size={28} /></div><div><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All players in your club</p></div></div><div className="player-grid">{allTimePlayerStats.map((s, i) => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className={`avatar player-avatar avatar-color-${i % 8}`}>{playerAvatarFile(s.name) ? <img src={playerAvatarFile(s.name) as string} alt="" className="player-avatar-image" /> : s.name.slice(0, 1)}</div><div className="player-card-copy"><b>{s.name}</b><small><span>{s.played} matches</span><span className="stat-dot">•</span><span className="win-stat">{s.w}W</span><span className="stat-dot">•</span><span className="loss-stat">{s.l}L</span><span className="stat-dot">•</span><span>{s.winRate}%</span></small></div><CircleUserRound size={23} className="player-profile-icon" /></button> })}</div></>}
     </section>
+    {tab === "today" && <Link href="/ai" className="floating-ask-ai" aria-label="Ask AI">
+      <span className="floating-ask-ai-icon"><Bot size={20} /></span>
+      <span className="floating-ask-ai-copy"><span>Ask AI</span></span>
+    </Link>}
+
     <nav className="bottom-nav" style={{
       display: "grid",
       gridTemplateColumns: "repeat(6, minmax(0, 1fr))",

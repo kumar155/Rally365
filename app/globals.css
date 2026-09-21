@@ -1230,31 +1230,32 @@
 .home-match-history .teams strong { font-weight:600; }
 /* Home match history keeps winner/loser names color-coded. */
 
-/* Rally365 natural-query AI */
-.smart-ai-cta{margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:12px;padding:11px 14px;background:#e8f7ef;color:#12643c;font-weight:600;cursor:pointer;}
-.smart-ai-cta svg:last-child{margin-left:auto;}
-.ai-page{min-height:100dvh;background:#f7fbf9;display:flex;flex-direction:column;max-width:720px;margin:0 auto;}
-.ai-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e4eee9;}
-.ai-header h1{margin:2px 0 0;display:flex;align-items:center;gap:7px;font-size:22px;}
-.ai-header p{margin:2px 0 0;color:#718078;font-size:12px;}
-.ai-content{flex:1;padding:18px 16px 120px;overflow:auto;}
-.ai-hero{display:flex;gap:11px;align-items:flex-start;padding:14px;border-radius:16px;background:#e8f7ef;margin-bottom:16px;color:#174b34;}
-.ai-hero p{margin:3px 0 0;color:#587267;font-size:13px;line-height:1.45;}
-.ai-avatar,.ai-message-icon{display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#176a42;color:#fff;}
-.ai-avatar{width:38px;height:38px;}
-.ai-message-row{display:flex;align-items:flex-end;gap:7px;margin:10px 0;}
-.ai-message-row.user{justify-content:flex-end;}
-.ai-message{max-width:82%;padding:11px 13px;border-radius:15px;background:#fff;border:1px solid #e2ebe6;color:#26372f;font-size:14px;line-height:1.45;white-space:normal;box-shadow:0 1px 2px rgba(0,0,0,.03);}
-.ai-message-row.user .ai-message{background:#dff3e8;border-color:#dff3e8;}
-.ai-message-icon{width:26px;height:26px;background:#e9f3ee;color:#176a42;}
-.ai-thinking{color:#7b8b83;font-style:italic;}
-.ai-quick-list{display:grid;gap:8px;margin-top:18px;}
-.ai-quick-list>span{font-size:12px;color:#77867f;margin-bottom:2px;}
-.ai-quick-list button{display:flex;align-items:center;justify-content:space-between;text-align:left;border:1px solid #dce9e2;background:#fff;border-radius:12px;padding:11px 13px;color:#28503d;font-size:13px;cursor:pointer;}
-.ai-quick-list button span{font-size:20px;color:#80a291;}
-.ai-loading{text-align:center;color:#87958e;font-size:13px;padding:30px 0;}
-.ai-input-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(720px,100%);display:flex;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);border-top:1px solid #e1ebe5;backdrop-filter:blur(8px);}
-.ai-input-bar input{flex:1;min-width:0;border:1px solid #d9e6df;border-radius:13px;padding:11px 13px;outline:none;font-size:14px;background:#fbfdfc;}
-.ai-input-bar input:focus{border-color:#74ae91;}
-.ai-input-bar button{width:42px;height:42px;border:0;border-radius:12px;background:#176a42;color:#fff;display:grid;place-items:center;cursor:pointer;}
-.ai-input-bar button:disabled{opacity:.45;cursor:default;}
+/* Smart Insights: visually separated from match history and color-coded by insight type. */
+.smart-insights-card{background:linear-gradient(135deg,#f4fbff 0%,#fbf8ff 52%,#f4fff9 100%);border-color:#cfe8e0;box-shadow:0 8px 24px rgba(20,75,60,.06)}
+.smart-insights-grid{gap:10px}
+.smart-insight{min-height:76px;padding:12px;border-radius:15px;background:#fff;box-shadow:0 2px 7px rgba(24,48,39,.035)}
+.smart-insight-warm{background:#fff8ed;border-color:#f5d9ae}
+.smart-insight-green{background:#effcf6;border-color:#bcebd2}
+.smart-insight-purple{background:#f7f1ff;border-color:#dcc9f5}
+.smart-insight-blue{background:#eff7ff;border-color:#c6def7}
+.smart-insight-warm strong{color:#9a5a00}
+.smart-insight-green strong{color:#14774b}
+.smart-insight-purple strong{color:#62339a}
+.smart-insight-blue strong{color:#1f619b}
+.smart-insight p{color:#55665f}
+
+.mvp-insight-card{display:flex;align-items:center;gap:12px;margin-top:10px;padding:13px 14px;border:1px solid #f0d58c;background:linear-gradient(100deg,#fff7d8 0%,#fffaf0 55%,#fff1c4 100%);border-radius:16px;box-shadow:0 3px 10px rgba(154,112,25,.07)}
+.mvp-badge{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border-radius:14px;background:#fff0b8;font-size:25px}
+.mvp-copy{min-width:0;flex:1}
+.mvp-eyebrow{display:block;margin-bottom:2px;color:#9b6a08;font-size:9px;font-weight:800;letter-spacing:1.2px}
+.mvp-copy strong{display:block;color:#604400;font-size:16px;line-height:1.2}
+.mvp-copy p{margin:3px 0 0;color:#79663a;font-size:11px;line-height:1.3}
+.mvp-stat{min-width:43px;padding-left:10px;border-left:1px solid #ead58e;text-align:center;color:#8b6409}
+.mvp-stat b{display:block;font-size:20px;line-height:1}
+.mvp-stat span{font-size:9px;font-weight:800;letter-spacing:.8px}
+@media(max-width:520px){
+  .smart-insights-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .smart-insight{min-height:86px;padding:10px}
+  .smart-insight p{font-size:10.5px}
+  .mvp-insight-card{padding:12px}
+}

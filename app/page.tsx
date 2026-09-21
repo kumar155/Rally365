@@ -250,13 +250,23 @@ export default function Home() {
     [matches]
   );
 
-  // Rally365 Smart Insights: deterministic insights from the existing match history.
-  // No external AI service or additional infrastructure is required.
-  const smartInsights = useMemo(() => {
+  // Rally365 Smart Insights: deterministic, dynamic insights from the selected day's
+  // match history plus all-time history where appropriate. Guest accounts are never
+  // surfaced in player-facing insights.
+  const smartInsightData = useMemo(() => {
+    const isGuest = (player: Player | undefined) => {
+      const n = player?.name?.trim().toLowerCase() || "";
+      return n === "guest1" || n === "guest2" || n.startsWith("guest ");
+    };
+    const eligiblePlayers = players.filter(p => !isGuest(p));
+    const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
     const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
-    const insights: { icon: string; title: string; text: string }[] = [];
+    const playerName = (id: string): string => players.find(p => p.id === id)?.name || "?";
 
-    const recentByPlayer = players.map(p => {
+    const insights: { icon: string; title: string; text: string; tone: "warm" | "green" | "purple" | "blue" }[] = [];
+
+    // Recent form is calculated from the latest five matches for real players only.
+    const recentByPlayer = eligiblePlayers.map(p => {
       const playerMatches = validMatches
         .filter(m => m.match_players.some(x => x.player_id === p.id))
         .sort((a, b) => new Date(b.played_at).getTime() - new Date(a.played_at).getTime())
@@ -270,48 +280,50 @@ export default function Home() {
 
     if (recentByPlayer.length) {
       const top = recentByPlayer[0];
-      insights.push({ icon: "🔥", title: "Recent form", text: `${top.p.name} has ${top.wins} win${top.wins === 1 ? "" : "s"} in the last ${top.matches} match${top.matches === 1 ? "" : "es"}.` });
+      insights.push({ icon: "🔥", title: "Recent form", tone: "warm", text: `${top.p.name} has ${top.wins} win${top.wins === 1 ? "" : "s"} in the last ${top.matches} match${top.matches === 1 ? "" : "es"}.` });
     }
 
-    if (todayMatches.length) {
-      const duoWins = new Map<string, { name: string; wins: number }>();
-      todayMatches.forEach(m => {
-        if (m.team_a_score === m.team_b_score) return;
-        const winningTeam = m.team_a_score > m.team_b_score ? "A" : "B";
-        const pair = m.match_players.filter(x => x.team === winningTeam).map(x => name(x.player_id)).sort();
-        if (pair.length === 2) {
-          const key = pair.join("|");
-          const existing = duoWins.get(key) || { name: pair.join(" & "), wins: 0 };
-          existing.wins += 1;
-          duoWins.set(key, existing);
-        }
-      });
-      const topDuo = [...duoWins.values()].sort((a, b) => b.wins - a.wins)[0];
-      if (topDuo) {
-        insights.push({ icon: "🤝", title: "Winning duo today", text: `${topDuo.name} won ${topDuo.wins} match${topDuo.wins === 1 ? "" : "es"} together today.` });
+    // Winning duo is scoped to the selected Home date, not necessarily today.
+    const duoWins = new Map<string, { name: string; wins: number }>();
+    todayMatches.forEach(m => {
+      if (m.team_a_score === m.team_b_score) return;
+      const winningTeam = m.team_a_score > m.team_b_score ? "A" : "B";
+      const pairIds = m.match_players.filter(x => x.team === winningTeam).map(x => x.player_id);
+      if (pairIds.length === 2 && pairIds.every(id => eligibleIds.has(id))) {
+        const pair = pairIds.map(playerName).sort();
+        const key = pair.join("|");
+        const existing = duoWins.get(key) || { name: pair.join(" & "), wins: 0 };
+        existing.wins += 1;
+        duoWins.set(key, existing);
       }
+    });
+    const topDuo = [...duoWins.values()].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name))[0];
+    if (topDuo) {
+      insights.push({ icon: "🤝", title: "Winning duo", tone: "green", text: `${topDuo.name} won ${topDuo.wins} match${topDuo.wins === 1 ? "" : "es"} together on this date.` });
     }
 
+    // Recurring matchup: only show matchups where all named players are real players.
     const pairCounts = new Map<string, { label: string; matches: number }>();
     validMatches.forEach(m => {
       const rows = m.match_players || [];
       const teams: Record<string, string[]> = { A: [], B: [] };
-      rows.forEach(x => { if (x.team === "A" || x.team === "B") teams[x.team].push(x.player_id); });
+      rows.forEach(x => { if ((x.team === "A" || x.team === "B") && eligibleIds.has(x.player_id)) teams[x.team].push(x.player_id); });
       if (teams.A.length === 2 && teams.B.length === 2) {
-        const a = teams.A.map(id => name(id)).sort();
-        const b = teams.B.map(id => name(id)).sort();
+        const a = teams.A.map(playerName).sort();
+        const b = teams.B.map(playerName).sort();
         const key = [...a, "vs", ...b].join("|");
         const existing = pairCounts.get(key) || { label: `${a.join(" & ")} vs ${b.join(" & ")}`, matches: 0 };
         existing.matches += 1;
         pairCounts.set(key, existing);
       }
     });
-    const recurringMatchup = [...pairCounts.values()].sort((a, b) => b.matches - a.matches)[0];
+    const recurringMatchup = [...pairCounts.values()].sort((a, b) => b.matches - a.matches || a.label.localeCompare(b.label))[0];
     if (recurringMatchup && recurringMatchup.matches >= 2) {
-      insights.push({ icon: "⚔️", title: "Recurring matchup", text: `${recurringMatchup.label} has met ${recurringMatchup.matches} times.` });
+      insights.push({ icon: "⚔️", title: "Recurring matchup", tone: "purple", text: `${recurringMatchup.label} has met ${recurringMatchup.matches} times.` });
     }
 
-    const playerWins = players.map(p => {
+    // Next milestone: never choose a guest as the milestone candidate.
+    const playerWins = eligiblePlayers.map(p => {
       const wins = validMatches.reduce((count, m) => {
         const side = m.match_players.find(x => x.player_id === p.id)?.team;
         const won = side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
@@ -321,15 +333,34 @@ export default function Home() {
     });
     const milestones = [5, 10, 25, 50];
     const milestoneCandidates = milestones.flatMap(n => playerWins.filter(x => x.wins < n).map(x => ({ ...x, milestone: n })));
-    milestoneCandidates.sort((a, b) => (a.milestone - a.wins) - (b.milestone - b.wins) || b.wins - a.wins);
+    milestoneCandidates.sort((a, b) => (a.milestone - a.wins) - (b.milestone - b.wins) || b.wins - a.wins || a.p.name.localeCompare(b.p.name));
     const closest = milestoneCandidates[0];
     if (closest) {
       const remaining = closest.milestone - closest.wins;
-      insights.push({ icon: "🏆", title: "Next milestone", text: `${closest.p.name} is ${remaining} win${remaining === 1 ? "" : "s"} away from ${closest.milestone} wins.` });
+      insights.push({ icon: "🏆", title: "Next milestone", tone: "blue", text: `${closest.p.name} is ${remaining} win${remaining === 1 ? "" : "s"} away from ${closest.milestone} wins.` });
     }
 
-    return insights.slice(0, 4);
+    // MVP of the selected Home date. Guests are excluded. We use wins first,
+    // then win rate, then matches as deterministic tie-breakers.
+    const mvpCandidates = eligiblePlayers.map(p => {
+      const pm = todayMatches.filter(m => m.match_players.some(x => x.player_id === p.id));
+      const wins = pm.filter(m => {
+        const side = m.match_players.find(x => x.player_id === p.id)?.team;
+        return side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
+      }).length;
+      const winRate = pm.length ? Math.round((wins / pm.length) * 100) : 0;
+      return { p, matches: pm.length, wins, winRate };
+    }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.matches - a.matches || a.p.name.localeCompare(b.p.name));
+
+    return {
+      insights: insights.slice(0, 4),
+      mvp: mvpCandidates[0] || null,
+      hasDateMatches: todayMatches.length > 0,
+    };
   }, [homeMatches, players, validMatches]);
+
+  const smartInsights = smartInsightData.insights;
+  const mvpOfDay = smartInsightData.mvp;
 
   const filteredMatches = useMemo(() => {
     const anchor = new Date(`${statsDate}T00:00:00`);
@@ -1717,12 +1748,21 @@ export default function Home() {
           </button>
           {smartInsightsOpen && <>
             <div className="smart-insights-grid">
-              {smartInsights.map((insight, index) => <div className="smart-insight" key={`${insight.title}-${index}`}>
+              {smartInsights.map((insight, index) => <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.title}-${index}`}>
                 <span className="smart-insight-icon">{insight.icon}</span>
                 <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
               </div>)}
             </div>
-            <div className="smart-insights-footer"><small className="smart-insights-note">Based on your Rally365 match history.</small><a className="ask-rally-ai-link" href="/ai"><Sparkles size={14}/> Ask Rally365 AI</a></div>
+            {mvpOfDay && <div className="mvp-insight-card">
+              <div className="mvp-badge" aria-hidden="true">👑</div>
+              <div className="mvp-copy">
+                <span className="mvp-eyebrow">MVP OF THE DAY</span>
+                <strong>{mvpOfDay.p.name}</strong>
+                <p>{mvpOfDay.wins} win{mvpOfDay.wins === 1 ? "" : "s"} · {mvpOfDay.matches} match{mvpOfDay.matches === 1 ? "" : "es"} played · {mvpOfDay.winRate}% win rate</p>
+              </div>
+              <div className="mvp-stat"><b>{mvpOfDay.wins}</b><span>W</span></div>
+            </div>}
+            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
           </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">

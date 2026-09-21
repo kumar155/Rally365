@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   BarChart3, ChevronRight, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles, Bot
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -1832,7 +1832,7 @@ export default function Home() {
               }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <Sparkles size={18} />
+                <Bot size={19} />
                 <span>Ask Rally365 AI</span>
               </span>
               <ChevronRight size={18} />

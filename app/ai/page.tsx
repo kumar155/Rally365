@@ -249,6 +249,84 @@ export default function RallyAiPage() {
 
   return <main className="ai-page">
     <style>{`
+      .ai-page { background:#f3f7f4; color:#10231a; max-width:560px; margin:0 auto; }
+      .ai-header {
+        height:72px; padding:12px 16px; display:flex; align-items:center; gap:10px;
+        background:#fff; border-bottom:1px solid #e2eae5; position:sticky; top:0; z-index:5;
+        box-sizing:border-box;
+      }
+      .ai-header .icon-button {
+        width:38px; height:38px; border:0; border-radius:12px; background:#eef4f0;
+        color:#476154; display:grid; place-items:center; flex:0 0 auto; cursor:pointer;
+      }
+      .ai-header > div { min-width:0; flex:1; }
+      .ai-header .eyebrow { color:#718078; font-size:10px; font-weight:800; letter-spacing:1px; margin-bottom:2px; }
+      .ai-header h1 {
+        margin:0; display:flex; align-items:center; gap:7px; font-size:20px; line-height:1.15;
+        letter-spacing:-.4px; color:#183027;
+      }
+      .ai-header h1 svg { color:#15985c; flex:0 0 auto; }
+      .ai-header p { margin:3px 0 0; color:#7b8b83; font-size:11px; }
+      .ai-content { padding:16px; }
+      .ai-hero {
+        display:flex; gap:12px; align-items:center; padding:15px;
+        background:linear-gradient(135deg,#e2f6eb,#eef8ff);
+        border:1px solid #d2e9dc; border-radius:18px; margin-bottom:16px;
+      }
+      .ai-avatar {
+        width:44px; height:44px; border-radius:14px; background:#fff; color:#15985c;
+        display:grid; place-items:center; flex:0 0 auto;
+      }
+      .ai-hero strong { display:block; font-size:13px; color:#183027; }
+      .ai-hero p { margin:4px 0 0; color:#6b7d73; font-size:11px; line-height:1.4; }
+      .ai-message-row { display:flex; gap:7px; align-items:flex-end; margin:10px 0; }
+      .ai-message-row.user { justify-content:flex-end; }
+      .ai-message-icon {
+        width:25px; height:25px; border-radius:9px; background:#e4f6ec; color:#15985c;
+        display:grid; place-items:center; flex:0 0 auto;
+      }
+      .ai-message {
+        max-width:84%; padding:10px 12px; border-radius:15px;
+        background:#f2f7f4; color:#53665c; font-size:12px; line-height:1.48;
+        box-shadow:0 1px 1px rgba(16,35,26,.03);
+      }
+      .ai-message-row.user .ai-message {
+        background:#15985c; color:#fff; border-bottom-right-radius:5px;
+      }
+      .ai-message-row.ai .ai-message { border-bottom-left-radius:5px; }
+      .ai-thinking { color:#6b7d73; font-style:italic; }
+      .ai-quick-list {
+        margin-top:16px; display:flex; flex-direction:column; gap:7px;
+      }
+      .ai-quick-list > span {
+        font-size:10px; font-weight:800; letter-spacing:1px; color:#718078; margin:0 2px 1px;
+      }
+      .ai-quick-list button {
+        width:100%; border:1px solid #dce8e0; background:#fff; border-radius:13px;
+        padding:11px 12px; text-align:left; color:#183027; font-size:12px;
+        display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;
+      }
+      .ai-quick-list button:hover { border-color:#b9d9c7; background:#fbfdfc; }
+      .ai-quick-list button span { color:#15985c; font-size:18px; line-height:1; }
+      .ai-loading { color:#7b8b83; font-size:11px; text-align:center; padding:24px 8px; }
+      .ai-input-bar {
+        border-top:1px solid #e1ebe5;
+        box-shadow:0 -3px 12px rgba(16,35,26,.04);
+      }
+      .ai-input-bar input {
+        height:44px; border:1px solid #dce7df; background:#fff; border-radius:13px;
+        padding:0 12px; outline:none; font-size:12px; color:#183027;
+      }
+      .ai-input-bar input:focus { border-color:#a9cfba; box-shadow:0 0 0 3px rgba(21,152,92,.08); }
+      .ai-input-bar button {
+        height:44px; width:44px; border:0; border-radius:13px; background:#15985c;
+        color:#fff; display:grid; place-items:center; cursor:pointer; flex:0 0 44px;
+      }
+      .ai-input-bar button:disabled { opacity:.4; cursor:default; }
+      @media (max-width:600px) {
+        .ai-content { padding-left:12px; padding-right:12px; }
+      }
+
       .ai-page {
         min-height: 100dvh;
         height: 100dvh;

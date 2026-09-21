@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   BarChart3, ChevronRight, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
   MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles
@@ -1812,6 +1813,30 @@ export default function Home() {
               </div>)}
             </div>
             <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
+            <Link
+              href="/ai"
+              className="ask-rally365-ai"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginTop: 14,
+                padding: "13px 15px",
+                borderRadius: 16,
+                border: "1px solid #dcc8ff",
+                background: "linear-gradient(135deg, #fbf8ff 0%, #f3edff 100%)",
+                color: "#5b2bbf",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <Sparkles size={18} />
+                <span>Ask Rally365 AI</span>
+              </span>
+              <ChevronRight size={18} />
+            </Link>
           </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">

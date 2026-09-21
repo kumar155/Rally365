@@ -1741,6 +1741,21 @@ export default function Home() {
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
           {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
         </div>}
+        {mvpOfDay && <section className="home-mvp-section">
+          <div className="mvp-home-card">
+            <div className="mvp-home-badge" aria-hidden="true">👑</div>
+            <div className="mvp-home-copy">
+              <span className="mvp-home-eyebrow">MVP OF THE DAY</span>
+              <strong>{mvpOfDay.p.name}</strong>
+              <p>Top performance from {mvpOfDay.matches} match{mvpOfDay.matches === 1 ? "" : "es"} played on this date.</p>
+            </div>
+            <div className="mvp-home-stats">
+              <div><b>{mvpOfDay.wins}</b><span>Wins</span></div>
+              <div><b>{mvpOfDay.matches}</b><span>Matches</span></div>
+              <div><b>{mvpOfDay.winRate}%</b><span>Win rate</span></div>
+            </div>
+          </div>
+        </section>}
         {smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
           <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
             <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
@@ -1753,15 +1768,6 @@ export default function Home() {
                 <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
               </div>)}
             </div>
-            {mvpOfDay && <div className="mvp-insight-card">
-              <div className="mvp-badge" aria-hidden="true">👑</div>
-              <div className="mvp-copy">
-                <span className="mvp-eyebrow">MVP OF THE DAY</span>
-                <strong>{mvpOfDay.p.name}</strong>
-                <p>{mvpOfDay.wins} win{mvpOfDay.wins === 1 ? "" : "s"} · {mvpOfDay.matches} match{mvpOfDay.matches === 1 ? "" : "es"} played · {mvpOfDay.winRate}% win rate</p>
-              </div>
-              <div className="mvp-stat"><b>{mvpOfDay.wins}</b><span>W</span></div>
-            </div>}
             <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
           </>}
         </section>}

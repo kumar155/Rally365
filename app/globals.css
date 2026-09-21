@@ -1244,6 +1244,21 @@
 .smart-insight-blue strong{color:#1f619b}
 .smart-insight p{color:#55665f}
 
+
+.home-mvp-section{margin:12px 0 14px}
+.mvp-home-card{display:flex;align-items:center;gap:12px;padding:14px 15px;border:1px solid #ecd58f;background:linear-gradient(105deg,#fff8df 0%,#fffdf4 58%,#fff1c4 100%);border-radius:18px;box-shadow:0 4px 14px rgba(126,92,20,.07)}
+.mvp-home-badge{width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;border-radius:15px;background:#ffefb5;font-size:25px}
+.mvp-home-copy{min-width:0;flex:1}
+.mvp-home-eyebrow{display:block;margin-bottom:2px;color:#9b6a08;font-size:9px;font-weight:800;letter-spacing:1.2px}
+.mvp-home-copy strong{display:block;color:#5e4308;font-size:18px;line-height:1.2}
+.mvp-home-copy p{margin:4px 0 0;color:#7c683b;font-size:11px;line-height:1.35}
+.mvp-home-stats{display:flex;align-items:stretch;border-left:1px solid #ead58e;padding-left:10px;flex:0 0 auto}
+.mvp-home-stats>div{min-width:46px;padding:0 7px;text-align:center}
+.mvp-home-stats>div+div{border-left:1px solid #ead58e}
+.mvp-home-stats b{display:block;color:#765208;font-size:17px;line-height:1.15}
+.mvp-home-stats span{display:block;margin-top:3px;color:#8b774c;font-size:9px;font-weight:700;line-height:1.1}
+.mvp-home-empty{min-height:76px}
+@media(max-width:600px){.mvp-home-card{gap:10px;padding:12px}.mvp-home-badge{width:42px;height:42px;border-radius:13px;font-size:22px}.mvp-home-copy strong{font-size:16px}.mvp-home-copy p{font-size:10px}.mvp-home-stats{padding-left:7px}.mvp-home-stats>div{min-width:40px;padding:0 4px}.mvp-home-stats b{font-size:15px}.mvp-home-stats span{font-size:8px}}
 .mvp-insight-card{display:flex;align-items:center;gap:12px;margin-top:10px;padding:13px 14px;border:1px solid #f0d58c;background:linear-gradient(100deg,#fff7d8 0%,#fffaf0 55%,#fff1c4 100%);border-radius:16px;box-shadow:0 3px 10px rgba(154,112,25,.07)}
 .mvp-badge{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border-radius:14px;background:#fff0b8;font-size:25px}
 .mvp-copy{min-width:0;flex:1}

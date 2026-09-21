@@ -280,7 +280,8 @@ export default function Home() {
 
     if (recentByPlayer.length) {
       const top = recentByPlayer[0];
-      insights.push({ icon: "🔥", title: "Recent form", tone: "warm", text: `${top.p.name} has ${top.wins} win${top.wins === 1 ? "" : "s"} in the last ${top.matches} match${top.matches === 1 ? "" : "es"}.` });
+      const rate = Math.round((top.wins / top.matches) * 100);
+      insights.push({ icon: "🔥", title: "Recent form", tone: "blue", text: `${top.p.name} is ${top.wins}-${top.matches - top.wins} in the last ${top.matches} matches (${rate}% win rate).` });
     }
 
     // Winning duo is scoped to the selected Home date, not necessarily today.
@@ -302,27 +303,60 @@ export default function Home() {
       insights.push({ icon: "🤝", title: "Winning duo", tone: "green", text: `${topDuo.name} won ${topDuo.wins} match${topDuo.wins === 1 ? "" : "es"} together on this date.` });
     }
 
-    // Recurring matchup: only show matchups where all named players are real players.
-    const pairCounts = new Map<string, { label: string; matches: number }>();
-    validMatches.forEach(m => {
-      const rows = m.match_players || [];
-      const teams: Record<string, string[]> = { A: [], B: [] };
-      rows.forEach(x => { if ((x.team === "A" || x.team === "B") && eligibleIds.has(x.player_id)) teams[x.team].push(x.player_id); });
-      if (teams.A.length === 2 && teams.B.length === 2) {
-        const a = teams.A.map(playerName).sort();
-        const b = teams.B.map(playerName).sort();
-        const key = [...a, "vs", ...b].join("|");
-        const existing = pairCounts.get(key) || { label: `${a.join(" & ")} vs ${b.join(" & ")}`, matches: 0 };
-        existing.matches += 1;
-        pairCounts.set(key, existing);
+    // Hot streak: current consecutive wins from each player's all-time history.
+    const streaks = eligiblePlayers.map(p => {
+      const ordered = validMatches
+        .filter(m => m.match_players.some(x => x.player_id === p.id))
+        .sort((a, b) => new Date(b.played_at).getTime() - new Date(a.played_at).getTime());
+      let streak = 0;
+      for (const m of ordered) {
+        const side = m.match_players.find(x => x.player_id === p.id)?.team;
+        const won = side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
+        if (!won) break;
+        streak++;
       }
-    });
-    const recurringMatchup = [...pairCounts.values()].sort((a, b) => b.matches - a.matches || a.label.localeCompare(b.label))[0];
-    if (recurringMatchup && recurringMatchup.matches >= 2) {
-      insights.push({ icon: "⚔️", title: "Recurring matchup", tone: "purple", text: `${recurringMatchup.label} has met ${recurringMatchup.matches} times.` });
+      return { p, streak };
+    }).filter(x => x.streak >= 2).sort((a, b) => b.streak - a.streak || a.p.name.localeCompare(b.p.name));
+
+    if (streaks.length) {
+      const hot = streaks[0];
+      insights.push({ icon: "⚡", title: "Hot streak", tone: "purple", text: `${hot.p.name} is riding ${hot.streak} straight wins. The streak is still alive.` });
     }
 
-    // Next milestone: never choose a guest as the milestone candidate.
+    // Giant killer: find a historical upset where the winning side had a lower
+    // career win total than the losing side. This is based only on recorded history.
+    const careerWins = new Map<string, number>();
+    eligiblePlayers.forEach(p => careerWins.set(p.id, 0));
+    validMatches.forEach(m => {
+      const winningTeam = m.team_a_score > m.team_b_score ? "A" : m.team_b_score > m.team_a_score ? "B" : null;
+      if (!winningTeam) return;
+      m.match_players.filter(x => x.team === winningTeam && eligibleIds.has(x.player_id)).forEach(x => careerWins.set(x.player_id, (careerWins.get(x.player_id) || 0) + 1));
+    });
+
+    const upsets = validMatches.map(m => {
+      if (m.team_a_score === m.team_b_score) return null;
+      const winnerTeam = m.team_a_score > m.team_b_score ? "A" : "B";
+      const loserTeam = winnerTeam === "A" ? "B" : "A";
+      const winners = m.match_players.filter(x => x.team === winnerTeam && eligibleIds.has(x.player_id));
+      const losers = m.match_players.filter(x => x.team === loserTeam && eligibleIds.has(x.player_id));
+      if (!winners.length || !losers.length) return null;
+      const winnerStrength = winners.reduce((sum, x) => sum + (careerWins.get(x.player_id) || 0), 0) / winners.length;
+      const loserStrength = losers.reduce((sum, x) => sum + (careerWins.get(x.player_id) || 0), 0) / losers.length;
+      if (winnerStrength >= loserStrength) return null;
+      return {
+        label: `${winners.map(x => playerName(x.player_id)).sort().join(" & ")} beat ${losers.map(x => playerName(x.player_id)).sort().join(" & ")}`,
+        gap: loserStrength - winnerStrength,
+        playedAt: new Date(m.played_at).getTime(),
+      };
+    }).filter(Boolean) as { label: string; gap: number; playedAt: number }[];
+
+    const giantKiller = upsets.sort((a, b) => b.gap - a.gap || b.playedAt - a.playedAt)[0];
+    if (giantKiller) {
+      insights.push({ icon: "😈", title: "Giant killer", tone: "warm", text: `${giantKiller.label} — an upset against a side with the stronger historical win record.` });
+    }
+
+    // If an unusual signal is unavailable, use a concrete milestone instead of
+    // showing the old generic recurring-matchup insight.
     const playerWins = eligiblePlayers.map(p => {
       const wins = validMatches.reduce((count, m) => {
         const side = m.match_players.find(x => x.player_id === p.id)?.team;
@@ -335,7 +369,7 @@ export default function Home() {
     const milestoneCandidates = milestones.flatMap(n => playerWins.filter(x => x.wins < n).map(x => ({ ...x, milestone: n })));
     milestoneCandidates.sort((a, b) => (a.milestone - a.wins) - (b.milestone - b.wins) || b.wins - a.wins || a.p.name.localeCompare(b.p.name));
     const closest = milestoneCandidates[0];
-    if (closest) {
+    if (insights.length < 4 && closest) {
       const remaining = closest.milestone - closest.wins;
       insights.push({ icon: "🏆", title: "Next milestone", tone: "blue", text: `${closest.p.name} is ${remaining} win${remaining === 1 ? "" : "s"} away from ${closest.milestone} wins.` });
     }
@@ -1719,14 +1753,23 @@ export default function Home() {
     setModal("pin");
   };
 
-  if (loading) return <main className="center">Loading Rally365…</main>;
+  if (loading) return <main className="rally-loading-screen" aria-label="Loading Rally365">
+    <style>{`
+      .rally-loading-screen{min-height:100dvh;width:100%;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;}
+      .rally-loading-logo-wrap{width:clamp(120px,28vw,170px);height:clamp(120px,28vw,170px);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+      .rally-loading-logo{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;transform:scale(.82);opacity:.72;animation:rally365LoadingZoom 4.2s cubic-bezier(.22,.61,.36,1) infinite;}
+      @keyframes rally365LoadingZoom{0%{transform:scale(.82);opacity:.72;}45%{transform:scale(1);opacity:1;}70%{transform:scale(1.035);opacity:1;}100%{transform:scale(.96);opacity:.9;}}
+      @media (prefers-reduced-motion:reduce){.rally-loading-logo{animation:none;transform:scale(1);opacity:1;}}
+    `}</style>
+    <div className="rally-loading-logo-wrap"><img src="/rally365-circle-logo.png" alt="Rally365" className="rally-loading-logo" /></div>
+  </main>;
 
   return <main className="app-shell">
     <header className="topbar"><div className="brand-lockup"><div className="brand-text"><div className="brand">Rally<span>365</span></div><div className="subtitle">Everyday badminton</div></div><img src="/rally365-circle-logo.png" alt="" className="brand-shuttle" /></div><div className="group-pill"><MapPin size={15} /> Vega Badminton</div></header>
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className={`hero-action-area ${homeDate === localDateKey(new Date()) && !todayMatchesFrozen ? "" : "no-floating"}`}><div className="hero-card"><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><h1>{homeDate === localDateKey(new Date()) ? "Today's games" : "Games"}</h1><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
+      {tab === "today" && <><div className={`hero-action-area ${homeDate === localDateKey(new Date()) && !todayMatchesFrozen ? "" : "no-floating"}`}><div className="hero-card" style={{ minHeight: "0", padding: "18px 28px" }}><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
         {homeDate === localDateKey(new Date()) && !todayMatchesFrozen && <><button className="floating-new-match" aria-label="New match" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></>}
         </div>
         <div className="home-date-filter">

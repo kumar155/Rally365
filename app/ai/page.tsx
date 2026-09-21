@@ -261,6 +261,19 @@ export default function RallyAiPage() {
   };
 
   const quick = ["How am I doing?", "Who is my best partner?", "Who has the most wins?", "Show me recent matches."];
+  const selectablePlayers = players.filter(p => !/^guest\s*\d*$/i.test(p.name));
+
+  const choosePlayer = (player: Player) => {
+    if (!pendingPlayerQuestion || answering) return;
+    const questionToAnswer = `${pendingPlayerQuestion} ${player.name}`;
+    setPendingPlayerQuestion(null);
+    setMessages(current => [...current, { role: "user", text: player.name }]);
+    setAnswering(true);
+    window.setTimeout(() => {
+      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer) }]);
+      setAnswering(false);
+    }, 250);
+  };
 
   return <main className="ai-page">
     <style>{`
@@ -373,7 +386,15 @@ export default function RallyAiPage() {
         background: rgba(255,255,255,.98);
         z-index: 5;
       }
-      .ai-input-bar input { min-width: 0; box-sizing: border-box; }
+      .ai-input-bar input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; }
+      .ai-input-bar button { flex: 0 0 auto; }
+      .ai-player-picker { margin: 10px 0 14px 40px; }
+      .ai-player-picker-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #53656a; }
+      .ai-player-options { display: flex; flex-wrap: wrap; gap: 8px; }
+      .ai-player-option { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d7e8e2; background: #fff; border-radius: 999px; padding: 6px 11px 6px 6px; color: #21434a; font: inherit; font-size: 13px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+      .ai-player-option:active { transform: scale(.98); }
+      .ai-player-option-avatar { position: relative; width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #e6f5ef; color: #159a67; font-size: 11px; font-weight: 700; }
+      .ai-player-option-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
       @media (max-width: 600px) {
         .ai-page { width: 100%; max-width: 100vw; }
         .ai-header { padding-left: 14px; padding-right: 14px; }
@@ -405,7 +426,24 @@ export default function RallyAiPage() {
 
       {answering && <div className="ai-message-row ai"><span className="ai-message-icon"><Bot size={15} /></span><div className="ai-message ai-thinking">Thinking…</div></div>}
 
-      {!loading && messages.length === 1 && <div className="ai-quick-list"><span>Try asking</span>{quick.map(item => <button key={item} type="button" onClick={() => { setQuery(item); window.setTimeout(() => submit(), 0); }}>{item}<span>›</span></button>)}</div>}
+      {pendingPlayerQuestion && !answering && !loading && (
+        <div className="ai-player-picker">
+          <span className="ai-player-picker-label">Choose a player</span>
+          <div className="ai-player-options">
+            {selectablePlayers.map(player => (
+              <button key={player.id} type="button" className="ai-player-option" onClick={() => choosePlayer(player)} aria-label={`Choose ${player.name}`}>
+                <span className="ai-player-option-avatar">
+                  <img src={`/avatars/${encodeURIComponent(player.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }} />
+                  <span>{player.name.charAt(0).toUpperCase()}</span>
+                </span>
+                <span>{player.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && messages.length === 1 && !pendingPlayerQuestion && <div className="ai-quick-list"><span>Try asking</span>{quick.map(item => <button key={item} type="button" onClick={() => { setQuery(item); window.setTimeout(() => submit(), 0); }}>{item}<span>›</span></button>)}</div>}
       {loading && <div className="ai-loading">Loading your Rally365 history…</div>}
     </section>
 

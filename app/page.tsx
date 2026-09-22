@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  BarChart3, ChevronRight, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles, Bot
+  BarChart3, ChevronRight, ChevronLeft, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles, Bot, Target, Flame, CalendarCheck
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -40,7 +40,7 @@ const matchHistoryTime = (value: string | null | undefined) => {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "achievements" | "duos">("today");
+  const [tab, setTab] = useState<"today" | "stats" | "money" | "players" | "achievements" | "duos" | "tasks">("today");
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -60,6 +60,8 @@ export default function Home() {
   const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
   const [todayMatchesFrozen, setTodayMatchesFrozen] = useState(false);
   const [smartInsightsOpen, setSmartInsightsOpen] = useState(true);
+  const [taskPlayerId, setTaskPlayerId] = useState<string | null>(null);
+  const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -240,6 +242,19 @@ export default function Home() {
     [matches, homeDate]
   );
 
+  const homeDateStrip = useMemo(() => {
+    const center = new Date(`${homeDate}T12:00:00`);
+    return Array.from({ length: 5 }, (_, index) => {
+      const d = new Date(center);
+      d.setDate(center.getDate() + (index - 2));
+      return {
+        key: localDateKey(d),
+        day: d.toLocaleDateString("en-IN", { weekday: "short" }),
+        date: d.getDate(),
+      };
+    });
+  }, [homeDate]);
+
   const moveHomeDate = (direction: number) => {
     const d = new Date(`${homeDate}T12:00:00`);
     d.setDate(d.getDate() + direction);
@@ -262,7 +277,6 @@ export default function Home() {
     const eligiblePlayers = players.filter(p => !isGuest(p));
     const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
     const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
-    const isCurrentDay = homeDate === localDateKey(new Date());
     const playerName = (id: string): string => players.find(p => p.id === id)?.name || "?";
 
     const insights: { icon: string; title: string; text: string; tone: "warm" | "green" | "purple" | "blue" }[] = [];
@@ -389,7 +403,7 @@ export default function Home() {
     }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.matches - a.matches || a.p.name.localeCompare(b.p.name));
 
     return {
-      insights: isCurrentDay ? insights.slice(0, 4) : [],
+      insights: insights.slice(0, 4),
       mvp: mvpCandidates[0] || null,
       hasDateMatches: todayMatches.length > 0,
     };
@@ -397,6 +411,141 @@ export default function Home() {
 
   const smartInsights = smartInsightData.insights;
   const mvpOfDay = smartInsightData.mvp;
+
+  type DailyTask = {
+    id: string;
+    kind: "rivalry" | "partnership" | "streak" | "performance" | "milestone";
+    icon: string;
+    title: string;
+    description: string;
+    progress: number;
+    target: number;
+    completed: boolean;
+    tone: "red" | "blue" | "orange" | "green";
+    meta?: string;
+  };
+
+  const taskEligiblePlayers = useMemo(() => players.filter(p => {
+    const n = p.name.trim().toLowerCase();
+    return !(n === "guest" || /^guest\d+$/.test(n));
+  }), [players]);
+
+  useEffect(() => {
+    if (!taskPlayerId || !taskEligiblePlayers.some(p => p.id === taskPlayerId)) {
+      setTaskPlayerId(taskEligiblePlayers[0]?.id || null);
+    }
+  }, [taskEligiblePlayers, taskPlayerId]);
+
+  const dailyTasksByPlayer = useMemo(() => {
+    const result = new Map<string, DailyTask[]>();
+    const todayKey = localDateKey(new Date());
+    const todayMatches = validMatches.filter(m => localDateKey(new Date(m.played_at)) === todayKey);
+
+    const sideWon = (m: Match, playerId: string) => {
+      const row = m.match_players.find(x => x.player_id === playerId);
+      if (!row) return false;
+      return row.team === "A" ? m.team_a_score > m.team_b_score : m.team_b_score > m.team_a_score;
+    };
+    const playerMatches = (playerId: string) => validMatches.filter(m => m.match_players.some(x => x.player_id === playerId));
+    const currentStreak = (playerId: string) => {
+      let wins = 0, losses = 0;
+      for (const m of playerMatches(playerId)) {
+        if (sideWon(m, playerId)) { if (losses === 0) wins++; else break; }
+        else { if (wins === 0) losses++; else break; }
+      }
+      return { wins, losses };
+    };
+
+    taskEligiblePlayers.forEach(player => {
+      const tasks: DailyTask[] = [];
+      const pm = playerMatches(player.id);
+      const todayPlayerMatches = todayMatches.filter(m => m.match_players.some(x => x.player_id === player.id));
+      const todayWins = todayPlayerMatches.filter(m => sideWon(m, player.id)).length;
+
+      // Rivalry challenge: only when there is enough head-to-head evidence.
+      const opponents = new Map<string, { matches: number; wins: number; recent: boolean[] }>();
+      pm.forEach(m => {
+        const row = m.match_players.find(x => x.player_id === player.id);
+        if (!row) return;
+        m.match_players.filter(x => x.team !== row.team).forEach(op => {
+          if (!taskEligiblePlayers.some(p => p.id === op.player_id)) return;
+          const item = opponents.get(op.player_id) || { matches: 0, wins: 0, recent: [] };
+          item.matches++;
+          if (sideWon(m, player.id)) item.wins++;
+          item.recent.push(sideWon(m, player.id));
+          opponents.set(op.player_id, item);
+        });
+      });
+      const rivalry = [...opponents.entries()]
+        .filter(([, v]) => v.matches >= 5)
+        .map(([id, v]) => ({ id, ...v, recent5: v.recent.slice(0, 5) }))
+        .filter(v => v.recent5.length >= 5 && v.recent5.filter(Boolean).length <= 2)
+        .sort((a, b) => a.wins - b.wins || b.matches - a.matches)[0];
+      if (rivalry) {
+        const opponentName = name(rivalry.id);
+        const completed = todayMatches.some(m => {
+          const row = m.match_players.find(x => x.player_id === player.id);
+          const opp = m.match_players.some(x => x.player_id === rivalry.id && x.team !== row?.team);
+          return !!row && opp && sideWon(m, player.id);
+        });
+        tasks.push({ id: `rivalry-${rivalry.id}`, kind: "rivalry", icon: "⚔️", tone: "red", title: `Beat ${opponentName} at least once today`, description: `You've lost ${rivalry.recent5.length - rivalry.recent5.filter(Boolean).length} of your last ${rivalry.recent5.length} matches against ${opponentName}. Time for a comeback! 💪`, progress: completed ? 1 : 0, target: 1, completed, meta: `Last ${rivalry.recent5.length} vs ${opponentName}` });
+      }
+
+      // Partnership challenge: enough shared history and a sub-50% win rate.
+      const partners = new Map<string, { matches: number; wins: number }>();
+      pm.forEach(m => {
+        const row = m.match_players.find(x => x.player_id === player.id);
+        if (!row) return;
+        const partner = m.match_players.find(x => x.team === row.team && x.player_id !== player.id);
+        if (!partner || !taskEligiblePlayers.some(p => p.id === partner.player_id)) return;
+        const item = partners.get(partner.player_id) || { matches: 0, wins: 0 };
+        item.matches++; if (sideWon(m, player.id)) item.wins++; partners.set(partner.player_id, item);
+      });
+      const partnership = [...partners.entries()]
+        .filter(([, v]) => v.matches >= 5 && v.wins / v.matches < 0.5)
+        .sort((a, b) => a[1].wins / a[1].matches - b[1].wins / b[1].matches || b[1].matches - a[1].matches)[0];
+      if (partnership) {
+        const partnerName = name(partnership[0]);
+        const completed = todayMatches.some(m => {
+          const a = m.match_players.find(x => x.player_id === player.id); const b = m.match_players.find(x => x.player_id === partnership[0]);
+          return !!a && !!b && a.team === b.team && sideWon(m, player.id);
+        });
+        const rate = Math.round(partnership[1].wins / partnership[1].matches * 100);
+        tasks.push({ id: `partner-${partnership[0]}`, kind: "partnership", icon: "🤝", tone: "blue", title: `Win at least 1 match with ${partnerName}`, description: `Your current win rate with ${partnerName} is ${rate}% (${partnership[1].wins}/${partnership[1].matches}). Let's improve that today!`, progress: completed ? 1 : 0, target: 1, completed, meta: `${rate}% partnership win rate` });
+      }
+
+      // Streak challenge: turn a live streak into a concrete target, or break a losing streak.
+      const streak = currentStreak(player.id);
+      if (streak.wins >= 2) {
+        const target = 2;
+        tasks.push({ id: "streak", kind: "streak", icon: "🔥", tone: "orange", title: `Win your next ${target} matches`, description: `You're currently on a ${streak.wins}-match winning streak. Keep it going!`, progress: Math.min(todayWins, target), target, completed: todayWins >= target, meta: `${todayWins}/${target} wins` });
+      } else if (streak.losses >= 2) {
+        tasks.push({ id: "break-streak", kind: "streak", icon: "🔥", tone: "orange", title: "Break your losing streak today", description: `You're on a ${streak.losses}-match losing streak. One win changes the story.`, progress: todayWins > 0 ? 1 : 0, target: 1, completed: todayWins > 0, meta: `${todayWins}/1 win` });
+      }
+
+      // Performance challenge: requires a meaningful history before suggesting a daily goal.
+      if (pm.length >= 8) {
+        const careerWins = pm.filter(m => sideWon(m, player.id)).length;
+        const careerRate = Math.round(careerWins / pm.length * 100);
+        const targetWins = careerRate >= 60 ? 2 : 1;
+        tasks.push({ id: "performance", kind: "performance", icon: "📈", tone: "green", title: `Win at least ${targetWins} match${targetWins === 1 ? "" : "es"} today`, description: `Your historical win rate is ${careerRate}%. Use today's games to build on your record.`, progress: Math.min(todayWins, targetWins), target: targetWins, completed: todayWins >= targetWins, meta: `${todayWins}/${targetWins} wins` });
+      }
+
+      // Milestone: surface a goal only when close enough to be realistically reachable.
+      const wins = pm.filter(m => sideWon(m, player.id)).length;
+      const milestone = [10, 25, 50, 75, 100].find(n => n > wins && n - wins <= 3);
+      if (milestone) {
+        const remaining = milestone - wins;
+        tasks.push({ id: `milestone-${milestone}`, kind: "milestone", icon: "🏆", tone: "green", title: `${remaining === 1 ? "One" : remaining} win${remaining === 1 ? "" : "s"} to ${milestone} wins`, description: `You're at ${wins} career wins. You're close to a Rally365 milestone.`, progress: 0, target: remaining, completed: false, meta: `${wins}/${milestone} wins` });
+      }
+
+      result.set(player.id, tasks.slice(0, 4));
+    });
+    return result;
+  }, [players, taskEligiblePlayers, validMatches]);
+
+  const selectedDailyTasks = taskPlayerId ? (dailyTasksByPlayer.get(taskPlayerId) || []) : [];
+  const selectedTaskPlayer = taskEligiblePlayers.find(p => p.id === taskPlayerId) || null;
 
   const filteredMatches = useMemo(() => {
     const anchor = new Date(`${statsDate}T00:00:00`);
@@ -464,11 +613,6 @@ export default function Home() {
 
   // Players screen is always ALL-TIME.
   // It intentionally uses validMatches, never filteredMatches/homeDate/statsDate.
-
-  const playerAvatarFile = (name: string) => {
-    const known = new Set(["Ashok", "Bhaskar", "Karthik", "Pradeep", "Ramesh", "Rohit"]);
-    return known.has(name.trim()) ? `/avatars/${encodeURIComponent(name.trim())}.png` : null;
-  };
 
   const allTimePlayerStats = useMemo(() => players.map(p => {
     const ms = validMatches.filter(m =>
@@ -1776,16 +1920,22 @@ export default function Home() {
     <section className="content">
       {error && <div className="error-banner">{error}<button onClick={() => setError("")}>×</button></div>}
 
-      {tab === "today" && <><div className={`hero-action-area ${homeDate === localDateKey(new Date()) && !todayMatchesFrozen ? "" : "no-floating"}`}><div className="hero-card" style={{ minHeight: "0", padding: "18px 28px" }}><div><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div><p>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players · {homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</p></div><Trophy size={42} /></div>
-        {homeDate === localDateKey(new Date()) && !todayMatchesFrozen && <><button className="floating-new-match" aria-label="New match" onClick={() => { setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></>}
+      {tab === "today" && <><div className={`hero-action-area ${homeDate === localDateKey(new Date()) && !todayMatchesFrozen ? "" : "no-floating"}`}><div className={`hero-card home-today-card ${homeDate === localDateKey(new Date()) && selectedTaskPlayer ? "task-enabled" : ""}`} onClick={() => { if (homeDate === localDateKey(new Date()) && selectedTaskPlayer) setTab("tasks"); }} role={homeDate === localDateKey(new Date()) && selectedTaskPlayer ? "button" : undefined} tabIndex={homeDate === localDateKey(new Date()) && selectedTaskPlayer ? 0 : undefined} onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && homeDate === localDateKey(new Date()) && selectedTaskPlayer) { e.preventDefault(); setTab("tasks"); } }}><div className="home-today-card-copy"><div className="eyebrow">{homeDate === localDateKey(new Date()) ? "TODAY" : "MATCH DAY"}</div>{homeDate === localDateKey(new Date()) ? <><h1>Today's Tasks</h1><p>Personalised goals to make you better</p></> : <h1>Match Day</h1>}<div className="home-today-meta"><span>{new Set(homeMatches.filter(m => m.status !== "VOIDED").flatMap(m => m.match_players.map(x => x.player_id))).size} players</span><span>·</span><span>{homeMatches.filter(m => m.status !== "VOIDED").length} valid matches</span></div>{homeDate === localDateKey(new Date()) && selectedDailyTasks.length > 0 && <div className="home-task-tags">{Array.from(new Set(selectedDailyTasks.map(t => t.kind))).map(kind => <span key={kind} className={`home-task-tag home-task-tag-${kind}`}>{kind === "rivalry" ? "Rivalries" : kind === "partnership" ? "Partnerships" : kind === "streak" ? "Streaks" : kind === "milestone" ? "Milestones" : "Performance"}</span>)}</div>}</div><Trophy size={46} /></div>
+        {homeDate === localDateKey(new Date()) && !todayMatchesFrozen && <><button className="floating-new-match" aria-label="New match" onClick={e => { e.stopPropagation(); setScheduledMatchToRecord(null); setWinnerTeam(""); setSelected([]); setModal("match"); }}><Plus size={30} strokeWidth={2.2} /></button><div className="floating-new-match-label">New match</div></>}
         </div>
-        <div className="home-date-filter">
-          <button type="button" className="period-arrow" onClick={() => moveHomeDate(-1)} aria-label="Previous date">‹</button>
-          <label className="date-picker-control">
-            <span>DATE</span>
+        <div className="home-date-strip" aria-label="Select match date">
+          <button type="button" className="home-date-arrow" onClick={() => moveHomeDate(-1)} aria-label="Previous date"><ChevronLeft size={18} /></button>
+          {homeDateStrip.map(d => (
+            <button key={d.key} type="button" className={`home-date-tile ${d.key === homeDate ? "active" : ""}`} onClick={() => setHomeDate(d.key)}>
+              <span>{d.day}</span>
+              <strong>{d.date}</strong>
+            </button>
+          ))}
+          <label className="home-date-calendar" aria-label="Choose date">
+            <CalendarCheck size={19} />
             <input type="date" value={homeDate} onChange={e => e.target.value && setHomeDate(e.target.value)} />
           </label>
-          <button type="button" className="period-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date">›</button>
+          <button type="button" className="home-date-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date"><ChevronRight size={18} /></button>
         </div>
         {homeDate === localDateKey(new Date()) && <div className={`today-freeze-panel ${todayMatchesFrozen ? "frozen" : ""}`}>
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
@@ -1806,7 +1956,7 @@ export default function Home() {
             </div>
           </div>
         </section>}
-        {smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
+        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
           <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
             <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
             <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
@@ -1818,7 +1968,7 @@ export default function Home() {
                 <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
               </div>)}
             </div>
-            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Today's insights update automatically as today's matches are recorded." : "No matches today yet. Insights will appear automatically when matches are recorded."}</small>
+            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
 
           </>}
         </section>}
@@ -1864,9 +2014,9 @@ export default function Home() {
           <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
           <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
         </div>}
-          {homeMatches.map((m, i) => <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number">M{homeMatches.length - i}</div><div className="teams">
+          {homeMatches.map((m, i) => <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small></div><div className="teams">
                 <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{team(m, "A")}</strong></div>
-                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small>
+                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div>
                 {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
               </div>{m.status !== "VOIDED" && <button
                   className="edit-link"
@@ -2184,6 +2334,37 @@ export default function Home() {
       </>}
 
       
+{tab === "tasks" && <section className="tasks-page">
+  <div className="tasks-heading">
+    <div><div className="eyebrow">PERSONALISED GOALS</div><h1>Today's Tasks</h1><p>Goals based on rivalry, partnership, streak and match history.</p></div>
+    <div className="tasks-date"><CalendarCheck size={18} /><span>Today</span></div>
+  </div>
+  <div className="task-history-toggle">
+    <button className={taskView === "history" ? "active" : ""} onClick={() => setTaskView(taskView === "history" ? "tasks" : "history")}>
+      <History size={14} /> History
+    </button>
+  </div>
+  {taskView === "tasks" && <>
+    {selectedTaskPlayer && <div className="task-player-picker">{taskEligiblePlayers.map(p => <button key={p.id} className={p.id === taskPlayerId ? "active" : ""} onClick={() => setTaskPlayerId(p.id)}>{p.name}</button>)}</div>}
+    {selectedTaskPlayer && (() => {
+      const completedCount = selectedDailyTasks.filter(t => t.completed).length;
+      const totalCount = selectedDailyTasks.length;
+      const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      return <div className="task-summary-card">
+        <div className="task-avatar">{selectedTaskPlayer.name.slice(0,1)}</div>
+        <div><strong>{selectedTaskPlayer.name}</strong><small>{selectedDailyTasks.length} personalised task{selectedDailyTasks.length === 1 ? "" : "s"} for today</small></div>
+        <div className="task-progress-ring" style={{ background: `conic-gradient(#fff ${progress}%, rgba(255,255,255,.28) ${progress}% 100%)` }}>
+          <div className="task-progress-ring-inner"><b>{completedCount}/{totalCount}</b></div>
+        </div>
+      </div>;
+    })()}
+    <div className="daily-task-list">{selectedDailyTasks.length ? selectedDailyTasks.map(task => <article key={task.id} className={`daily-task-card task-tone-${task.tone} ${task.completed ? "completed" : ""}`}>
+      <div className="daily-task-icon">{task.icon}</div><div className="daily-task-body"><span className="daily-task-kind">{task.kind === "rivalry" ? "Rivalry Challenge" : task.kind === "partnership" ? "Partnership Goal" : task.kind === "streak" ? "Streak Challenge" : task.kind === "milestone" ? "Milestone Goal" : "Performance Goal"}</span><h3>{task.title}</h3><p>{task.description}</p>{task.meta && <small>{task.meta}</small>}<div className="daily-task-progress"><div><span>{task.progress}/{task.target}</span></div><i style={{ width: `${Math.min(100, Math.round(task.progress / task.target * 100))}%` }} /></div></div><div className="daily-task-check">{task.completed ? <Check size={19} /> : ""}</div>
+    </article>) : <div className="tasks-empty"><Target size={30}/><strong>No tasks yet</strong><p>Play a few more matches and Rally365 will generate meaningful goals from your history.</p></div>}</div>
+  </>}
+  {taskView === "history" && <div className="tasks-empty"><CalendarCheck size={30}/><strong>Task history</strong><p>Daily task history will build automatically as Rally365 records goals and results.</p></div>}
+</section>}
+
 {tab === "achievements" && (() => {
   const selectedId = achievementPlayerId || allTimePlayerStats[0]?.id;
   const selected = selectedId ? achievementData[selectedId] : null;
@@ -2262,16 +2443,15 @@ export default function Home() {
   </div>;
 })()}
 
-{tab === "players" && <><div className="players-heading"><div className="players-heading-icon"><UsersRound size={28} /></div><div><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All players in your club</p></div></div><div className="player-grid">{allTimePlayerStats.map((s, i) => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className={`avatar player-avatar avatar-color-${i % 8}`}>{playerAvatarFile(s.name) ? <img src={playerAvatarFile(s.name) as string} alt="" className="player-avatar-image" /> : s.name.slice(0, 1)}</div><div className="player-card-copy"><b>{s.name}</b><small><span>{s.played} matches</span><span className="stat-dot">•</span><span className="win-stat">{s.w}W</span><span className="stat-dot">•</span><span className="loss-stat">{s.l}L</span><span className="stat-dot">•</span><span>{s.winRate}%</span></small></div><CircleUserRound size={23} className="player-profile-icon" /></button> })}</div></>}
+{tab === "players" && <><div className="players-heading"><div className="players-heading-icon"><UsersRound size={28} /></div><div><div className="eyebrow">ROSTER</div><h1>Players</h1><p>All players in your club</p></div></div><div className="player-grid">{allTimePlayerStats.map((s, i) => { return <button className="player-card" key={s.id} onClick={() => setPlayerDetailsId(s.id)}><div className="player-avatar-wrap"><img className="player-avatar-image" src={`/avatars/${encodeURIComponent(s.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("is-hidden"); }} /><div className={`avatar player-avatar avatar-color-${i % 8} is-hidden`}>{s.name.slice(0, 1)}</div></div><div className="player-card-copy"><b>{s.name}</b><small><span>{s.played} matches</span><span className="stat-dot">•</span><span className="win-stat">{s.w}W</span><span className="stat-dot">•</span><span className="loss-stat">{s.l}L</span><span className="stat-dot">•</span><span>{s.winRate}%</span></small></div><ChevronRight size={22} className="player-chevron" /></button> })}</div></>}
     </section>
-    {tab === "today" && <Link href="/ai" className="floating-ask-ai" aria-label="Ask AI">
-      <span className="floating-ask-ai-icon"><Bot size={20} /></span>
-      <span className="floating-ask-ai-copy"><span>Ask AI</span></span>
-    </Link>}
-
+    <Link href="/ai" className="floating-ask-ai" aria-label="Ask AI">
+      <span className="floating-ask-ai-icon"><Bot size={21} strokeWidth={2.2} /></span>
+      <span className="floating-ask-ai-copy"><b>Ask AI</b></span>
+    </Link>
     <nav className="bottom-nav" style={{
       display: "grid",
-      gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+      gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
       width: "100%",
       minWidth: 0
     }}><button className={tab === "today" ? "active" : ""} onClick={() => setTab("today")}><History /><span>Today</span></button><button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}><BarChart3 /><span>Stats</span></button><button className={tab === "money" ? "active" : ""} onClick={() => setTab("money")}><ReceiptText /><span>Money</span></button><button className={tab === "duos" ? "active" : ""} onClick={() => setTab("duos")}><Shuffle /><span>Duos</span></button><button className={tab === "players" ? "active" : ""} onClick={() => setTab("players")}><Users /><span>Players</span></button><button className={tab === "achievements" ? "active" : ""} onClick={() => setTab("achievements")}><Trophy /><span>Achievements</span></button></nav>

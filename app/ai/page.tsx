@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 type Player = { id: string; name: string };
+type Message = { role: "ai" | "user"; text: string; feedback?: "up" | "down"; feedbackRetry?: boolean; id?: string; sourceQuestion?: string };
 type Match = {
   id: string;
   team_a_score: number;
@@ -25,11 +26,12 @@ export default function RallyAiPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState<{ role: "ai" | "user"; text: string }[]>([
-    { role: "ai", text: "Ask me anything about your Rally365 games, players, partnerships or rivalries." },
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "ai", text: "Ask me anything about your Rally365 games, players, partnerships or rivalries.", id: "welcome" },
   ]);
   const [loading, setLoading] = useState(true);
   const [answering, setAnswering] = useState(false);
+  const [feedbackBusy, setFeedbackBusy] = useState<string | null>(null);
   const [pendingPlayerQuestion, setPendingPlayerQuestion] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -65,22 +67,29 @@ export default function RallyAiPage() {
     return { matches: wins + losses, wins, losses, winRate: wins + losses ? Math.round(wins / (wins + losses) * 100) : 0 };
   };
 
-  const bestPartner = (playerId: string) => {
-    const pairs = new Map<string, { matches: number; wins: number }>();
+  const partnerStats = (playerId: string) => {
+    const pairs = new Map<string, { matches: number; wins: number; losses: number }>();
     validMatches.forEach(m => {
       const row = m.match_players.find(x => x.player_id === playerId);
       if (!row) return;
       const partner = m.match_players.find(x => x.team === row.team && x.player_id !== playerId);
       if (!partner) return;
-      const item = pairs.get(partner.player_id) || { matches: 0, wins: 0 };
+      const item = pairs.get(partner.player_id) || { matches: 0, wins: 0, losses: 0 };
       item.matches++;
       const own = row.team === "A" ? m.team_a_score : m.team_b_score;
       const opp = row.team === "A" ? m.team_b_score : m.team_a_score;
       if (own > opp) item.wins++;
+      else if (own < opp) item.losses++;
       pairs.set(partner.player_id, item);
     });
-    return [...pairs.entries()].sort((a, b) => b[1].wins - a[1].wins || b[1].matches - a[1].matches)[0];
+    return [...pairs.entries()];
   };
+
+  const bestPartner = (playerId: string) =>
+    partnerStats(playerId).sort((a, b) => b[1].wins - a[1].wins || b[1].matches - a[1].matches)[0];
+
+  const weakestPartner = (playerId: string) =>
+    partnerStats(playerId).sort((a, b) => b[1].losses - a[1].losses || a[1].wins - b[1].wins || b[1].matches - a[1].matches)[0];
 
   const streak = (playerId: string) => {
     let count = 0;
@@ -151,12 +160,16 @@ export default function RallyAiPage() {
 
     // Handle an explicitly requested window first. This prevents phrases such as
     // “last 10 matches stats” from falling through to the all-time stats branch.
-    const requestedCountMatch = q.match(/\b(?:last|recent)\s+(\d+)\b/);
+    const requestedCountMatch = q.match(/\b(?:last|recent)\s+(\d+)\s*(?:matches?|games?|history)?\b/);
     const requestedCount = requestedCountMatch ? Math.max(1, Number(requestedCountMatch[1])) : null;
     const asksStats = /(stats|statistics|record|performance|win rate|wins|losses)/.test(q);
     const asksRecent = /(recent|latest|last|most recent)/.test(q);
+    if (/(mvp|most valuable player)/.test(q)) {
+      return "Rally365 calculates the MVP for the selected match day from that day's valid matches. Guest players are excluded. Each eligible player's day performance is compared using wins, win rate and number of matches; the result is recalculated whenever the day's match results change. If there are no valid matches for the day, there is no MVP.";
+    }
+
     const needsPlayer =
-      /(how am i|how is|how's|doing|performance|win rate|winning streak|streak|best partner|best duo|partnership|partner|pair|opponent|rival|recent matches|latest matches|last .* matches|stats|statistics|record)/.test(q) &&
+      /(how am i|how is|how's|doing|performance|win rate|winning streak|streak|strongest partner|best partner|best duo|weakest partner|worst partner|partnership|partner|pair|opponent|rival|recent matches|latest matches|last .* matches|stats|statistics|record)/.test(q) &&
       !/(most wins|highest wins|top player|leader|leaderboard|how many|total|number of)/.test(q);
 
     if (needsPlayer && !mentioned) {
@@ -189,7 +202,15 @@ export default function RallyAiPage() {
       return `${first.name} and ${second.name} have played together ${pair.matchesTogether} ${pair.matchesTogether === 1 ? "match" : "matches"}: ${pair.wins} wins and ${pair.losses} losses (${rate}% win rate).`;
     }
 
-    if (/(best partner|best duo|partner|pair)/.test(q) && subject) {
+    if (/(weakest partner|worst partner)/.test(q) && subject) {
+      const result = weakestPartner(subject.id);
+      if (!result) return `${subject.name} does not have enough team history yet for a partner insight.`;
+      const partner = nameById.get(result[0]) || "Unknown";
+      const rate = result[1].matches ? Math.round(result[1].wins / result[1].matches * 100) : 0;
+      return `${subject.name}'s weakest historical partner is ${partner}: ${result[1].wins} wins and ${result[1].losses} losses in ${result[1].matches} matches together (${rate}% win rate).`;
+    }
+
+    if (/(strongest partner|best partner|best duo)/.test(q) && subject) {
       const result = bestPartner(subject.id);
       if (!result) return `${subject.name} does not have enough team history yet for a partner insight.`;
       const partner = nameById.get(result[0]) || "Unknown";
@@ -241,6 +262,93 @@ export default function RallyAiPage() {
 
     return "I can answer questions about player performance, wins and losses, winning streaks, partners, opponents, recent matches and match history. Try asking a specific player name with your question.";
   };
+  const classifyIntent = (raw: string) => {
+    const q = normalize(raw);
+    if (/(weakest partner|worst partner)/.test(q)) return "weakest_partner";
+    if (/(strongest partner|best partner|best duo)/.test(q)) return "strongest_partner";
+    if (/(mvp|most valuable player)/.test(q)) return "mvp";
+    if (/(last|recent|latest|most recent).*\b\d+\b.*(match|game|history)/.test(q)) return "recent_matches";
+    if (/(recent|latest|last|most recent).*(match|game)/.test(q)) return "recent_matches";
+    if (/(streak|winning streak|form)/.test(q)) return "streak";
+    if (/(win rate|performance|how am i|how is|doing|stats|record)/.test(q)) return "player_stats";
+    if (/(partner|partnership|duo|pair)/.test(q)) return "partnership";
+    if (/(most wins|highest wins|top player|leader|leaderboard)/.test(q)) return "most_wins";
+    return "general";
+  };
+
+  const reframeAnswer = (question: string, previousAnswer: string) => {
+    const q = normalize(question);
+    const mentionedPlayers = players.filter(p => q.includes(normalize(p.name)));
+    const subject = mentionedPlayers[0];
+    const intent = classifyIntent(question);
+
+    // Re-run the underlying calculation, but deliberately use a fuller response
+    // format. This is the free/no-LLM feedback loop: a negative rating triggers
+    // a second pass over the same Rally365 data instead of merely repeating text.
+    if (intent === "weakest_partner" && subject) {
+      const result = weakestPartner(subject.id);
+      if (result) {
+        const partner = nameById.get(result[0]) || "Unknown";
+        const total = result[1].matches;
+        const rate = total ? Math.round(result[1].wins / total * 100) : 0;
+        return `I re-checked ${subject.name}'s partnership history. ${partner} is the weakest historical partner by the recorded results: ${result[1].wins} wins and ${result[1].losses} losses across ${total} matches together (${rate}% win rate).`;
+      }
+    }
+    if (intent === "strongest_partner" && subject) {
+      const result = bestPartner(subject.id);
+      if (result) {
+        const partner = nameById.get(result[0]) || "Unknown";
+        const total = result[1].matches;
+        const rate = total ? Math.round(result[1].wins / total * 100) : 0;
+        return `I re-checked ${subject.name}'s partnership history. ${partner} is the strongest historical partner: ${result[1].wins} wins in ${total} matches together (${rate}% win rate).`;
+      }
+    }
+    if (intent === "mvp") {
+      return "I re-checked the MVP rule: it is calculated independently for the selected match day from valid matches, excluding Guest players. The eligible players are compared using wins, win rate and number of matches, and the result is recalculated when that day's match results change.";
+    }
+    if (previousAnswer) return `I re-checked the Rally365 data and restructured the answer:\n${previousAnswer}`;
+    return answerQuery(question);
+  };
+
+  const submitFeedback = async (messageIndex: number, feedback: "up" | "down") => {
+    const message = messages[messageIndex];
+    if (!message || message.role !== "ai" || feedbackBusy) return;
+    setFeedbackBusy(message.id || String(messageIndex));
+
+    setMessages(current => current.map((m, i) => i === messageIndex ? { ...m, feedback } : m));
+
+    let retryText: string | null = null;
+    const previousUser = [...messages.slice(0, messageIndex)].reverse().find(m => m.role === "user");
+    const sourceQuestion = message.sourceQuestion || previousUser?.text || "";
+    if (feedback === "down") {
+      if (sourceQuestion) {
+        retryText = reframeAnswer(sourceQuestion, message.text);
+        setAnswering(true);
+        window.setTimeout(() => {
+          setMessages(current => [...current, { role: "ai", text: retryText || "I re-checked the answer, but could not produce a better response.", feedbackRetry: true, id: `retry-${Date.now()}`, sourceQuestion }]);
+          setAnswering(false);
+        }, 300);
+      }
+    }
+
+    try {
+      await fetch("/api/ai/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupId,
+          question: sourceQuestion,
+          response: message.text,
+          feedback,
+          intent: classifyIntent(sourceQuestion),
+          retryResponse: retryText,
+        }),
+      }).catch(() => undefined);
+    } finally {
+      setFeedbackBusy(null);
+    }
+  };
+
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     const value = query.trim();
@@ -251,11 +359,11 @@ export default function RallyAiPage() {
     const questionToAnswer = pendingPlayerQuestion && selectedPlayer ? `${pendingPlayerQuestion} ${selectedPlayer.name}` : value;
     if (pendingPlayerQuestion && selectedPlayer) setPendingPlayerQuestion(null);
 
-    setMessages(current => [...current, { role: "user", text: value }]);
+    setMessages(current => [...current, { role: "user", text: value, id: `user-${Date.now()}` }]);
     setQuery("");
     setAnswering(true);
     window.setTimeout(() => {
-      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer) }]);
+      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer), id: `ai-${Date.now()}`, sourceQuestion: questionToAnswer }]);
       setAnswering(false);
     }, 250);
   };
@@ -267,10 +375,10 @@ export default function RallyAiPage() {
     if (!pendingPlayerQuestion || answering) return;
     const questionToAnswer = `${pendingPlayerQuestion} ${player.name}`;
     setPendingPlayerQuestion(null);
-    setMessages(current => [...current, { role: "user", text: player.name }]);
+    setMessages(current => [...current, { role: "user", text: player.name, id: `user-${Date.now()}` }]);
     setAnswering(true);
     window.setTimeout(() => {
-      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer) }]);
+      setMessages(current => [...current, { role: "ai", text: answerQuery(questionToAnswer), id: `ai-${Date.now()}`, sourceQuestion: questionToAnswer }]);
       setAnswering(false);
     }, 250);
   };
@@ -388,6 +496,12 @@ export default function RallyAiPage() {
       }
       .ai-input-bar input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; }
       .ai-input-bar button { flex: 0 0 auto; }
+      .ai-message-wrap { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: min(88%, 680px); }
+      .ai-message-row.user .ai-message-wrap { align-items: flex-end; }
+      .ai-feedback { display: flex; gap: 4px; margin: 5px 0 0 6px; }
+      .ai-feedback button { border: 0; background: transparent; border-radius: 8px; padding: 3px 5px; font-size: 13px; line-height: 1; cursor: pointer; opacity: .55; }
+      .ai-feedback button:hover, .ai-feedback button.selected { background: #e8f5ef; opacity: 1; }
+      .ai-feedback button:disabled { cursor: default; opacity: .35; }
       .ai-player-picker { margin: 10px 0 14px 40px; }
       .ai-player-picker-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #53656a; }
       .ai-player-options { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -420,7 +534,15 @@ export default function RallyAiPage() {
 
       {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`ai-message-row ${message.role}`}>
         {message.role === "ai" && <span className="ai-message-icon"><Bot size={15} /></span>}
-        <div className="ai-message">{message.text.split("\n").map((line, i) => <div key={i}>{line}</div>)}</div>
+        <div className="ai-message-wrap">
+          <div className="ai-message">{message.text.split("\n").map((line, i) => <div key={i}>{line}</div>)}</div>
+          {message.role === "ai" && index > 0 && (
+            <div className="ai-feedback" aria-label="Rate this response">
+              <button type="button" className={message.feedback === "up" ? "selected" : ""} onClick={() => submitFeedback(index, "up")} disabled={feedbackBusy === (message.id || String(index))} aria-label="Helpful">👍</button>
+              <button type="button" className={message.feedback === "down" ? "selected" : ""} onClick={() => submitFeedback(index, "down")} disabled={feedbackBusy === (message.id || String(index))} aria-label="Not helpful">👎</button>
+            </div>
+          )}
+        </div>
         {message.role === "user" && <span className="ai-message-icon"><UserRound size={15} /></span>}
       </div>)}
 

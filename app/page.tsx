@@ -62,6 +62,11 @@ export default function Home() {
   const [smartInsightsOpen, setSmartInsightsOpen] = useState(true);
   const [taskPlayerId, setTaskPlayerId] = useState<string | null>(null);
   const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");
+  const [duoAttendanceIds, setDuoAttendanceIds] = useState<string[]>([]);
+  const [attendanceEditorOpen, setAttendanceEditorOpen] = useState(false);
+  const [attendanceHistoryOpen, setAttendanceHistoryOpen] = useState(false);
+  const [attendanceHistoryDate, setAttendanceHistoryDate] = useState<string | null>(null);
+  const [savingAttendance, setSavingAttendance] = useState(false);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -266,6 +271,59 @@ export default function Home() {
     [matches]
   );
 
+  const todayKey = localDateKey(new Date());
+  const realPlayers = useMemo(() => players.filter(p => {
+    const n = p.name.trim().toLowerCase();
+    return !(n === "guest" || /^guest\d+$/.test(n) || n.startsWith("guest "));
+  }), [players]);
+  const todayAttendanceRows = useMemo(() => attendance.filter(a => a.attendance_date === todayKey && a.status === "PRESENT"), [attendance, todayKey]);
+  const todayAttendingIds = useMemo(() => new Set(todayAttendanceRows.map(a => a.player_id)), [todayAttendanceRows]);
+
+  useEffect(() => {
+    const validIds = new Set(realPlayers.map(p => p.id));
+    setDuoAttendanceIds([...todayAttendingIds].filter(id => validIds.has(id)));
+  }, [attendance, realPlayers, todayKey]);
+
+  const attendanceHistory = useMemo(() => {
+    const byDate = new Map<string, string[]>();
+    attendance.filter(a => a.status === "PRESENT" && realPlayers.some(p => p.id === a.player_id)).forEach(a => {
+      const list = byDate.get(a.attendance_date) || [];
+      if (!list.includes(a.player_id)) list.push(a.player_id);
+      byDate.set(a.attendance_date, list);
+    });
+    return [...byDate.entries()].sort((a,b) => b[0].localeCompare(a[0]));
+  }, [attendance, realPlayers]);
+
+  const saveTodayAttendance = async () => {
+    if (!groupId) return;
+    setSavingAttendance(true);
+    setError("");
+    try {
+      const existing = attendance.filter(a => a.attendance_date === todayKey && realPlayers.some(p => p.id === a.player_id));
+      const selected = new Set(duoAttendanceIds);
+      for (const row of existing) {
+        if (row.fine_amount > 0) continue;
+        const nextStatus = selected.has(row.player_id) ? "PRESENT" : "ABSENT";
+        if (row.status !== nextStatus) {
+          const { error: updateError } = await supabase.from("attendance").update({ status: nextStatus }).eq("id", row.id);
+          if (updateError) throw updateError;
+        }
+      }
+      const existingIds = new Set(existing.map(a => a.player_id));
+      const inserts = duoAttendanceIds.filter(id => !existingIds.has(id)).map(player_id => ({ group_id: groupId, player_id, attendance_date: todayKey, status: "PRESENT", late_minutes: 0, fine_amount: 0 }));
+      if (inserts.length) {
+        const { error: insertError } = await supabase.from("attendance").insert(inserts);
+        if (insertError) throw insertError;
+      }
+      setAttendanceEditorOpen(false);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Could not save today's attendance.");
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
   // Rally365 Smart Insights: deterministic, dynamic insights from the selected day's
   // match history plus all-time history where appropriate. Guest accounts are never
   // surfaced in player-facing insights.
@@ -274,7 +332,7 @@ export default function Home() {
       const n = player?.name?.trim().toLowerCase() || "";
       return n === "guest1" || n === "guest2" || n.startsWith("guest ");
     };
-    const eligiblePlayers = players.filter(p => !isGuest(p));
+    const eligiblePlayers = players.filter(p => !isGuest(p) && todayAttendingIds.has(p.id));
     const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
     const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
     const playerName = (id: string): string => players.find(p => p.id === id)?.name || "?";
@@ -407,7 +465,7 @@ export default function Home() {
       mvp: mvpCandidates[0] || null,
       hasDateMatches: todayMatches.length > 0,
     };
-  }, [homeMatches, players, validMatches]);
+  }, [homeMatches, players, validMatches, todayAttendingIds]);
 
   const smartInsights = smartInsightData.insights;
   const mvpOfDay = smartInsightData.mvp;
@@ -425,10 +483,7 @@ export default function Home() {
     meta?: string;
   };
 
-  const taskEligiblePlayers = useMemo(() => players.filter(p => {
-    const n = p.name.trim().toLowerCase();
-    return !(n === "guest" || /^guest\d+$/.test(n));
-  }), [players]);
+  const taskEligiblePlayers = useMemo(() => realPlayers.filter(p => todayAttendingIds.has(p.id)), [realPlayers, todayAttendingIds]);
 
   useEffect(() => {
     if (!taskPlayerId || !taskEligiblePlayers.some(p => p.id === taskPlayerId)) {
@@ -543,6 +598,10 @@ export default function Home() {
     });
     return result;
   }, [players, taskEligiblePlayers, validMatches]);
+
+  useEffect(() => {
+    if (duoAttendanceIds.length >= 4 && !duoPlayers.length) setDuoPlayers(duoAttendanceIds);
+  }, [duoAttendanceIds]);
 
   const selectedDailyTasks = taskPlayerId ? (dailyTasksByPlayer.get(taskPlayerId) || []) : [];
   const selectedTaskPlayer = taskEligiblePlayers.find(p => p.id === taskPlayerId) || null;
@@ -2195,6 +2254,25 @@ export default function Home() {
             <span className="duo-date-label">TODAY</span>
             <strong>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</strong>
           </div>
+        </div>
+
+        <div className="duos-panel duo-attendance-panel">
+          <div className="section-title"><span>👥 Today's Attendance</span><span>{duoAttendanceIds.length} players</span></div>
+          <div className="duo-attendance-date">{new Date(`${todayKey}T12:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</div>
+          <div className="duo-attendance-summary">
+            {duoAttendanceIds.length ? <div className="duo-attendance-avatars">{realPlayers.filter(p => duoAttendanceIds.includes(p.id)).map(p => <div className="duo-attendee" key={p.id}><span className="duo-attendee-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }} /><b>{p.name.slice(0,1)}</b></span><span>{p.name}</span></div>)}</div> : <div className="duo-attendance-empty">No players marked present yet.</div>}
+            <button type="button" className="secondary-button duo-attendance-edit" onClick={() => setAttendanceEditorOpen(v => !v)}>{attendanceEditorOpen ? "Close" : "Edit attendance"}</button>
+          </div>
+          <div className="duo-attendance-note">Attendance is used for today's duos, tasks and insights.</div>
+          {attendanceEditorOpen && <div className="duo-attendance-editor">
+            <div className="duo-selection-helper">Select players who are playing today. Guests are not shown.</div>
+            <div className="duo-attendance-list">{realPlayers.map(p => { const checked = duoAttendanceIds.includes(p.id); return <button type="button" key={p.id} className={`duo-attendance-row ${checked ? "selected" : ""}`} onClick={() => setDuoAttendanceIds(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id])}>
+              <span className="duo-attendance-player-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }} /><b>{p.name.slice(0,1)}</b></span><span>{p.name}</span><span className="duo-attendance-check">{checked ? <Check size={18} strokeWidth={3} /> : ""}</span>
+            </button> })}</div>
+            <button type="button" className="primary-button duo-attendance-save" disabled={savingAttendance} onClick={saveTodayAttendance}>{savingAttendance ? "Saving…" : "Save attendance"}</button>
+          </div>}
+          <button type="button" className="duo-attendance-history-toggle" onClick={() => setAttendanceHistoryOpen(v => !v)}>{attendanceHistoryOpen ? "Hide attendance history" : "View attendance history"}<ChevronDown size={16} className={attendanceHistoryOpen ? "rotated" : ""} /></button>
+          {attendanceHistoryOpen && <div className="duo-attendance-history">{attendanceHistory.length ? attendanceHistory.map(([date, ids]) => <div key={date}><button type="button" className="duo-attendance-history-row" onClick={() => setAttendanceHistoryDate(attendanceHistoryDate === date ? null : date)}><span><b>{new Date(`${date}T12:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</b><small>{ids.length} {ids.length === 1 ? "player" : "players"}</small></span><ChevronRight size={17} className={attendanceHistoryDate === date ? "history-chevron-open" : ""} /></button>{attendanceHistoryDate === date && <div className="duo-history-detail">{ids.map(id => <span key={id}>{name(id)}</span>)}</div>}</div>) : <div className="duo-attendance-empty">No attendance history yet.</div>}</div>}
         </div>
 
         <div className="duos-panel duo-add-player-panel">

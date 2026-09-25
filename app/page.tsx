@@ -12,7 +12,26 @@ import { supabase } from "../lib/supabase";
 type Player = { id: string; name: string };
 type Match = { id: string; group_id: string; team_a_score: number; team_b_score: number; played_at: string; status: string; edit_count: number; last_edited_at: string | null; match_players: { player_id: string; team: "A" | "B" }[] };
 type Expense = { id: string; expense_date: string; category: string; amount: number; description: string | null };
-type Attendance = { id: string; player_id: string; attendance_date: string; status: string; late_minutes: number; fine_amount: number };
+// type Attendance = { id: string; player_id: string; attendance_date: string; status: string; late_minutes: number; fine_amount: number };
+type Attendance = {
+  id: string;
+  player_id: string;
+  attendance_date: string;
+  status: string;
+  late_minutes: number;
+};
+
+type Fine = {
+  id: string;
+  group_id: string;
+  player_id: string;
+  fine_date: string;
+  fine_type: "late" | "missed";
+  late_minutes: number;
+  amount: number;
+  created_at: string;
+};
+
 
 const CODE = "RALLY365";
 const money = (n: number) => `₹${Number(n || 0).toFixed(0)}`;
@@ -67,6 +86,8 @@ export default function Home() {
   const [attendanceHistoryOpen, setAttendanceHistoryOpen] = useState(false);
   const [attendanceHistoryDate, setAttendanceHistoryDate] = useState<string | null>(null);
   const [savingAttendance, setSavingAttendance] = useState(false);
+  // const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [fines, setFines] = useState<Fine[]>([]);
 
   const [scheduledMatchToRecord, setScheduledMatchToRecord] = useState<{ id: string; teamA: string[]; teamB: string[] } | null>(null);
   const [scheduledMatchToDelete, setScheduledMatchToDelete] = useState<{ id: string; matchNo: number } | null>(null);
@@ -103,17 +124,56 @@ export default function Home() {
     const { data: g, error: ge } = await supabase.from("groups").select("id,name,join_code").eq("join_code", CODE).single();
     if (ge || !g) { setError(ge?.message || "Group not found"); setLoading(false); return }
     setGroupId(g.id);
-    const [p, m, e, a, r] = await Promise.all([
-      supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
-      supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
-      supabase.from("expenses").select("id,expense_date,category,amount,description").eq("group_id", g.id).order("expense_date", { ascending: false }),
-      supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
-      supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).single()
-    ]);
+    // const [p, m, e, a, r] = await Promise.all([
+    //   supabase.from("players").select("id,name").eq("group_id", g.id).order("name"),
+    //   supabase.from("matches").select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)").eq("group_id", g.id).order("played_at", { ascending: false }),
+    //   supabase.from("expenses").select("id,expense_date,category,amount,description").eq("group_id", g.id).order("expense_date", { ascending: false }),
+    //   supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
+    //   supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).single()
+    // ]);
+    const [p, m, e, a, f, r] = await Promise.all([
+    supabase
+      .from("players")
+      .select("id,name")
+      .eq("group_id", g.id)
+      .order("name"),
+
+    supabase
+      .from("matches")
+      .select("id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)")
+      .eq("group_id", g.id)
+      .order("played_at", { ascending: false }),
+
+    supabase
+      .from("expenses")
+      .select("id,expense_date,category,amount,description")
+      .eq("group_id", g.id)
+      .order("expense_date", { ascending: false }),
+
+    supabase
+      .from("attendance")
+      .select("id,player_id,attendance_date,status,late_minutes")
+      .eq("group_id", g.id)
+      .order("attendance_date", { ascending: false }),
+
+    supabase
+      .from("fines")
+      .select("id,group_id,player_id,fine_date,fine_type,late_minutes,amount,created_at")
+      .eq("group_id", g.id)
+      .order("fine_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+
+    supabase
+      .from("group_rates")
+      .select("late_per_minute,missed_day_fine")
+      .eq("group_id", g.id)
+      .single()
+  ]);
     if (p.error) setError(p.error.message); else setPlayers(p.data || []);
     if (m.error) setError(m.error.message); else setMatches((m.data || []) as Match[]);
     if (e.error) setError(e.error.message); else setExpenses((e.data || []) as Expense[]);
     if (a.error) setError(a.error.message); else setAttendance((a.data || []) as Attendance[]);
+    if (f.error) setError(f.error.message); else setFines((f.data || []) as Fine[]);
     if (!r.error && r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
 
     const now = new Date();
@@ -228,6 +288,7 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedules", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedule_matches" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "match_day_freezes", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*",schema: "public",table: "fines",filter: `group_id=eq.${groupId}`},load)
       .subscribe();
     return () => { supabase.removeChannel(ch) }
   }, [groupId, load]);
@@ -302,15 +363,23 @@ export default function Home() {
       const existing = attendance.filter(a => a.attendance_date === todayKey && realPlayers.some(p => p.id === a.player_id));
       const selected = new Set(duoAttendanceIds);
       for (const row of existing) {
-        if (row.fine_amount > 0) continue;
         const nextStatus = selected.has(row.player_id) ? "PRESENT" : "ABSENT";
+        // const nextStatus = selected.has(row.player_id) ? "PRESENT" : "ABSENT";
         if (row.status !== nextStatus) {
           const { error: updateError } = await supabase.from("attendance").update({ status: nextStatus }).eq("id", row.id);
           if (updateError) throw updateError;
         }
       }
       const existingIds = new Set(existing.map(a => a.player_id));
-      const inserts = duoAttendanceIds.filter(id => !existingIds.has(id)).map(player_id => ({ group_id: groupId, player_id, attendance_date: todayKey, status: "PRESENT", late_minutes: 0, fine_amount: 0 }));
+      // const inserts = duoAttendanceIds.filter(id => !existingIds.has(id)).map(player_id => ({ group_id: groupId, player_id, attendance_date: todayKey, status: "PRESENT", late_minutes: 0, fine_amount: 0 }));
+      const inserts = duoAttendanceIds.filter(id => !existingIds.has(id))
+      .map(player_id => ({
+        group_id: groupId,
+        player_id,
+        attendance_date: todayKey,
+        status: "PRESENT",
+        late_minutes: 0
+      }));
       if (inserts.length) {
         const { error: insertError } = await supabase.from("attendance").insert(inserts);
         if (insertError) throw insertError;
@@ -993,43 +1062,107 @@ export default function Home() {
   const stats = useMemo(() => players.map(p => {
     const ms = filteredMatches.filter(m => m.status !== "VOIDED" && m.match_players.some(x => x.player_id === p.id));
     let w = 0, pf = 0, pa = 0; ms.forEach(m => { const t = m.match_players.find(x => x.player_id === p.id)?.team; const own = t === "A" ? m.team_a_score : m.team_b_score; const opp = t === "A" ? m.team_b_score : m.team_a_score; pf += own; pa += opp; if (own > opp) w++ });
-    const fines = attendance.filter(a => a.player_id === p.id).reduce((s, a) => s + Number(a.fine_amount), 0);
-    return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
-  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [players, filteredMatches, attendance]);
+    // const fines = attendance.filter(a => a.player_id === p.id).reduce((s, a) => s + Number(a.fine_amount), 0);
+    const finesForPlayer = fines.filter(f => f.player_id === p.id).reduce((s, f) => s + Number(f.amount || 0), 0);
+    // return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
+    return { ...p,played: ms.length,w,l: ms.length - w,winRate: ms.length ? Math.round(w / ms.length * 100) : 0,diff: pf - pa,fines: finesForPlayer,owedExpenses: 0};
+  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [[players, filteredMatches, fines]]);
 
   const finePlayerStats = useMemo(() => players.map(p => {
-    const rows = attendance.filter(a => a.player_id === p.id);
-    const total = rows.reduce((sum, a) => sum + Number(a.fine_amount || 0), 0);
-    const late = rows
-      .filter(a => a.status !== "MISSED")
-      .reduce((sum, a) => sum + Number(a.fine_amount || 0), 0);
-    const missed = rows
-      .filter(a => a.status === "MISSED")
-      .reduce((sum, a) => sum + Number(a.fine_amount || 0), 0);
-    const latest = rows[0]?.attendance_date || null;
-    return { ...p, entries: rows.length, total, late, missed, latest };
-  }).sort((a, b) => b.total - a.total || b.entries - a.entries), [players, attendance]);
+  const rows = fines.filter(f => f.player_id === p.id);
+
+  const total = rows.reduce(
+    (sum, f) => sum + Number(f.amount || 0),
+    0
+  );
+
+  const late = rows
+    .filter(f => f.fine_type === "late")
+    .reduce(
+      (sum, f) => sum + Number(f.amount || 0),
+      0
+    );
+
+  const missed = rows
+    .filter(f => f.fine_type === "missed")
+    .reduce(
+      (sum, f) => sum + Number(f.amount || 0),
+      0
+    );
+
+  const latest = rows[0]?.fine_date || null;
+
+  return {
+    ...p,
+    entries: rows.length,
+    total,
+    late,
+    missed,
+    latest
+  };
+}).sort(
+  (a, b) => b.total - a.total || b.entries - a.entries
+), [players, fines]);
 
   const monthlyExpenses = useMemo(
     () => expenses.filter(e => e.expense_date.slice(0, 7) === reportMonth),
     [expenses, reportMonth]
   );
 
-  const monthlyAttendance = useMemo(() => attendance.filter(a => a.attendance_date.slice(0, 7) === reportMonth), [attendance, reportMonth]);
-  const monthlyFineStats = useMemo(() => players.map(p => {
-    const rows = monthlyAttendance.filter(a => a.player_id === p.id);
-    const late = rows.filter(a => a.status === "PRESENT").reduce((s, a) => s + Number(a.fine_amount), 0);
-    const missed = rows.filter(a => a.status === "MISSED").reduce((s, a) => s + Number(a.fine_amount), 0);
-    return { ...p, late, missed, total: late + missed, lateCount: rows.filter(a => a.status === "PRESENT").length, missedCount: rows.filter(a => a.status === "MISSED").length };
-  }).sort((a, b) => b.total - a.total), [players, monthlyAttendance]);
+  // const monthlyAttendance = useMemo(() => attendance.filter(a => a.attendance_date.slice(0, 7) === reportMonth), [attendance, reportMonth]);
+  const monthlyFines = useMemo(
+  () => fines.filter(f => f.fine_date.slice(0, 7) === reportMonth),
+  [fines, reportMonth]
+);
+
+const monthlyFineStats = useMemo(() => players.map(p => {
+  const rows = monthlyFines.filter(f => f.player_id === p.id);
+
+  const lateRows = rows.filter(f => f.fine_type === "late");
+  const missedRows = rows.filter(f => f.fine_type === "missed");
+
+  const late = lateRows.reduce(
+    (sum, f) => sum + Number(f.amount || 0),
+    0
+  );
+
+  const missed = missedRows.reduce(
+    (sum, f) => sum + Number(f.amount || 0),
+    0
+  );
+
+  return {
+    ...p,
+    late,
+    missed,
+    total: late + missed,
+    lateCount: lateRows.length,
+    missedCount: missedRows.length
+  };
+}).sort((a, b) => b.total - a.total), [players, monthlyFines]);
+  // const monthlyFineStats = useMemo(() => players.map(p => {
+  //   const rows = monthlyAttendance.filter(a => a.player_id === p.id);
+  //   const late = rows.filter(a => a.status === "PRESENT").reduce((s, a) => s + Number(a.fine_amount), 0);
+  //   const missed = rows.filter(a => a.status === "MISSED").reduce((s, a) => s + Number(a.fine_amount), 0);
+  //   return { ...p, late, missed, total: late + missed, lateCount: rows.filter(a => a.status === "PRESENT").length, missedCount: rows.filter(a => a.status === "MISSED").length };
+  // }).sort((a, b) => b.total - a.total), [players, monthlyAttendance]);
   const monthTotal = monthlyFineStats.reduce((s, p) => s + p.total, 0);
   const monthLate = monthlyFineStats.reduce((s, p) => s + p.late, 0);
   const monthMissed = monthlyFineStats.reduce((s, p) => s + p.missed, 0);
   const monthLateCount = monthlyFineStats.reduce((s, p) => s + p.lateCount, 0);
   const monthMissedCount = monthlyFineStats.reduce((s, p) => s + p.missedCount, 0);
 
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalFines = attendance.reduce((s, a) => s + Number(a.fine_amount), 0);
+  // const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  // const totalFines = attendance.reduce((s, a) => s + Number(a.fine_amount), 0);
+  const totalExpenses = expenses.reduce(
+  (s, e) => s + Number(e.amount),
+  0
+);
+
+const totalFines = fines.reduce(
+  (s, f) => s + Number(f.amount || 0),
+  0
+);
   const duoName = (ids: string[]) => ids.map(name).join(" & ");
 
   const generateDuoSchedule = (ids: string[]) => {
@@ -1831,13 +1964,26 @@ export default function Home() {
         ? mins * Number(lateRate)
         : Number(missedRate);
 
-    const { error } = await supabase.from("attendance").insert({
+    // const { error } = await supabase.from("attendance").insert({
+    //   group_id: groupId,
+    //   player_id: finePlayer,
+    //   attendance_date: fineDate,
+    //   status: fineType === "late" ? "PRESENT" : "MISSED",
+    //   late_minutes: mins,
+    //   fine_amount: amount,
+    // });
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Fine amount must be greater than ₹0.");
+      return;
+    }
+
+    const { error } = await supabase.from("fines").insert({
       group_id: groupId,
       player_id: finePlayer,
-      attendance_date: fineDate,
-      status: fineType === "late" ? "PRESENT" : "MISSED",
+      fine_date: fineDate,
+      fine_type: fineType,
       late_minutes: mins,
-      fine_amount: amount,
+      amount,
     });
 
     if (error) {
@@ -2260,14 +2406,14 @@ export default function Home() {
           <div className="section-title"><span>👥 Today's Attendance</span><span>{duoAttendanceIds.length} players</span></div>
           <div className="duo-attendance-date">{new Date(`${todayKey}T12:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</div>
           <div className="duo-attendance-summary">
-            {duoAttendanceIds.length ? <div className="duo-attendance-avatars">{realPlayers.filter(p => duoAttendanceIds.includes(p.id)).map(p => <div className="duo-attendee" key={p.id}><span className="duo-attendee-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }} /><b>{p.name.slice(0,1)}</b></span><span>{p.name}</span></div>)}</div> : <div className="duo-attendance-empty">No players marked present yet.</div>}
+            {duoAttendanceIds.length ? <div className="duo-attendance-avatars">{realPlayers.filter(p => duoAttendanceIds.includes(p.id)).map(p => <div className="duo-attendee" key={p.id}><span className="duo-attendee-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("is-hidden"); }} /><b className="is-hidden">{p.name.slice(0,1)}</b></span><span>{p.name}</span></div>)}</div> : <div className="duo-attendance-empty">No players marked present yet.</div>}
             <button type="button" className="secondary-button duo-attendance-edit" onClick={() => setAttendanceEditorOpen(v => !v)}>{attendanceEditorOpen ? "Close" : "Edit attendance"}</button>
           </div>
           <div className="duo-attendance-note">Attendance is used for today's duos, tasks and insights.</div>
           {attendanceEditorOpen && <div className="duo-attendance-editor">
             <div className="duo-selection-helper">Select players who are playing today. Guests are not shown.</div>
             <div className="duo-attendance-list">{realPlayers.map(p => { const checked = duoAttendanceIds.includes(p.id); return <button type="button" key={p.id} className={`duo-attendance-row ${checked ? "selected" : ""}`} onClick={() => setDuoAttendanceIds(current => current.includes(p.id) ? current.filter(id => id !== p.id) : [...current, p.id])}>
-              <span className="duo-attendance-player-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; }} /><b>{p.name.slice(0,1)}</b></span><span>{p.name}</span><span className="duo-attendance-check">{checked ? <Check size={18} strokeWidth={3} /> : ""}</span>
+              <span className="duo-attendance-player-avatar"><img src={`/avatars/${encodeURIComponent(p.name)}.png`} alt="" onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("is-hidden"); }} /><b className="is-hidden">{p.name.slice(0,1)}</b></span><span>{p.name}</span><span className="duo-attendance-check">{checked ? <Check size={18} strokeWidth={3} /> : ""}</span>
             </button> })}</div>
             <button type="button" className="primary-button duo-attendance-save" disabled={savingAttendance} onClick={saveTodayAttendance}>{savingAttendance ? "Saving…" : "Save attendance"}</button>
           </div>}
@@ -2684,11 +2830,31 @@ export default function Home() {
 
     {fineDetailsPlayer && <Modal title={`${name(fineDetailsPlayer)} · Fine history`} close={() => setFineDetailsPlayer(null)}>
       <div className="fine-history">
-        {attendance.filter(a => a.player_id === fineDetailsPlayer).length === 0 && <div className="empty-card">No fines recorded.</div>}
-        {attendance.filter(a => a.player_id === fineDetailsPlayer).map(a => <div className="fine-history-row" key={a.id}>
-          <div><b>{a.status === "MISSED" ? "Missed day" : "Late arrival"}</b><small>{new Date(`${a.attendance_date}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}{a.status === "PRESENT" && a.late_minutes ? ` · ${a.late_minutes} min late` : ""}</small></div>
-          <strong>{money(Number(a.fine_amount))}</strong>
-        </div>)}
+        {fines.filter(f => f.player_id === fineDetailsPlayer).length === 0 &&
+  <div className="empty-card">No fines recorded.</div>}
+
+{fines
+  .filter(f => f.player_id === fineDetailsPlayer)
+  .map(f =>
+    <div className="fine-history-row" key={f.id}>
+      <div>
+        <b>
+          {f.fine_type === "missed" ? "Missed day" : "Late arrival"}
+        </b>
+        <small>
+          {new Date(`${f.fine_date}T12:00:00`).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+          })}
+          {f.fine_type === "late" && f.late_minutes
+            ? ` · ${f.late_minutes} min late`
+            : ""}
+        </small>
+      </div>
+      <b>{money(Number(f.amount))}</b>
+    </div>
+  )}
       </div>
     </Modal>}
   </main>

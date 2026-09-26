@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./loading-splash.css";
 
 export const metadata: Metadata = {
   title: "Rally365",

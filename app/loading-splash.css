@@ -1,6 +1,6 @@
-.rally-loading-screen{background:#f7fbf9!important;}
-.rally-loading-logo-wrap{width:min(92vw,560px)!important;height:min(92vw,560px)!important;max-width:560px;max-height:560px;}
-.rally-loading-screen .rally-loading-logo{content:url('/rally365-loading.svg');width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;transform:none!important;opacity:1!important;animation:none!important;}
+.rally-loading-screen{background:#fff!important;}
+.rally-loading-logo-wrap{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;}
+.rally-loading-screen .rally-loading-logo{content:url('/rally365-loading.svg');width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;object-position:center!important;transform:none!important;opacity:1!important;animation:none!important;}
 @media (max-width:600px){
-  .rally-loading-logo-wrap{width:100vw!important;height:100vw!important;max-width:520px;max-height:520px;}
+  .rally-loading-logo-wrap{width:100vw!important;height:100svh!important;}
 }

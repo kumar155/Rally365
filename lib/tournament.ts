@@ -4,10 +4,10 @@ export type PartnerMode = "RANDOM" | "FIXED";
 export type Tournament = {
   id: string;
   name: string;
-  venue: string | null;
+  venue: string;
   tournament_date: string | null;
-  partner_mode: PartnerMode;
-  format: TournamentFormat;
+  partner_mode: PartnerMode | null;
+  format: string;
   rounds: number | null;
   group_count: number | null;
   qualifiers_per_group: number | null;
@@ -18,8 +18,22 @@ export type Tournament = {
   status: string;
 };
 
-export type TournamentPlayer = { id: string; name: string; phone?: string | null; seed?: number | null };
-export type TournamentDuo = { id: string; name: string; seed?: number | null; source: PartnerMode; locked: boolean };
+export type TournamentPlayer = {
+  id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  seed?: number | null;
+  status?: string;
+};
+
+export type TournamentDuo = {
+  id: string;
+  name: string;
+  player_one_id: string;
+  player_two_id: string;
+  seed?: number | null;
+  status: string;
+};
 
 export function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -41,6 +55,13 @@ export function knockoutSize(count: number) {
   let size = 1;
   while (size < count) size *= 2;
   return size;
+}
+
+export function knockoutRoundType(size: number): "ROUND_OF_16" | "QUARTER_FINAL" | "SEMI_FINAL" | "FINAL" {
+  if (size <= 2) return "FINAL";
+  if (size === 4) return "SEMI_FINAL";
+  if (size === 8) return "QUARTER_FINAL";
+  return "ROUND_OF_16";
 }
 
 export function knockoutRoundName(size: number) {

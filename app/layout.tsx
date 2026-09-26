@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./loading-splash.css";
+import TournamentNavBridge from "./tournament-nav-bridge";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -14,7 +15,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <TournamentNavBridge />
+      </body>
     </html>
   );
 }

@@ -1,18 +1,4 @@
 "use client";
-
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
-import s from "./tournament.module.css";
-
-type T = { id:string; name:string; tournament_date:string|null; venue:string|null; format:string; status:string };
-
-export default function TournamentsPage(){
-  const [items,setItems]=useState<T[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState("");
-  useEffect(()=>{ (async()=>{ const {data,error}=await supabase.from("tournaments").select("id,name,tournament_date,venue,format,status").order("created_at",{ascending:false}); if(error)setError(error.message); setItems(data||[]); setLoading(false); })(); },[]);
-  return <main className={s.page}><div className={s.shell}>
-    <div className={s.top}><div><div className={s.brand}>RALLY365 · TOURNAMENTS</div><h1 className={s.title}>Tournament centre</h1><p className={s.sub}>Create, draw, schedule and run a badminton tournament.</p></div><Link className={s.button} href="/tournaments/create">Create tournament</Link></div>
-    {error&&<div className={s.error}>{error}</div>}
-    {loading?<div className={s.card}>Loading tournaments…</div>:items.length===0?<div className={s.hero}><h2>Start a new tournament</h2><p className={s.sub}>Use individual players, create random or fixed partners, then generate groups, knockout, round-robin or random-round schedules.</p><br/><Link className={s.button} href="/tournaments/create">Create your first tournament</Link></div>:<div className={s.list}>{items.map(t=><Link key={t.id} href={`/tournaments/${t.id}`} className={s.item} style={{textDecoration:"none",color:"inherit"}}><div><strong>{t.name}</strong><div className={s.muted}>{t.tournament_date||"Date TBD"}{t.venue?` · ${t.venue}`:""}</div></div><span className={s.pill}>{t.format.replaceAll("_"," ")}</span></Link>)}</div>}
-  </div></main>
-}
+import Link from "next/link";import {useEffect,useState} from "react";import {supabase} from "../../lib/supabase";import s from "./tournament.module.css";
+type T={id:string;name:string;tournament_date:string|null;venue:string|null;format:string;status:string};
+export default function TournamentsPage(){const [items,setItems]=useState<T[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");useEffect(()=>{(async()=>{const {data,error}=await supabase.from("tournaments").select("id,name,tournament_date,venue,format,status").order("created_at",{ascending:false});if(error)setError(error.message);setItems(data||[]);setLoading(false)})()},[]);return <main className={s.page}><div className={s.shell}><div className={s.top}><div><div className={s.brand}>RALLY365 · TOURNAMENTS</div><h1 className={s.title}>Tournament centre</h1><p className={s.sub}>Create, draw, schedule and run a badminton tournament.</p></div><Link className={s.button} href="/tournaments/create">Create tournament</Link></div>{error&&<div className={s.error}>{error}</div>}{loading?<div className={s.card}>Loading tournaments…</div>:items.length===0?<div className={s.hero}><h2>Start a new tournament</h2><p className={s.sub}>Use individual players, create random or fixed partners, then generate groups, knockout, round-robin or random-round schedules.</p><br/><Link className={s.button} href="/tournaments/create">Create your first tournament</Link></div>:<div className={s.list}>{items.map(t=><Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} className={s.item} style={{textDecoration:"none",color:"inherit"}}><div><strong>{t.name}</strong><div className={s.muted}>{t.tournament_date||"Date TBD"}{t.venue?` · ${t.venue}`:""}</div></div><span className={s.pill}>{t.format.replaceAll("_"," ")}</span></Link>)}</div>}</div></main>}

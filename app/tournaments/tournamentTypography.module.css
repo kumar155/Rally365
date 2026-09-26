@@ -1,0 +1,21 @@
+.typography :global(.page),
+.typography :global(.page) * {
+  font-weight: 400 !important;
+  font-synthesis: none !important;
+}
+
+/* Keep tournament typography visually light even when component classes
+   or global styles specify heavier weights. */
+.typography :global(.page) :global(h1),
+.typography :global(.page) :global(h2),
+.typography :global(.page) :global(h3),
+.typography :global(.page) :global(h4),
+.typography :global(.page) :global(h5),
+.typography :global(.page) :global(h6),
+.typography :global(.page) :global(strong),
+.typography :global(.page) :global(b),
+.typography :global(.page) :global(button),
+.typography :global(.page) :global(label),
+.typography :global(.page) :global(th) {
+  font-weight: 400 !important;
+}

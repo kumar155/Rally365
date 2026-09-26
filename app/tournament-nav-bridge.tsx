@@ -9,6 +9,43 @@ import { useEffect } from "react";
  */
 export default function TournamentNavBridge() {
   useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "rally365-tournament-bottom-nav-style";
+    style.textContent = `
+      .bottom-nav .tournaments-bottom-nav-link {
+        min-width: 0;
+        min-height: 58px;
+        padding: 7px 2px 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .bottom-nav .tournaments-bottom-nav-link svg {
+        width: 21px;
+        height: 21px;
+        flex: 0 0 auto;
+      }
+      .bottom-nav .tournaments-bottom-nav-link span {
+        font-size: 11px;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+      .bottom-nav .tournaments-bottom-nav-link:hover,
+      .bottom-nav .tournaments-bottom-nav-link:focus-visible {
+        color: #087f4f;
+      }
+    `;
+    if (!document.getElementById(style.id)) document.head.appendChild(style);
+
     const trophySvg = `
       <svg viewBox="0 0 24 24" aria-hidden="true" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 21h8" />
@@ -47,6 +84,7 @@ export default function TournamentNavBridge() {
     return () => {
       observer.disconnect();
       window.clearInterval(timer);
+      document.getElementById(style.id)?.remove();
     };
   }, []);
 

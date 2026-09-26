@@ -25,7 +25,109 @@ export default function Draw(){
  <nav className={s.tabs}><Link className={s.tab} href={path("manage")}>Overview</Link><Link className={`${s.tab} ${s.tabActive}`} href={path("draw")}>Draw</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
  {error&&<div className={s.error}>{error}</div>}{done&&<div className={s.success}>{done}</div>}
  <div className={ds.drawRoundTabs}>{rounds.map(r=><button key={r.id} className={`${ds.drawRoundTab} ${r.round_number===activeRound?.round_number?ds.drawRoundTabActive:""}`} onClick={()=>setSelectedRound(r.round_number)}>{r.name}</button>)}</div>
- {matches.length>0&&activeRound?<section className={ds.bracketStage}><div className={ds.bracketHeading}><div><span className={s.eyebrow}>ROUND {activeRound.round_number}</span><h2>{activeRound.name}</h2></div><span>{activeMatches.length} matches</span></div><div className={ds.bracketGrid}>{activeMatches.map(m=>{const a=names.get(m.team_a_duo_id||"")||"TBD";const b=names.get(m.team_b_duo_id||"")||"TBD";const ap=duoParts(a),bp=duoParts(b);const prefix=/quarter/i.test(activeRound.name)?"QF":/semi/i.test(activeRound.name)?"SF":/final/i.test(activeRound.name)?"F":"Match";return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.drawMatch}><div className={ds.drawMatchMeta}><span>{prefix} {m.match_number}</span><span>Court TBD</span></div><div className={`${ds.drawTeam} ${ds.drawTeamA}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{ap.map((p,i)=><span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><strong>{a}</strong></span><strong className={ds.drawScore}>{m.team_a_score??"-"}</strong></div><div className={`${ds.drawTeam} ${ds.drawTeamB}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{bp.map((p,i)=><span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><strong>{b}</strong></span><strong className={ds.drawScore}>{m.team_b_score??"-"}</strong></div></Link>)})}</div></section>:<section className={s.card}><h2>No draw yet</h2><p className={s.sub}>Generate the draw after partners are ready.</p></section>}
+ {matches.length > 0 && activeRound ? (
+  <section className={ds.bracketStage}>
+    <div className={ds.bracketHeading}>
+      <div>
+        <span className={s.eyebrow}>
+          ROUND {activeRound.round_number}
+        </span>
+        <h2>{activeRound.name}</h2>
+      </div>
+
+      <span>{activeMatches.length} matches</span>
+    </div>
+
+    <div className={ds.bracketGrid}>
+      {activeMatches.map((m) => {
+        const a =
+          names.get(m.team_a_duo_id || "") || "TBD";
+
+        const b =
+          names.get(m.team_b_duo_id || "") || "TBD";
+
+        const ap = duoParts(a);
+        const bp = duoParts(b);
+
+        const prefix = /quarter/i.test(activeRound.name)
+          ? "QF"
+          : /semi/i.test(activeRound.name)
+            ? "SF"
+            : /final/i.test(activeRound.name)
+              ? "F"
+              : "Match";
+
+        return (
+          <Link
+            key={m.id}
+            href={`/tournaments/match?id=${m.id}`}
+            className={ds.drawMatch}
+          >
+            <div className={ds.drawMatchMeta}>
+              <span>
+                {prefix} {m.match_number}
+              </span>
+              <span>Court TBD</span>
+            </div>
+
+            <div
+              className={`${ds.drawTeam} ${ds.drawTeamA}`}
+            >
+              <span className={ds.drawTeamPeople}>
+                <span className={ds.miniAvatars}>
+                  {ap.map((p, i) => (
+                    <span
+                      key={i}
+                      className={ds.miniAvatar}
+                    >
+                      {p[0]}
+                    </span>
+                  ))}
+                </span>
+
+                <strong>{a}</strong>
+              </span>
+
+              <strong className={ds.drawScore}>
+                {m.team_a_score ?? "-"}
+              </strong>
+            </div>
+
+            <div
+              className={`${ds.drawTeam} ${ds.drawTeamB}`}
+            >
+              <span className={ds.drawTeamPeople}>
+                <span className={ds.miniAvatars}>
+                  {bp.map((p, i) => (
+                    <span
+                      key={i}
+                      className={ds.miniAvatar}
+                    >
+                      {p[0]}
+                    </span>
+                  ))}
+                </span>
+
+                <strong>{b}</strong>
+              </span>
+
+              <strong className={ds.drawScore}>
+                {m.team_b_score ?? "-"}
+              </strong>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  </section>
+) : (
+  <section className={s.card}>
+    <h2>No draw yet</h2>
+    <p className={s.sub}>
+      Generate the draw after partners are ready.
+    </p>
+  </section>
+)}
  <section className={ds.drawActions}><button className={s.button} onClick={generate} disabled={busy}>{busy?"Generating…":"Generate / regenerate draw"}</button><Link href={path("schedule")} className={s.button+" "+s.secondary}>View schedule →</Link></section>
  </div></main>;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../../../lib/supabase";
 import s from "../tournament.module.css";
 
 type Tournament = { id: string; name: string; start_date: string | null };

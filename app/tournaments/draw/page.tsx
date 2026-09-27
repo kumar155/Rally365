@@ -93,9 +93,26 @@ export default function Draw() {
 
   async function generate() {
     if (!t) return;
+    if (matches.length > 0) {
+      setError("Draw is locked because matches have already been scheduled. Complete the existing matches before continuing the tournament.");
+      return;
+    }
     if (duos.length < 2) { setError("Create at least two partner teams first."); return; }
     setBusy(true); setError(""); setDone("");
     try {
+      // Re-check the database immediately before destructive regeneration. This prevents
+      // a stale page from regenerating a draw after another screen has already scheduled it.
+      const { count, error: ce } = await supabase
+        .from("tournament_matches")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", id);
+      if (ce) throw ce;
+      if ((count || 0) > 0) {
+        setError("Draw is locked because matches have already been scheduled.");
+        await load();
+        return;
+      }
+
       await reset();
       let no = 1;
 
@@ -164,6 +181,7 @@ export default function Draw() {
   const duoParts = (name: string) => name.split(/\s*&\s*|\s*\+\s*/).map((x) => x.trim()).filter(Boolean).slice(0, 2);
   const prefixForRound = (name: string) => /quarter/i.test(name) ? "QF" : /semi/i.test(name) ? "SF" : /final/i.test(name) ? "F" : "Match";
   const visibleGroups = selectedGroupId === "ALL" ? groups : groups.filter((group) => group.id === selectedGroupId);
+  const drawLocked = matches.length > 0;
 
   if (!id) return <main className={s.page}><div className={s.shell}><div className={s.card}>Tournament ID is missing.</div></div></main>;
 
@@ -215,7 +233,16 @@ export default function Draw() {
           )
         ) : <section className={s.card}><h2>No draw yet</h2><p className={s.sub}>Generate the draw after partners are ready.</p></section>}
 
-        <section className={ds.drawActions}><button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate / regenerate draw"}</button><Link href={path("schedule")} className={`${s.button} ${s.secondary}`}>View schedule →</Link></section>
+        <section className={ds.drawActions}>
+          {drawLocked ? (
+            <div className={`${s.button} ${s.secondary}`} aria-disabled="true" title="Draw regeneration is locked once matches are scheduled">
+              Draw locked · matches scheduled
+            </div>
+          ) : (
+            <button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate draw"}</button>
+          )}
+          <Link href={path("schedule")} className={`${s.button} ${s.secondary}`}>View schedule →</Link>
+        </section>
       </div>
     </main>
   );

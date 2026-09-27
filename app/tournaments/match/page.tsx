@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
+import { syncTournamentProgression } from "../../../lib/tournamentProgression";
 import s from "../tournament.module.css";
 
 type M = {
@@ -118,8 +119,9 @@ function MatchDetailContent() {
       })
       .eq("id", m.id);
 
-    if (error) setError(error.message);
-    else
+    if (error) {
+      setError(error.message);
+    } else {
       setM({
         ...m,
         team_a_score: na,
@@ -127,6 +129,15 @@ function MatchDetailContent() {
         status,
         winner_duo_id: winnerId,
       });
+
+      // Recalculate group qualifiers and/or advance this winner into the
+      // next knockout slot. This removes manual TBD handling from the flow.
+      try {
+        await syncTournamentProgression(m.tournament_id);
+      } catch (e: any) {
+        setError(e?.message || "Score saved, but progression could not be updated.");
+      }
+    }
 
     setBusy(false);
   }

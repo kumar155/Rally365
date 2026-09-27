@@ -8,6 +8,8 @@ type Match = {
   group_id: string | null;
   team_a_duo_id: string | null;
   team_b_duo_id: string | null;
+  team_a_score: number | null;
+  team_b_score: number | null;
   winner_duo_id: string | null;
   status: string;
 };
@@ -31,7 +33,7 @@ export async function syncTournamentProgression(tournamentId: string) {
       .order("round_number"),
     supabase
       .from("tournament_matches")
-      .select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,winner_duo_id,status")
+      .select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,team_a_score,team_b_score,winner_duo_id,status")
       .eq("tournament_id", tournamentId)
       .order("match_number"),
   ]);
@@ -77,16 +79,26 @@ export async function syncTournamentProgression(tournamentId: string) {
           const a = stats.get(m.team_a_duo_id);
           const b = stats.get(m.team_b_duo_id);
           if (!a || !b) continue;
-          // Group matches are stored with their scores, but progression only
-          // needs the winner. A draw is intentionally not treated as a win.
-          if (m.winner_duo_id === m.team_a_duo_id) a.wins += 1;
-          if (m.winner_duo_id === m.team_b_duo_id) b.wins += 1;
+          const sa = Number(m.team_a_score ?? 0);
+          const sb = Number(m.team_b_score ?? 0);
+          a.gf += sa;
+          a.ga += sb;
+          b.gf += sb;
+          b.ga += sa;
+          if (sa > sb) a.wins += 1;
+          if (sb > sa) b.wins += 1;
         }
 
         ranked.set(
           g.id,
           [...stats.entries()]
-            .sort((a, b) => b[1].wins - a[1].wins || a[0].localeCompare(b[0]))
+            .sort(
+              (a, b) =>
+                b[1].wins - a[1].wins ||
+                (b[1].gf - b[1].ga) - (a[1].gf - a[1].ga) ||
+                b[1].gf - a[1].gf ||
+                a[0].localeCompare(b[0])
+            )
             .map(([id]) => id)
             .slice(0, Math.max(1, g.qualifying_teams || tournament.qualifiers_per_group || 1))
         );

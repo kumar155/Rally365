@@ -8,7 +8,6 @@ type T={id:string;name:string;venue:string|null;start_date:string|null;format:st
 type M={id:string;match_number:number;scheduled_at:string|null;court:number|null;status:string;team_a_score:number|null;team_b_score:number|null;team_a_duo_id:string|null;team_b_duo_id:string|null;team_a:{name:string}|null;team_b:{name:string}|null};
 const label=(v:string)=>({KNOCKOUT:"Doubles Knockout",ROUND_ROBIN:"Round Robin",GROUPS_KNOCKOUT:"Groups + Knockout",RANDOM_ROUNDS:"Random Rounds"}as Record<string,string>)[v]||v.replaceAll("_"," ");
 const date=(v:string|null)=>v?new Date(v).toLocaleDateString("en-IN",{month:"short",day:"numeric",year:"numeric"}):"Date TBD";
-function countdown(v:string|null){if(!v)return ["--","--","--","--"];const diff=Math.max(0,new Date(v).getTime()-Date.now());const d=Math.floor(diff/86400000),h=Math.floor(diff%86400000/3600000),m=Math.floor(diff%3600000/60000),sec=Math.floor(diff%60000/1000);return [String(d).padStart(2,"0"),String(h).padStart(2,"0"),String(m).padStart(2,"0"),String(sec).padStart(2,"0")]}
 
 export default function Dashboard(){
  const[id,setId]=useState("");
@@ -17,7 +16,6 @@ export default function Dashboard(){
  const[counts,setCounts]=useState({players:0,teams:0,matches:0,completed:0});
  const[error,setError]=useState("");
  const[success,setSuccess]=useState("");
- const[now,setNow]=useState(Date.now());
  const[partnerMode,setPartnerMode]=useState("RANDOM");
  const[format,setFormat]=useState("KNOCKOUT");
  const[games,setGames]=useState("1");
@@ -27,7 +25,6 @@ export default function Dashboard(){
  const[saving,setSaving]=useState(false);
 
  useEffect(()=>setId(new URLSearchParams(window.location.search).get("id")||""),[]);
- useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer)},[]);
  useEffect(()=>{
    if(!id)return;
    (async()=>{
@@ -52,8 +49,6 @@ export default function Dashboard(){
 
  const path=(p:string)=>`/tournaments/${p}?id=${encodeURIComponent(id)}`;
  const upcoming=matches.filter(m=>m.status!=="COMPLETED").slice(0,4);
- const cd=countdown(t?.start_date||null);
- void now;
 
  async function saveControls(){
    if(!id)return;
@@ -77,7 +72,6 @@ export default function Dashboard(){
   <div className={s.mobileTournamentHeader}><Link href="/tournaments" className={s.iconBack}>‹</Link><strong>{t?.name||"Rally365 Open"}</strong><span className={s.menuDots}>⋮</span></div>
   <section className={s.tournamentHero}><div><div className={s.brand} style={{color:"#d9d07a"}}>RALLY365 OPEN</div><h1>{t?.name||"Rally365 Open"}</h1><p>📅 {date(t?.start_date||null)} &nbsp; · &nbsp; 📍 {t?.venue||"Venue TBD"}</p></div><span className={s.statusBadge}>{t?.status||"UPCOMING"}</span></section>
   <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("draw")}>Draw</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
-  <section className={s.card}><div className={s.eyebrow}>TOURNAMENT STARTS IN</div><div className={s.countdown}>{cd.map((v,i)=><div key={i}><strong>{v}</strong><span>{["Days","Hours","Minutes","Seconds"][i]}</span></div>)}</div></section>
   <div className={s.overviewStats}><div className={s.overviewStat}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
 
   <section className={s.card} style={{marginTop:14}}>

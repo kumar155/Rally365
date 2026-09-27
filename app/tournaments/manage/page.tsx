@@ -63,7 +63,7 @@ export default function Dashboard(){
    };
    const {data,error:saveError}=await supabase.from("tournaments").update(payload).eq("id",id).select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").single();
    if(saveError){setError(saveError.message);setSaving(false);return;}
-   setT(data as T);setSuccess("Tournament controls updated.");setSaving(false);
+   setT(data as T);setSuccess("Tournament configuration saved.");setSaving(false);
  }
 
  if(error&&!t)return <main className={s.page}><div className={s.shell}><div className={s.error}>{error}</div></div></main>;
@@ -75,18 +75,18 @@ export default function Dashboard(){
   <div className={s.overviewStats}><div className={s.overviewStat}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
 
   <section className={s.card} style={{marginTop:14}}>
-    <div className={s.sectionHeader}><div><div className={s.eyebrow}>TOURNAMENT CONTROLS</div><h2>Competition settings</h2></div></div>
+    <div className={s.sectionHeader}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div>
     <p className={s.sub} style={{marginBottom:14}}>These settings stay editable from the dashboard at any time.</p>
     <div className={s.grid2}>
       <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
-      <div className={s.field}><label>Competition format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → knockout</option><option value="RANDOM_ROUNDS">Random matches by rounds</option></select></div>
+      <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → knockout</option><option value="RANDOM_ROUNDS">Random matches by rounds</option></select></div>
       <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
       {format==="RANDOM_ROUNDS"&&<div className={s.field}><label>Number of rounds</label><input className={s.input} type="number" min="1" value={rounds} onChange={e=>setRounds(e.target.value)}/></div>}
       {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
     </div>
     {error&&<div className={s.error}>{error}</div>}
     {success&&<div className={s.success}>{success}</div>}
-    <div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save competition settings"}</button></div>
+    <div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div>
   </section>
 
   <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>NEXT UP</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View draw →</Link></div><div className={s.grid2}>{upcoming.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!upcoming.length&&<p className={s.sub}>No matches generated yet.</p>}</section>

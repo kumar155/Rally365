@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   BarChart3, ChevronRight, ChevronLeft, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles, Bot, Target, Flame, CalendarCheck
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Bot, Target, Flame, CalendarCheck
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -78,7 +78,7 @@ export default function Home() {
   const [duoDraftStatus, setDuoDraftStatus] = useState<"DRAFT" | "PUBLISHED" | null>(null);
   const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
   const [todayMatchesFrozen, setTodayMatchesFrozen] = useState(false);
-  const [smartInsightsOpen, setSmartInsightsOpen] = useState(true);
+  const [smartInsightIndex, setSmartInsightIndex] = useState(0);
   const [taskPlayerId, setTaskPlayerId] = useState<string | null>(null);
   const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");
   const [duoAttendanceIds, setDuoAttendanceIds] = useState<string[]>([]);
@@ -538,6 +538,30 @@ export default function Home() {
 
   const smartInsights = smartInsightData.insights;
   const mvpOfDay = smartInsightData.mvp;
+
+  useEffect(() => {
+    if (homeDate !== localDateKey(new Date()) || smartInsights.length <= 1) {
+      setSmartInsightIndex(0);
+      return;
+    }
+
+    setSmartInsightIndex(index => Math.min(index, smartInsights.length - 1));
+    const timer = window.setInterval(() => {
+      setSmartInsightIndex(index => (index + 1) % smartInsights.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [homeDate, smartInsights.length]);
+
+  const showNextSmartInsight = () => {
+    if (smartInsights.length < 2) return;
+    setSmartInsightIndex(index => (index + 1) % smartInsights.length);
+  };
+
+  const showPreviousSmartInsight = () => {
+    if (smartInsights.length < 2) return;
+    setSmartInsightIndex(index => (index - 1 + smartInsights.length) % smartInsights.length);
+  };
 
   type DailyTask = {
     id: string;
@@ -2161,21 +2185,63 @@ const totalFines = fines.reduce(
             </div>
           </div>
         </section>}
-        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
-          <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
-            <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
-            <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
-          </button>
-          {smartInsightsOpen && <>
-            <div className="smart-insights-grid">
-              {smartInsights.map((insight, index) => <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.title}-${index}`}>
-                <span className="smart-insight-icon">{insight.icon}</span>
-                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
-              </div>)}
+        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section
+          className="smart-insights-carousel"
+          aria-label="Rally365 smart insights"
+          onTouchStart={event => {
+            (event.currentTarget as HTMLElement).dataset.touchStartX = String(event.touches[0]?.clientX ?? "");
+          }}
+          onTouchEnd={event => {
+            const startX = Number((event.currentTarget as HTMLElement).dataset.touchStartX || 0);
+            const endX = event.changedTouches[0]?.clientX ?? startX;
+            if (!startX) return;
+            const delta = endX - startX;
+            if (Math.abs(delta) > 45) {
+              if (delta < 0) showNextSmartInsight();
+              else showPreviousSmartInsight();
+            }
+          }}
+        >
+          <div className="smart-insights-carousel-viewport">
+            <div
+              className="smart-insights-carousel-track"
+              style={{ transform: `translateX(-${smartInsightIndex * 100}%)` }}
+            >
+              {smartInsights.map((insight, index) => (
+                <div className="smart-insight-carousel-slide" key={`${insight.title}-${index}`}>
+                  <div className={`smart-insight-carousel-card smart-insight-${insight.tone}`}>
+                    <div className="smart-insight-carousel-icon" aria-hidden="true">{insight.icon}</div>
+                    <div className="smart-insight-carousel-copy">
+                      <span className="smart-insight-carousel-eyebrow">RALLY365 INTELLIGENCE</span>
+                      <strong>{insight.title}</strong>
+                      <p>{insight.text}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
-
-          </>}
+          </div>
+          {smartInsights.length > 1 && (
+            <div className="smart-insights-carousel-controls">
+              <button type="button" className="smart-insights-carousel-arrow" onClick={showPreviousSmartInsight} aria-label="Previous smart insight">
+                <ChevronLeft size={18} />
+              </button>
+              <div className="smart-insights-carousel-dots" aria-label="Smart insight position">
+                {smartInsights.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className={`smart-insights-carousel-dot ${index === smartInsightIndex ? "active" : ""}`}
+                    onClick={() => setSmartInsightIndex(index)}
+                    aria-label={`Show smart insight ${index + 1}`}
+                  />
+                ))}
+              </div>
+              <button type="button" className="smart-insights-carousel-arrow" onClick={showNextSmartInsight} aria-label="Next smart insight">
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">

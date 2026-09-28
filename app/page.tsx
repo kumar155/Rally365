@@ -78,7 +78,7 @@ export default function Home() {
   const [duoDraftStatus, setDuoDraftStatus] = useState<"DRAFT" | "PUBLISHED" | null>(null);
   const [todayPublishedScheduleExists, setTodayPublishedScheduleExists] = useState(false);
   const [todayMatchesFrozen, setTodayMatchesFrozen] = useState(false);
-  const [homeHighlightIndex, setHomeHighlightIndex] = useState(0);
+  const [smartInsightsOpen, setSmartInsightsOpen] = useState(true);
   const [taskPlayerId, setTaskPlayerId] = useState<string | null>(null);
   const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");
   const [duoAttendanceIds, setDuoAttendanceIds] = useState<string[]>([]);
@@ -538,38 +538,6 @@ export default function Home() {
 
   const smartInsights = smartInsightData.insights;
   const mvpOfDay = smartInsightData.mvp;
-
-  const homeHighlights = [
-    ...(mvpOfDay ? [{ type: "mvp" as const, data: mvpOfDay }] : []),
-    ...(homeDate === localDateKey(new Date())
-      ? smartInsights.map(insight => ({ type: "insight" as const, data: insight }))
-      : []),
-  ];
-
-  useEffect(() => {
-    if (homeHighlights.length <= 1) {
-      setHomeHighlightIndex(0);
-      return;
-    }
-
-    setHomeHighlightIndex(index => Math.min(index, homeHighlights.length - 1));
-
-    const timer = window.setInterval(() => {
-      setHomeHighlightIndex(index => (index + 1) % homeHighlights.length);
-    }, 5000);
-
-    return () => window.clearInterval(timer);
-  }, [homeDate, homeHighlights.length, mvpOfDay?.p.id, smartInsights.length]);
-
-  const showNextHomeHighlight = () => {
-    if (homeHighlights.length < 2) return;
-    setHomeHighlightIndex(index => (index + 1) % homeHighlights.length);
-  };
-
-  const showPreviousHomeHighlight = () => {
-    if (homeHighlights.length < 2) return;
-    setHomeHighlightIndex(index => (index - 1 + homeHighlights.length) % homeHighlights.length);
-  };
 
   type DailyTask = {
     id: string;
@@ -2178,79 +2146,36 @@ const totalFines = fines.reduce(
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
           {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
         </div>}
-        {homeHighlights.length > 0 && <section
-          className="home-highlights-carousel"
-          aria-label="Rally365 highlights"
-          onTouchStart={event => {
-            (event.currentTarget as HTMLElement).dataset.touchStartX = String(event.touches[0]?.clientX ?? "");
-          }}
-          onTouchEnd={event => {
-            const start = Number((event.currentTarget as HTMLElement).dataset.touchStartX || 0);
-            const end = event.changedTouches[0]?.clientX ?? start;
-            if (!start) return;
-            const delta = end - start;
-            if (Math.abs(delta) > 45) {
-              if (delta < 0) showNextHomeHighlight();
-              else showPreviousHomeHighlight();
-            }
-          }}
-        >
-          <div className="home-highlights-viewport">
-            <div
-              className="home-highlights-track"
-              style={{ transform: `translateX(-${homeHighlightIndex * 100}%)` }}
-            >
-              {homeHighlights.map((highlight, index) => (
-                <div className="home-highlight-slide" key={highlight.type === "mvp" ? "mvp" : `${highlight.data.title}-${index}`}>
-                  {highlight.type === "mvp" ? (
-                    <div className="mvp-home-card home-highlight-card">
-                      <div className="mvp-home-badge" aria-hidden="true">👑</div>
-                      <div className="mvp-home-copy">
-                        <span className="mvp-home-eyebrow">MVP OF THE DAY</span>
-                        <strong>{highlight.data.p.name}</strong>
-                        <p>Top performance from {highlight.data.matches} match{highlight.data.matches === 1 ? "" : "es"} played on this date.</p>
-                      </div>
-                      <div className="mvp-home-stats">
-                        <div><b>{highlight.data.wins}</b><span>Wins</span></div>
-                        <div><b>{highlight.data.matches}</b><span>Matches</span></div>
-                        <div><b>{highlight.data.winRate}%</b><span>Win rate</span></div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`home-highlight-card home-highlight-insight smart-insight-${highlight.data.tone}`}>
-                      <div className="home-highlight-insight-icon" aria-hidden="true">{highlight.data.icon}</div>
-                      <div className="home-highlight-insight-copy">
-                        <span className="home-highlight-insight-eyebrow">RALLY365 INTELLIGENCE</span>
-                        <strong>{highlight.data.title}</strong>
-                        <p>{highlight.data.text}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+        {mvpOfDay && <section className="home-mvp-section">
+          <div className="mvp-home-card">
+            <div className="mvp-home-badge" aria-hidden="true">👑</div>
+            <div className="mvp-home-copy">
+              <span className="mvp-home-eyebrow">MVP OF THE DAY</span>
+              <strong>{mvpOfDay.p.name}</strong>
+              <p>Top performance from {mvpOfDay.matches} match{mvpOfDay.matches === 1 ? "" : "es"} played on this date.</p>
+            </div>
+            <div className="mvp-home-stats">
+              <div><b>{mvpOfDay.wins}</b><span>Wins</span></div>
+              <div><b>{mvpOfDay.matches}</b><span>Matches</span></div>
+              <div><b>{mvpOfDay.winRate}%</b><span>Win rate</span></div>
             </div>
           </div>
-          {homeHighlights.length > 1 && (
-            <div className="home-highlights-controls">
-              <button type="button" className="home-highlight-arrow" onClick={showPreviousHomeHighlight} aria-label="Previous highlight">
-                <ChevronLeft size={18} />
-              </button>
-              <div className="home-highlight-dots" aria-label="Highlight position">
-                {homeHighlights.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`home-highlight-dot ${index === homeHighlightIndex ? "active" : ""}`}
-                    onClick={() => setHomeHighlightIndex(index)}
-                    aria-label={`Show highlight ${index + 1}`}
-                  />
-                ))}
-              </div>
-              <button type="button" className="home-highlight-arrow" onClick={showNextHomeHighlight} aria-label="Next highlight">
-                <ChevronRight size={18} />
-              </button>
+        </section>}
+        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
+          <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
+            <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
+            <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
+          </button>
+          {smartInsightsOpen && <>
+            <div className="smart-insights-grid">
+              {smartInsights.map((insight, index) => <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.title}-${index}`}>
+                <span className="smart-insight-icon">{insight.icon}</span>
+                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
+              </div>)}
             </div>
-          )}
+            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
+
+          </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">

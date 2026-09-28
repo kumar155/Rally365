@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   BarChart3, ChevronRight, ChevronLeft, ChevronDown, CircleUserRound, Clock3, History, LockOpen, Pencil, LockKeyhole,
-  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Bot, Target, Flame, CalendarCheck
+  MapPin, Plus, ReceiptText, Trophy, Users, UsersRound, X, Trash2, UserMinus, UserPlus, Shuffle, Check, Sparkles, Bot, Target, Flame, CalendarCheck
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 

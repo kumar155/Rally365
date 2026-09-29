@@ -1,17 +1,42 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { shuffle, knockoutSize, knockoutRoundName, knockoutRoundType } from "../../../lib/tournament";
+import { syncTournamentProgression } from "../../../lib/tournamentProgression";
 import s from "../tournament.module.css";
 import ds from "./draw.module.css";
 
 type D = { id: string; name: string };
 type T = { id: string; name: string; format: string; rounds: number | null; group_count: number | null; qualifiers_per_group: number | null };
-type G = { id: string; name: string; group_number: number; qualifying_teams: number };
-type GD = { group_id: string; duo_id: string };
+type G = { id: string; name: string; group_number: number; qualifying_teams: number; qualification_confirmed: boolean };
+type GD = { group_id: string; duo_id: string; qualified: boolean };
 type R = { id: string; round_number: number; name: string; round_type: string };
-type M = { id: string; round_id: string; match_number: number; group_id: string | null; team_a_duo_id: string | null; team_b_duo_id: string | null; team_a_score: number | null; team_b_score: number | null; status: string };
+type M = { id: string; round_id: string; match_number: number; group_id: string | null; team_a_duo_id: string | null; team_b_duo_id: string | null; team_a_score: number | null; team_b_score: number | null; status: string; winner_duo_id?: string | null };
+type Row = D & { played: number; wins: number; losses: number; points: number; diff: number };
+
+const completed = (status: string) => status === "COMPLETED" || status === "WALKOVER";
+
+function standingsForGroup(duos: D[], memberships: GD[], matches: M[], groupId: string): Row[] {
+  const ids = new Set(memberships.filter((x) => x.group_id === groupId).map((x) => x.duo_id));
+  const rows = new Map<string, Row>();
+  for (const duo of duos) {
+    if (ids.has(duo.id)) rows.set(duo.id, { ...duo, played: 0, wins: 0, losses: 0, points: 0, diff: 0 });
+  }
+  for (const match of matches.filter((m) => m.group_id === groupId && completed(m.status))) {
+    const a = match.team_a_duo_id ? rows.get(match.team_a_duo_id) : null;
+    const b = match.team_b_duo_id ? rows.get(match.team_b_duo_id) : null;
+    if (!a || !b) continue;
+    const sa = Number(match.team_a_score ?? 0);
+    const sb = Number(match.team_b_score ?? 0);
+    a.played++; b.played++;
+    a.diff += sa - sb; b.diff += sb - sa;
+    if (sa > sb) { a.wins++; a.points++; b.losses++; }
+    else if (sb > sa) { b.wins++; b.points++; a.losses++; }
+  }
+  return [...rows.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || b.diff - a.diff || a.name.localeCompare(b.name));
+}
 
 export default function Draw() {
   const [id, setId] = useState("");
@@ -26,6 +51,7 @@ export default function Draw() {
   const [done, setDone] = useState("");
   const [selectedRound, setSelectedRound] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState("");
+  const [selectedQualifiers, setSelectedQualifiers] = useState<Record<string, string[]>>({});
 
   useEffect(() => setId(new URLSearchParams(window.location.search).get("id") || ""), []);
 
@@ -34,14 +60,16 @@ export default function Draw() {
     const [{ data: tournament, error: te }, { data: teams, error: de }, { data: gs, error: ge }, { data: r, error: re }, { data: m, error: me }] = await Promise.all([
       supabase.from("tournaments").select("id,name,format,rounds,group_count,qualifiers_per_group").eq("id", id).single(),
       supabase.from("tournament_duos").select("id,name").eq("tournament_id", id).eq("status", "ACTIVE").order("created_at"),
-      supabase.from("tournament_groups").select("id,name,group_number,qualifying_teams").eq("tournament_id", id).order("group_number"),
+      supabase.from("tournament_groups").select("id,name,group_number,qualifying_teams,qualification_confirmed").eq("tournament_id", id).order("group_number"),
       supabase.from("tournament_rounds").select("id,round_number,name,round_type").eq("tournament_id", id).order("round_number"),
-      supabase.from("tournament_matches").select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,team_a_score,team_b_score,status").eq("tournament_id", id).order("match_number")
+      supabase.from("tournament_matches").select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,team_a_score,team_b_score,status,winner_duo_id").eq("tournament_id", id).order("match_number")
     ]);
     const groupIds = (gs || []).map((g) => g.id);
-    const { data: gds, error: gde } = groupIds.length ? await supabase.from("tournament_group_duos").select("group_id,duo_id").in("group_id", groupIds) : { data: [], error: null };
+    const { data: gds, error: gde } = groupIds.length
+      ? await supabase.from("tournament_group_duos").select("group_id,duo_id,qualified").in("group_id", groupIds)
+      : { data: [], error: null };
     const e = te || de || ge || gde || re || me;
-    if (e) setError(e.message);
+    if (e) { setError(e.message); return; }
     setT(tournament);
     setDuos(teams || []);
     setGroups(gs || []);
@@ -50,6 +78,10 @@ export default function Draw() {
     setMatches(m || []);
     if ((r || []).length && !selectedRound) setSelectedRound((r || [])[0].round_number);
     if ((gs || []).length && !selectedGroup) setSelectedGroup((gs || [])[0].id);
+
+    const next: Record<string, string[]> = {};
+    for (const g of gs || []) next[g.id] = (gds || []).filter((x) => x.group_id === g.id && x.qualified).map((x) => x.duo_id);
+    setSelectedQualifiers(next);
   }
 
   useEffect(() => { load(); }, [id]);
@@ -77,13 +109,10 @@ export default function Draw() {
   async function generate() {
     if (!t) return;
     if (duos.length < 2) return setError("Create at least two partner teams first.");
-    setBusy(true);
-    setError("");
-    setDone("");
+    setBusy(true); setError(""); setDone("");
     try {
       await reset();
       let no = 1;
-
       if (t.format === "ROUND_ROBIN") {
         const { data: r, error } = await supabase.from("tournament_rounds").insert({ tournament_id: id, round_number: 1, name: "Round Robin", round_type: "GROUP" }).select("id").single();
         if (error) throw error;
@@ -111,25 +140,21 @@ export default function Draw() {
         const qpg = Math.max(1, t.qualifiers_per_group || 1);
         const { data: groupRound, error: re } = await supabase.from("tournament_rounds").insert({ tournament_id: id, round_number: 1, name: "Group Stage", round_type: "GROUP" }).select("id").single();
         if (re) throw re;
-
         const createdGroups: G[] = [];
         for (let i = 0; i < gc; i++) {
-          const { data, error } = await supabase.from("tournament_groups").insert({ tournament_id: id, name: `Group ${String.fromCharCode(65 + i)}`, group_number: i + 1, qualifying_teams: qpg }).select("id,name,group_number,qualifying_teams").single();
+          const { data, error } = await supabase.from("tournament_groups").insert({ tournament_id: id, name: `Group ${String.fromCharCode(65 + i)}`, group_number: i + 1, qualifying_teams: qpg, qualification_confirmed: false }).select("id,name,group_number,qualifying_teams,qualification_confirmed").single();
           if (error) throw error;
           createdGroups.push(data);
         }
-
         const shuffled = shuffle(duos);
-        const memberships: { group_id: string; duo_id: string; seed: number }[] = [];
-        for (let i = 0; i < shuffled.length; i++) memberships.push({ group_id: createdGroups[i % createdGroups.length].id, duo_id: shuffled[i].id, seed: i + 1 });
+        const memberships: { group_id: string; duo_id: string; seed: number; qualified: boolean }[] = [];
+        for (let i = 0; i < shuffled.length; i++) memberships.push({ group_id: createdGroups[i % createdGroups.length].id, duo_id: shuffled[i].id, seed: i + 1, qualified: false });
         const { error: membershipError } = await supabase.from("tournament_group_duos").insert(memberships);
         if (membershipError) throw membershipError;
-
         for (const g of createdGroups) {
           const members = memberships.filter((x) => x.group_id === g.id).map((x) => shuffled.find((d) => d.id === x.duo_id)!).filter(Boolean);
           for (let i = 0; i < members.length; i++) for (let j = i + 1; j < members.length; j++) await addMatch({ tournament_id: id, round_id: groupRound.id, group_id: g.id, match_number: no++, team_a_duo_id: members[i].id, team_b_duo_id: members[j].id, best_of: 1, status: "SCHEDULED" });
         }
-
         const qualifiers = gc * qpg;
         const size = knockoutSize(qualifiers);
         const knockoutRounds = Math.log2(size);
@@ -137,30 +162,36 @@ export default function Draw() {
           const roundSize = size / 2 ** r;
           const { data: kr, error } = await supabase.from("tournament_rounds").insert({ tournament_id: id, round_number: r + 2, name: knockoutRoundName(roundSize), round_type: knockoutRoundType(roundSize) }).select("id").single();
           if (error) throw error;
-          const matchCount = roundSize / 2;
-          for (let i = 0; i < matchCount; i++) await addMatch({ tournament_id: id, round_id: kr.id, match_number: no++, team_a_duo_id: null, team_b_duo_id: null, best_of: 3, status: "SCHEDULED" });
-        }
-      } else {
-        const count = Math.max(1, t.rounds || 5);
-        for (let rn = 1; rn <= count; rn++) {
-          const { data: round, error } = await supabase.from("tournament_rounds").insert({ tournament_id: id, round_number: rn, name: `Random Round ${rn}`, round_type: "RANDOM" }).select("id").single();
-          if (error) throw error;
-          const shuffled = shuffle(duos);
-          for (let i = 0; i + 1 < shuffled.length; i += 2) await addMatch({ tournament_id: id, round_id: round.id, match_number: no++, team_a_duo_id: shuffled[i].id, team_b_duo_id: shuffled[i + 1].id, best_of: 1, status: "SCHEDULED" });
+          for (let i = 0; i < roundSize / 2; i++) await addMatch({ tournament_id: id, round_id: kr.id, match_number: no++, team_a_duo_id: null, team_b_duo_id: null, best_of: 3, status: "SCHEDULED" });
         }
       }
 
       const { error: se } = await supabase.from("tournaments").update({ status: "READY" }).eq("id", id);
       if (se) throw se;
-      setDone("Draw generated successfully.");
+      setDone(t.format === "GROUPS_KNOCKOUT" ? "Teams distributed and group matches scheduled." : "Draw generated successfully.");
       setSelectedRound(1);
       await load();
     } catch (e: any) {
       setError(e?.message || "Could not generate draw");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
+
+  function toggleQualifier(groupId: string, duoId: string, limit: number) {
+    const current = selectedQualifiers[groupId] || [];
+    if (current.includes(duoId)) {
+      setSelectedQualifiers({ ...selectedQualifiers, [groupId]: current.filter((x) => x !== duoId) });
+      return;
+    }
+    if (current.length >= limit) return;
+    setSelectedQualifiers({ ...selectedQualifiers, [groupId]: [...current, duoId] });
+  }
+
+  const groupMatches = matches.filter((m) => m.group_id);
+  const allGroupMatchesComplete = groups.length > 0 && groupMatches.length > 0 && groupMatches.every((m) => completed(m.status));
+  const anyGroupMatchStarted = groupMatches.some((m) => completed(m.status) || m.status === "LIVE" || Number(m.team_a_score ?? 0) > 0 || Number(m.team_b_score ?? 0) > 0);
+  const allQualificationsConfirmed = groups.length > 0 && groups.every((g) => g.qualification_confirmed);
+  const firstKnockoutRound = rounds.find((r) => r.round_type !== "GROUP");
+  const knockoutSeeded = !!firstKnockoutRound && matches.some((m) => m.round_id === firstKnockoutRound.id && (m.team_a_duo_id || m.team_b_duo_id));
 
   const names = new Map(duos.map((d) => [d.id, d.name]));
   const groupByDuo = new Map(groupDuos.map((x) => [x.duo_id, x.group_id]));
@@ -172,8 +203,64 @@ export default function Draw() {
     const inRound = activeRound ? matches.filter((m) => m.round_id === activeRound.id) : [];
     return isGroupStage && selectedGroup ? inRound.filter((m) => groupMatchGroupId(m) === selectedGroup) : inRound;
   }, [activeRound, matches, isGroupStage, selectedGroup, groupDuos]);
-  const totalGroupMatches = isGroupStage && activeRound ? matches.filter((m) => m.round_id === activeRound.id).length : activeMatches.length;
   const duoParts = (name: string) => name.split(/\s*&\s*/).map((x) => x.trim()).filter(Boolean).slice(0, 2);
+
+  async function confirmQualifications() {
+    if (!allGroupMatchesComplete) return;
+    setBusy(true); setError(""); setDone("");
+    try {
+      for (const group of groups) {
+        const selected = selectedQualifiers[group.id] || [];
+        if (selected.length !== group.qualifying_teams) throw new Error(`${group.name}: select exactly ${group.qualifying_teams} team${group.qualifying_teams === 1 ? "" : "s"}.`);
+        const memberships = groupDuos.filter((x) => x.group_id === group.id);
+        for (const membership of memberships) {
+          const { error } = await supabase.from("tournament_group_duos").update({ qualified: selected.includes(membership.duo_id) }).eq("group_id", group.id).eq("duo_id", membership.duo_id);
+          if (error) throw error;
+        }
+        const { error } = await supabase.from("tournament_groups").update({ qualification_confirmed: true, status: "COMPLETED" }).eq("id", group.id);
+        if (error) throw error;
+      }
+      setDone("Qualified teams confirmed. Choose what to do next.");
+      await load();
+    } catch (e: any) { setError(e?.message || "Could not confirm qualification"); }
+    finally { setBusy(false); }
+  }
+
+  async function createKnockoutDraw() {
+    if (!allQualificationsConfirmed || !firstKnockoutRound) return;
+    setBusy(true); setError(""); setDone("");
+    try {
+      const ordered: string[] = [];
+      const rankedGroups = groups.slice().sort((a, b) => a.group_number - b.group_number);
+      const ranked = rankedGroups.map((g) => standingsForGroup(duos, groupDuos, matches, g.id).filter((r) => groupDuos.some((x) => x.group_id === g.id && x.duo_id === r.id && x.qualified)));
+      const qpg = Math.max(1, t?.qualifiers_per_group || 1);
+      if (rankedGroups.length === 2) {
+        for (let i = 0; i < qpg; i++) {
+          const a = ranked[0]?.[i]?.id;
+          const b = ranked[1]?.[qpg - 1 - i]?.id;
+          if (a) ordered.push(a);
+          if (b) ordered.push(b);
+        }
+      } else {
+        for (const groupRows of ranked) ordered.push(...groupRows.map((r) => r.id));
+      }
+
+      const knockoutMatches = matches.filter((m) => m.round_id === firstKnockoutRound.id).sort((a, b) => a.match_number - b.match_number);
+      for (let i = 0; i < knockoutMatches.length; i++) {
+        const a = ordered[i * 2] || null;
+        const b = ordered[i * 2 + 1] || null;
+        const bye = !!a !== !!b;
+        const winner = bye ? (a || b) : null;
+        const { error } = await supabase.from("tournament_matches").update({ team_a_duo_id: a, team_b_duo_id: b, status: bye ? "COMPLETED" : "SCHEDULED", winner_duo_id: winner }).eq("id", knockoutMatches[i].id);
+        if (error) throw error;
+      }
+      await syncTournamentProgression(id);
+      setDone("Knockout draw created from the confirmed qualifiers.");
+      await load();
+      setSelectedRound(firstKnockoutRound.round_number);
+    } catch (e: any) { setError(e?.message || "Could not create knockout draw"); }
+    finally { setBusy(false); }
+  }
 
   if (!id) return <main className={s.page}><div className={s.shell}><div className={s.card}>Tournament ID is missing.</div></div></main>;
 
@@ -182,13 +269,55 @@ export default function Draw() {
     <div className={ds.drawTop}><div><div className={s.brand}>RALLY365 OPEN</div><h1 className={ds.drawTitle}>Draw</h1><p className={s.sub}>{t?.name || "Tournament"}</p></div><Link href={path("manage")} className={s.secondaryButton}>Overview</Link></div>
     <nav className={s.tabs}><Link className={s.tab} href={path("manage")}>Overview</Link><Link className={`${s.tab} ${s.tabActive}`} href={path("draw")}>Draw</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
     {error && <div className={s.error}>{error}</div>}{done && <div className={s.success}>{done}</div>}
+
     {rounds.length > 0 && <div className={ds.drawRoundTabs}>{rounds.map((r) => <button key={r.id} className={`${ds.drawRoundTab} ${r.round_number === activeRound?.round_number ? ds.drawRoundTabActive : ""}`} onClick={() => setSelectedRound(r.round_number)}>{r.name}</button>)}</div>}
     {isGroupStage && groups.length > 0 && <div className={ds.groupTabs}>{groups.map((g) => { const count = matches.filter((m) => m.round_id === activeRound?.id && groupMatchGroupId(m) === g.id).length; return <button key={g.id} className={`${ds.groupTab} ${g.id === selectedGroup ? ds.groupTabActive : ""}`} onClick={() => setSelectedGroup(g.id)}><span>{g.name}</span><small>{count} matches · {groupDuos.filter((x) => x.group_id === g.id).length} teams</small></button>; })}</div>}
+
     {matches.length > 0 && activeRound ? <section className={ds.bracketStage}>
       <div className={ds.bracketHeading}><div><span className={s.eyebrow}>{isGroupStage ? (groups.find((g) => g.id === selectedGroup)?.name || "GROUP STAGE").toUpperCase() : `ROUND ${activeRound.round_number}`}</span><h2>{activeRound.name}</h2></div><span>{activeMatches.length} matches</span></div>
-      {isGroupStage && <div className={ds.groupSummary}><strong>{groupDuos.filter((x) => x.group_id === selectedGroup).length} partner teams</strong><span>{groups.find((g) => g.id === selectedGroup)?.qualifying_teams || 1} qualifier{(groups.find((g) => g.id === selectedGroup)?.qualifying_teams || 1) > 1 ? "s" : ""}</span><span>{totalGroupMatches} total group matches</span></div>}
+      {isGroupStage && <div className={ds.groupSummary}><strong>{groupDuos.filter((x) => x.group_id === selectedGroup).length} partner teams</strong><span>{groups.find((g) => g.id === selectedGroup)?.qualifying_teams || 1} qualifier{(groups.find((g) => g.id === selectedGroup)?.qualifying_teams || 1) > 1 ? "s" : ""}</span><span>{matches.filter((m) => m.round_id === activeRound.id).length} total group matches</span></div>}
       <div className={ds.bracketGrid}>{activeMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; const ap = duoParts(a); const bp = duoParts(b); const prefix = /quarter/i.test(activeRound.name) ? "QF" : /semi/i.test(activeRound.name) ? "SF" : /final/i.test(activeRound.name) ? "F" : "Match"; return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.drawMatch}><div className={ds.drawMatchMeta}><span>{prefix} {m.match_number}</span><span>{m.group_id && isGroupStage ? groups.find((g) => g.id === m.group_id)?.name : "Court TBD"}</span></div><div className={`${ds.drawTeam} ${ds.drawTeamA}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{ap.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><strong>{a}</strong></span><strong className={ds.drawScore}>{m.team_a_score ?? 0}</strong></div><div className={`${ds.drawTeam} ${ds.drawTeamB}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{bp.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><strong>{b}</strong></span><strong className={ds.drawScore}>{m.team_b_score ?? 0}</strong></div></Link>; })}</div>
-    </section> : <section className={s.card}><h2>No draw yet</h2><p className={s.sub}>Generate the draw after partners are ready.</p></section>}
-    <section className={ds.drawActions}><button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate / regenerate draw"}</button><Link href={path("schedule")} className={s.button + " " + s.secondary}>View schedule →</Link></section>
+    </section> : <section className={s.card}><h2>No draw yet</h2><p className={s.sub}>Distribute teams and create the group schedule after partners are ready.</p></section>}
+
+    {t?.format === "GROUPS_KNOCKOUT" && groups.length > 0 && allGroupMatchesComplete && !allQualificationsConfirmed && <section className={s.card} style={{ marginTop: 14 }}>
+      <div className={s.eyebrow}>GROUP STAGE COMPLETE</div>
+      <h2 style={{ marginBottom: 6 }}>Select qualified teams</h2>
+      <p className={s.sub}>All group matches are recorded. Select the teams that move to the next round.</p>
+      {groups.map((group) => {
+        const rows = standingsForGroup(duos, groupDuos, matches, group.id);
+        const selected = selectedQualifiers[group.id] || [];
+        return <div key={group.id} style={{ marginTop: 18 }}>
+          <div className={s.sectionHeader}><div><div className={s.eyebrow}>{group.name.toUpperCase()}</div><h3>{group.qualifying_teams} qualifier{group.qualifying_teams === 1 ? "" : "s"}</h3></div><span>{selected.length}/{group.qualifying_teams} selected</span></div>
+          <div className={s.standingTable}>
+            <div className={s.standingHead}><span>Select</span><span>Team</span><span>P</span><span>W</span><span>L</span><span>Pts</span></div>
+            {rows.map((row, index) => <label key={row.id} className={s.standingRow} style={{ cursor: "pointer" }}><input type="checkbox" checked={selected.includes(row.id)} onChange={() => toggleQualifier(group.id, row.id, group.qualifying_teams)} style={{ width: 18, height: 18 }} /><div className={s.standingTeam}><div className={s.duoAvatar} aria-hidden="true">{index + 1}</div><div><span className={s.teamName}>{row.name}</span><small>{row.played} played · {row.wins} won · {row.losses} lost</small></div></div><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span className={s.points}>{row.points}</span></label>)}
+          </div>
+        </div>;
+      })}
+      <div className={s.actions} style={{ marginTop: 20 }}><button className={s.button} onClick={confirmQualifications} disabled={busy}>{busy ? "Saving…" : "Confirm qualified teams"}</button></div>
+    </section>}
+
+    {t?.format === "GROUPS_KNOCKOUT" && allQualificationsConfirmed && <section className={s.card} style={{ marginTop: 14 }}>
+      <div className={s.eyebrow}>QUALIFIED TEAMS</div>
+      <h2>Next stage</h2>
+      <p className={s.sub}>Qualification is locked. Review the selected teams and choose what to do next.</p>
+      <div className={s.standingTable} style={{ marginTop: 14 }}>
+        <div className={s.standingHead}><span>Group</span><span>Qualified team</span><span>P</span><span>W</span><span>L</span><span>Pts</span></div>
+        {groups.flatMap((group) => standingsForGroup(duos, groupDuos, matches, group.id).filter((row) => groupDuos.some((x) => x.group_id === group.id && x.duo_id === row.id && x.qualified)).map((row) => <div className={s.standingRow} key={`${group.id}-${row.id}`}><span>{group.name}</span><div className={s.standingTeam}><div className={s.duoAvatar}>✓</div><span className={s.teamName}>{row.name}</span></div><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span className={s.points}>{row.points}</span></div>))}
+      </div>
+      <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid rgba(16,45,37,.10)" }}>
+        <div className={s.eyebrow}>WHAT DO YOU WANT TO DO NEXT?</div>
+        <div className={s.grid2} style={{ marginTop: 12 }}>
+          <button className={s.button} onClick={createKnockoutDraw} disabled={busy || knockoutSeeded}>{knockoutSeeded ? "Knockout draw created" : busy ? "Creating…" : "Create knockout draw →"}</button>
+          <Link href={path("standings")} className={`${s.button} ${s.secondary}`}>Review full standings</Link>
+        </div>
+      </div>
+    </section>}
+
+    <section className={ds.drawActions}>
+      {(!matches.length || (!anyGroupMatchStarted && t?.format === "GROUPS_KNOCKOUT")) && <button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : t?.format === "GROUPS_KNOCKOUT" ? "Distribute teams & schedule group matches" : "Generate draw"}</button>}
+      {anyGroupMatchStarted && t?.format === "GROUPS_KNOCKOUT" && <span className={s.sub}>Group results have started. Draw generation is locked.</span>}
+      <Link href={path("schedule")} className={s.button + " " + s.secondary}>View schedule →</Link>
+    </section>
   </div></main>;
 }

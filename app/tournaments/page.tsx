@@ -26,12 +26,11 @@ export default function TournamentsPage(){
               <span className={s.pill} style={{background:state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf2f0":"#fff3c4",color:state==="LIVE"?"#b42318":state==="COMPLETED"?"#60736b":"#6d5710"}}>{state}</span>
               <span style={{fontSize:10,color:"#71857d",fontWeight:700}}>{formatLabel(t.format)}</span>
             </div>
-            <h2 style={{fontSize:22,lineHeight:1.05,margin:"0 0 4px",letterSpacing:"-.025em"}}>{t.name}</h2>
-            <p style={{fontSize:12,color:"#70837b",margin:0}}>{formatLabel(t.format)}</p>
+            <h2 style={{fontSize:22,lineHeight:1.05,margin:0,letterSpacing:"-.025em"}}>{t.name}</h2>
           </div>
           <span style={{fontSize:20,color:"#078b5c",lineHeight:1,paddingTop:2}}>›</span>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginTop:13,paddingTop:10,borderTop:"1px solid #e8efec"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginTop:12,paddingTop:10,borderTop:"1px solid #e8efec"}}>
           <div><strong style={{display:"block",fontSize:11}}>📅 {dateLabel(t.start_date)}</strong><span style={{fontSize:9,color:"#84958e"}}>Date</span></div>
           <div><strong style={{display:"block",fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>📍 {t.venue||"Venue TBD"}</strong><span style={{fontSize:9,color:"#84958e"}}>Venue</span></div>
           <div><strong style={{display:"block",fontSize:11}}>Rally365</strong><span style={{fontSize:9,color:"#84958e"}}>Organizer</span></div>

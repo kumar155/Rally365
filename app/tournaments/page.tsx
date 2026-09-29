@@ -16,6 +16,28 @@ export default function TournamentsPage(){
   <div className={s.top}><div><div className={s.brand}>RALLY365</div><h1 className={s.title}>Tournaments</h1><p className={s.sub}>Run every Rally365 competition in one place.</p></div><Link className={s.button} href="/tournaments/create">+ Create</Link></div>
   <div className={s.filterTabs}>{[["ALL","All"],["UPCOMING","Upcoming"],["LIVE","Live"],["COMPLETED","Completed"]].map(([v,l])=><button key={v} className={`${s.filterTab} ${filter===v?s.filterActive:""}`} onClick={()=>setFilter(v)}>{l}</button>)}</div>
   {error&&<div className={s.error}>{error}</div>}
-  {loading?<div className={s.card}>Loading tournaments…</div>:!visible.length?<div className={s.hero}><h2>No tournaments here yet</h2><p>Create the first Rally365 tournament and add players, partners and a draw.</p><Link className={s.button} href="/tournaments/create" style={{marginTop:14}}>Create tournament</Link></div>:<div className={s.list}>{visible.map(t=><Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}><article className={s.card} style={{padding:0,overflow:"hidden"}}><div className={s.tournamentHero}><div><span className={s.pill} style={{background:stateLabel(t.status)==="LIVE"?"#ef4444":"#f6d44d",color:stateLabel(t.status)==="LIVE"?"#fff":"#173c2c"}}>{stateLabel(t.status)}</span><h2>{t.name}</h2><p>{formatLabel(t.format)}</p></div></div><div style={{padding:12}}><div className={s.tournamentMeta}><div className={s.metaBox}><strong>📅 {dateLabel(t.start_date)}</strong><span>Date</span></div><div className={s.metaBox}><strong>📍 {t.venue||"Venue TBD"}</strong><span>Venue</span></div><div className={s.metaBox}><strong>👥 Rally365</strong><span>Organizer</span></div></div></div></article></Link>)}</div>}
+  {loading?<div className={s.card}>Loading tournaments…</div>:!visible.length?<div className={s.hero}><h2>No tournaments here yet</h2><p>Create the first Rally365 tournament and add players, partners and a draw.</p><Link className={s.button} href="/tournaments/create" style={{marginTop:14}}>Create tournament</Link></div>:<div className={s.list}>{visible.map(t=>{
+    const state=stateLabel(t.status);
+    return <Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}>
+      <article className={s.card} style={{padding:"14px 14px 12px"}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+          <div style={{minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+              <span className={s.pill} style={{background:state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf2f0":"#fff3c4",color:state==="LIVE"?"#b42318":state==="COMPLETED"?"#60736b":"#6d5710"}}>{state}</span>
+              <span style={{fontSize:10,color:"#71857d",fontWeight:700}}>{formatLabel(t.format)}</span>
+            </div>
+            <h2 style={{fontSize:22,lineHeight:1.05,margin:"0 0 4px",letterSpacing:"-.025em"}}>{t.name}</h2>
+            <p style={{fontSize:12,color:"#70837b",margin:0}}>{formatLabel(t.format)}</p>
+          </div>
+          <span style={{fontSize:20,color:"#078b5c",lineHeight:1,paddingTop:2}}>›</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginTop:13,paddingTop:10,borderTop:"1px solid #e8efec"}}>
+          <div><strong style={{display:"block",fontSize:11}}>📅 {dateLabel(t.start_date)}</strong><span style={{fontSize:9,color:"#84958e"}}>Date</span></div>
+          <div><strong style={{display:"block",fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>📍 {t.venue||"Venue TBD"}</strong><span style={{fontSize:9,color:"#84958e"}}>Venue</span></div>
+          <div><strong style={{display:"block",fontSize:11}}>Rally365</strong><span style={{fontSize:9,color:"#84958e"}}>Organizer</span></div>
+        </div>
+      </article>
+    </Link>
+  })}</div>}
  </div></main>;
 }

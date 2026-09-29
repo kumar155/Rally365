@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {CalendarDays,ChevronRight,Home,Map,Trophy,UsersRound} from "lucide-react";
+import {CalendarDays,ChevronRight,Home,MapPin,Trophy,UsersRound} from "lucide-react";
 import {supabase} from "../../lib/supabase";
 import s from "./tournament.module.css";
 type T={id:string;name:string;start_date:string|null;venue:string|null;format:string;status:string};
@@ -38,7 +38,7 @@ export default function TournamentsPage(){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap",marginTop:18,paddingTop:13,borderTop:"1px solid rgba(87,125,109,.18)",fontSize:12,color:"#526c62"}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:6}}><CalendarDays size={16}/> {dateLabel(t.start_date)}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><Map size={16}/> {t.venue||"Venue TBD"}</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><MapPin size={16}/> {t.venue||"Venue TBD"}</span>
           <span style={{display:"inline-flex",alignItems:"center",gap:6}}><UsersRound size={16}/> Rally365</span>
           <ChevronRight size={21} style={{marginLeft:"auto",color:"#078b5c"}}/>
         </div>

@@ -25,22 +25,22 @@ export default function TournamentsPage(){
     const state=stateLabel(t.status);
     const accent=state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf3f0":"#fff3c4";
     return <Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}>
-      <article className={s.card} style={{padding:"18px 18px 16px",borderRadius:22,border:"1px solid #cfe4da",background:"linear-gradient(135deg,#eaf8f0 0%,#eaf4fb 100%)",boxShadow:"0 5px 18px rgba(10,50,35,.04)"}}>
+      <article className={`${s.card} hero-card`} style={{padding:"22px",borderRadius:24,display:"block",position:"relative",boxShadow:"none"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:14}}>
           <div style={{minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8}}>
-              <span className={s.pill} style={{background:accent,color:state==="LIVE"?"#a33b3b":state==="COMPLETED"?"#60736b":"#6d5710",padding:"6px 11px",fontSize:10}}>{state}</span>
+              <span className={s.pill} style={{background:accent,color:state==="LIVE"?"#a33b3b":state==="COMPLETED"?"#60736b":"#6d5710",padding:"7px 12px",fontSize:10}}>{state}</span>
             </div>
-            <h2 style={{fontSize:27,lineHeight:1.05,margin:"0 0 5px",letterSpacing:"-.04em"}}>{t.name}</h2>
-            <p style={{fontSize:14,color:"#526c62",margin:0,fontWeight:650}}>{formatLabel(t.format)}</p>
+            <h2 style={{fontSize:29,lineHeight:1.05,margin:"5px 0 6px",letterSpacing:"-1px"}}>{t.name}</h2>
+            <p style={{fontSize:13,color:"#6b7d73",margin:0}}>{formatLabel(t.format)}</p>
           </div>
-          <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.68)",display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",color:"#078b5c"}}><Trophy size={29} strokeWidth={1.7}/></div>
+          <div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",marginTop:17,paddingTop:12,borderTop:"1px solid rgba(87,125,109,.18)",fontSize:11,color:"#526c62"}}>
-          <span style={{display:"inline-flex",alignItems:"center",gap:5}}><CalendarDays size={15}/> {dateLabel(t.start_date)}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:5}}><Map size={15}/> {t.venue||"Venue TBD"}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:5}}><UsersRound size={15}/> Rally365</span>
-          <ChevronRight size={20} style={{marginLeft:"auto",color:"#078b5c"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap",marginTop:18,paddingTop:13,borderTop:"1px solid rgba(87,125,109,.18)",fontSize:12,color:"#526c62"}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><CalendarDays size={16}/> {dateLabel(t.start_date)}</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><Map size={16}/> {t.venue||"Venue TBD"}</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><UsersRound size={16}/> Rally365</span>
+          <ChevronRight size={21} style={{marginLeft:"auto",color:"#078b5c"}}/>
         </div>
       </article>
     </Link>

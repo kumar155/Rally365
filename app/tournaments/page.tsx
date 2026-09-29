@@ -25,7 +25,7 @@ export default function TournamentsPage(){
     const state=stateLabel(t.status);
     const accent=state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf3f0":"#fff3c4";
     return <Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}>
-      <article className={`${s.card} hero-card`} style={{padding:"22px",borderRadius:24,display:"block",position:"relative",boxShadow:"none"}}>
+      <article className={`${s.card} hero-card`} style={{padding:"22px",borderRadius:24,display:"block",position:"relative",boxShadow:"none",background:"linear-gradient(135deg,#dff5e9,#edf8f3)",border:"1px solid #cbe9d8"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:14}}>
           <div style={{minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8}}>

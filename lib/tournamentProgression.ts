@@ -8,22 +8,21 @@ type Match = {
   group_id: string | null;
   team_a_duo_id: string | null;
   team_b_duo_id: string | null;
-  team_a_score: number | null;
-  team_b_score: number | null;
   winner_duo_id: string | null;
   status: string;
 };
-type Group = { id: string; group_number: number; qualifying_teams: number };
-type GroupDuo = { group_id: string; duo_id: string };
 
-const completed = (status: string | null | undefined) =>
-  status === "COMPLETED" || status === "WALKOVER";
-
+/**
+ * Progress only already-confirmed knockout matches.
+ * Group qualification is intentionally manual: the organiser selects the
+ * qualifying teams and explicitly confirms them before the first knockout
+ * round is populated.
+ */
 export async function syncTournamentProgression(tournamentId: string) {
   const [{ data: tournament }, { data: rounds }, { data: matches }] = await Promise.all([
     supabase
       .from("tournaments")
-      .select("format,group_count,qualifiers_per_group")
+      .select("format")
       .eq("id", tournamentId)
       .single(),
     supabase
@@ -33,7 +32,7 @@ export async function syncTournamentProgression(tournamentId: string) {
       .order("round_number"),
     supabase
       .from("tournament_matches")
-      .select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,team_a_score,team_b_score,winner_duo_id,status")
+      .select("id,round_id,match_number,group_id,team_a_duo_id,team_b_duo_id,winner_duo_id,status")
       .eq("tournament_id", tournamentId)
       .order("match_number"),
   ]);
@@ -43,109 +42,22 @@ export async function syncTournamentProgression(tournamentId: string) {
   const roundRows = rounds as Round[];
   const matchRows = matches as Match[];
 
-  // Group -> knockout: once every group match is complete, seed the first
-  // knockout round from the actual group standings instead of leaving teams TBD.
+  // Never auto-select group qualifiers. The organiser must explicitly confirm
+  // them from the standings/qualification screen first.
   if (tournament.format === "GROUPS_KNOCKOUT") {
-    const groupRound = roundRows.find((r) => r.round_type === "GROUP");
-    const groupMatches = groupRound
-      ? matchRows.filter((m) => m.round_id === groupRound.id)
-      : [];
-
-    if (groupRound && groupMatches.length && groupMatches.every((m) => completed(m.status))) {
+    const groupRounds = roundRows.filter((r) => r.round_type === "GROUP");
+    if (groupRounds.length) {
       const { data: groups } = await supabase
         .from("tournament_groups")
-        .select("id,group_number,qualifying_teams")
-        .eq("tournament_id", tournamentId)
-        .order("group_number");
-
-      const groupIds = (groups || []).map((g) => g.id);
-      const { data: memberships } = groupIds.length
-        ? await supabase
-            .from("tournament_group_duos")
-            .select("group_id,duo_id")
-            .in("group_id", groupIds)
-        : { data: [] as GroupDuo[] };
-
-      const ranked = new Map<string, string[]>();
-      for (const g of (groups || []) as Group[]) {
-        const ids = (memberships || [])
-          .filter((x) => x.group_id === g.id)
-          .map((x) => x.duo_id);
-        const stats = new Map<string, { wins: number; gf: number; ga: number }>();
-        ids.forEach((id) => stats.set(id, { wins: 0, gf: 0, ga: 0 }));
-
-        for (const m of groupMatches.filter((x) => x.group_id === g.id)) {
-          if (!m.team_a_duo_id || !m.team_b_duo_id) continue;
-          const a = stats.get(m.team_a_duo_id);
-          const b = stats.get(m.team_b_duo_id);
-          if (!a || !b) continue;
-          const sa = Number(m.team_a_score ?? 0);
-          const sb = Number(m.team_b_score ?? 0);
-          a.gf += sa;
-          a.ga += sb;
-          b.gf += sb;
-          b.ga += sa;
-          if (sa > sb) a.wins += 1;
-          if (sb > sa) b.wins += 1;
-        }
-
-        ranked.set(
-          g.id,
-          [...stats.entries()]
-            .sort(
-              (a, b) =>
-                b[1].wins - a[1].wins ||
-                (b[1].gf - b[1].ga) - (a[1].gf - a[1].ga) ||
-                b[1].gf - a[1].gf ||
-                a[0].localeCompare(b[0])
-            )
-            .map(([id]) => id)
-            .slice(0, Math.max(1, g.qualifying_teams || tournament.qualifiers_per_group || 1))
-        );
-      }
-
-      const orderedGroups = [...((groups || []) as Group[])].sort(
-        (a, b) => a.group_number - b.group_number
-      );
-      const qpg = Math.max(1, tournament.qualifiers_per_group || 1);
-      const qualifiers: string[] = [];
-
-      if (orderedGroups.length === 2) {
-        for (let seed = 0; seed < qpg; seed++) {
-          const first = ranked.get(orderedGroups[0].id)?.[seed];
-          const second = ranked.get(orderedGroups[1].id)?.[qpg - 1 - seed];
-          if (first) qualifiers.push(first);
-          if (second) qualifiers.push(second);
-        }
-      } else {
-        for (const g of orderedGroups) {
-          qualifiers.push(...(ranked.get(g.id) || []));
-        }
-      }
-
-      const firstKnockoutRound = roundRows.find(
-        (r) => r.round_number > groupRound.round_number && r.round_type !== "GROUP"
-      );
-      if (firstKnockoutRound) {
-        const knockoutMatches = matchRows
-          .filter((m) => m.round_id === firstKnockoutRound.id)
-          .sort((a, b) => a.match_number - b.match_number);
-
-        for (let i = 0; i < knockoutMatches.length; i++) {
-          const nextA = qualifiers[i * 2] || null;
-          const nextB = qualifiers[i * 2 + 1] || null;
-          if (!nextA && !nextB) continue;
-          await supabase
-            .from("tournament_matches")
-            .update({ team_a_duo_id: nextA, team_b_duo_id: nextB })
-            .eq("id", knockoutMatches[i].id);
-        }
-      }
+        .select("id,qualification_confirmed")
+        .eq("tournament_id", tournamentId);
+      if ((groups || []).some((g) => !g.qualification_confirmed)) return;
     }
   }
 
   // Knockout -> knockout: the winner of match N advances to the matching
-  // slot in the next round. This also makes later finals populate naturally.
+  // slot in the next round. Later rounds therefore populate automatically
+  // only after an actual result has been recorded.
   const knockoutRounds = roundRows
     .filter((r) => r.round_type !== "GROUP")
     .sort((a, b) => a.round_number - b.round_number);

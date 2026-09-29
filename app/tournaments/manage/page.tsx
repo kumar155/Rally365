@@ -22,6 +22,7 @@ export default function Dashboard(){
  const[groups,setGroups]=useState("2");
  const[qualifiers,setQualifiers]=useState("2");
  const[saving,setSaving]=useState(false);
+ const[configOpen,setConfigOpen]=useState(false);
 
  useEffect(()=>setId(new URLSearchParams(window.location.search).get("id")||""),[]);
  useEffect(()=>{
@@ -69,24 +70,29 @@ export default function Dashboard(){
  return <main className={s.page}><div className={s.shell}>
   <div className={s.mobileTournamentHeader}><Link href="/tournaments" className={s.iconBack}>‹</Link><strong>{t?.name||"Rally365 Open"}</strong><span className={s.menuDots}>⋮</span></div>
   <section className={s.tournamentHero}><div><div className={s.brand} style={{color:"#d9d07a"}}>RALLY365 OPEN</div><h1>{t?.name||"Rally365 Open"}</h1><p>📅 {date(t?.start_date||null)} &nbsp; · &nbsp; 📍 {t?.venue||"Venue TBD"}</p></div><span className={s.statusBadge}>{t?.status||"UPCOMING"}</span></section>
-  <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("draw")}>Draw</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
+  <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("draw")}>Plan</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
   <div className={s.overviewStats}><div className={s.overviewStat}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
 
   <section className={s.card} style={{marginTop:14}}>
-    <div className={s.sectionHeader}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div>
-    <p className={s.sub} style={{marginBottom:14}}>These settings stay editable from the dashboard at any time.</p>
-    <div className={s.grid2}>
-      <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
-      <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div>
-      <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
-      {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
-    </div>
-    {error&&<div className={s.error}>{error}</div>}
-    {success&&<div className={s.success}>{success}</div>}
-    <div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div>
+    <button type="button" onClick={()=>setConfigOpen(v=>!v)} aria-expanded={configOpen} style={{display:"flex",width:"100%",alignItems:"center",justifyContent:"space-between",background:"none",border:0,padding:0,textAlign:"left",cursor:"pointer",color:"inherit"}}>
+      <div className={s.sectionHeader} style={{margin:0}}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div>
+      <span aria-hidden="true" style={{fontSize:28,lineHeight:1,transform:configOpen?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s ease",marginLeft:16}}>⌄</span>
+    </button>
+    {configOpen&&<>
+      <p className={s.sub} style={{marginTop:14,marginBottom:14}}>These settings stay editable from the dashboard at any time.</p>
+      <div className={s.grid2}>
+        <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
+        <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div>
+        <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
+        {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
+      </div>
+      {error&&<div className={s.error}>{error}</div>}
+      {success&&<div className={s.success}>{success}</div>}
+      <div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div>
+    </>}
   </section>
 
-  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>NEXT UP</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View draw →</Link></div><div className={s.grid2}>{upcoming.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!upcoming.length&&<p className={s.sub}>No matches generated yet.</p>}</section>
-  <div className={s.grid2} style={{marginTop:14}}><Link href={path("draw")} className={s.button}>View draw →</Link><Link href={path("players")} className={`${s.button} ${s.secondary}`}>View players</Link></div>
+  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>NEXT UP</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div className={s.grid2}>{upcoming.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!upcoming.length&&<p className={s.sub}>No matches generated yet.</p>}</section>
+  <div className={s.grid2} style={{marginTop:14}}><Link href={path("draw")} className={s.button}>View plan →</Link><Link href={path("players")} className={`${s.button} ${s.secondary}`}>View players</Link></div>
  </div></main>;
 }

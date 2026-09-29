@@ -48,7 +48,7 @@ export default function Dashboard(){
  },[id]);
 
  const path=(p:string)=>`/tournaments/${p}?id=${encodeURIComponent(id)}`;
- const upcoming=matches.filter(m=>m.status!=="COMPLETED").slice(0,4);
+ const schedulePreview=matches.slice(0,4);
 
  async function saveControls(){
    if(!id)return;
@@ -105,7 +105,7 @@ export default function Dashboard(){
           <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
           <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div>
           <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
-          {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
+          {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div>}
         </div>
         {error&&<div className={s.error}>{error}</div>}
         {success&&<div className={s.success}>{success}</div>}
@@ -114,7 +114,7 @@ export default function Dashboard(){
     </div>
   </section>
 
-  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>NEXT UP</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div className={s.grid2}>{upcoming.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!upcoming.length&&<p className={s.sub}>No matches generated yet.</p>}</section>
+  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div className={s.grid2}>{schedulePreview.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!matches.length&&<p className={s.sub}>No match schedule generated yet.</p>}</section>
   <div className={s.grid2} style={{marginTop:14}}><Link href={path("draw")} className={s.button}>View plan →</Link><Link href={path("players")} className={`${s.button} ${s.secondary}`}>View players</Link></div>
  </div></main>;
 }

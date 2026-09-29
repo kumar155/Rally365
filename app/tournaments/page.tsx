@@ -24,22 +24,23 @@ export default function TournamentsPage(){
   {loading?<div className={s.card}>Loading tournaments…</div>:!visible.length?<div className={s.hero}><h2>No tournaments here yet</h2><p>Create the first Rally365 tournament and add players, partners and a draw.</p><Link className={s.button} href="/tournaments/create" style={{marginTop:14}}>Create tournament</Link></div>:<div className={s.list}>{visible.map(t=>{
     const state=stateLabel(t.status);
     const accent=state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf3f0":"#fff3c4";
+    const metaTag={display:"inline-flex",alignItems:"center",gap:7,padding:"8px 11px",borderRadius:999,border:"1px solid rgba(73,126,105,.16)",background:"rgba(255,255,255,.58)",color:"#526c62",fontSize:12,lineHeight:1,whiteSpace:"nowrap" as const};
     return <Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}>
       <article className={`${s.card} hero-card`} style={{padding:"22px",borderRadius:24,display:"block",position:"relative",boxShadow:"none",background:"linear-gradient(135deg,#dff5e9,#edf8f3)",border:"1px solid #cbe9d8"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:14}}>
           <div style={{minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8,flexWrap:"wrap"}}>
               <span className={s.pill} style={{background:accent,color:state==="LIVE"?"#a33b3b":state==="COMPLETED"?"#60736b":"#6d5710",padding:"7px 12px",fontSize:10}}>{state}</span>
+              <span style={{...metaTag,padding:"7px 11px",background:"rgba(255,255,255,.46)"}}>{formatLabel(t.format)}</span>
             </div>
             <h2 style={{fontSize:29,lineHeight:1.05,margin:"5px 0 6px",letterSpacing:"-1px"}}>{t.name}</h2>
-            <p style={{fontSize:13,color:"#6b7d73",margin:0}}>{formatLabel(t.format)}</p>
           </div>
           <div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap",marginTop:18,paddingTop:13,borderTop:"1px solid rgba(87,125,109,.18)",fontSize:12,color:"#526c62"}}>
-          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><CalendarDays size={16}/> {dateLabel(t.start_date)}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><MapPin size={16}/> {t.venue||"Venue TBD"}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:6}}><UsersRound size={16}/> Rally365</span>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:18,paddingTop:13,borderTop:"1px solid rgba(87,125,109,.18)"}}>
+          <span style={metaTag}><CalendarDays size={16} strokeWidth={1.8}/> {dateLabel(t.start_date)}</span>
+          <span style={metaTag}><MapPin size={16} strokeWidth={1.8}/> {t.venue||"Venue TBD"}</span>
+          <span style={metaTag}><UsersRound size={16} strokeWidth={1.8}/> Rally365</span>
           <ChevronRight size={21} style={{marginLeft:"auto",color:"#078b5c"}}/>
         </div>
       </article>

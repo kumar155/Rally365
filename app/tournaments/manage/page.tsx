@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {CalendarDays,ChevronDown,ChevronRight,Map,Trophy,UsersRound} from "lucide-react";
+import {CalendarDays,ChevronDown,Map,Trophy} from "lucide-react";
 import {supabase} from "../../../lib/supabase";
 import s from "../tournament.module.css";
 
@@ -48,19 +48,11 @@ export default function Dashboard(){
  },[id]);
 
  const path=(p:string)=>`/tournaments/${p}?id=${encodeURIComponent(id)}`;
- const schedulePreview=matches.slice(0,4);
 
  async function saveControls(){
    if(!id)return;
    setSaving(true);setError("");setSuccess("");
-   const payload={
-     partner_mode:partnerMode,
-     format,
-     games_per_match:Number(games)||1,
-     rounds:null,
-     group_count:format==="GROUPS_KNOCKOUT"?Number(groups)||1:null,
-     qualifiers_per_group:format==="GROUPS_KNOCKOUT"?Number(qualifiers)||1:null,
-   };
+   const payload={partner_mode:partnerMode,format,games_per_match:Number(games)||1,rounds:null,group_count:format==="GROUPS_KNOCKOUT"?Number(groups)||1:null,qualifiers_per_group:format==="GROUPS_KNOCKOUT"?Number(qualifiers)||1:null};
    const {data,error:saveError}=await supabase.from("tournaments").update(payload).eq("id",id).select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").single();
    if(saveError){setError(saveError.message);setSaving(false);return;}
    setT(data as T);setSuccess("Tournament configuration saved.");setSaving(false);
@@ -71,50 +63,18 @@ export default function Dashboard(){
  return <main className={s.page}><div className={s.shell}>
   <div className={s.mobileTournamentHeader}><Link href="/tournaments" className={s.iconBack}>‹</Link><strong>{t?.name||"Rally365 Open"}</strong><span className={s.menuDots}>⋮</span></div>
   <section className="hero-card" style={{marginBottom:0,padding:"22px",position:"relative",alignItems:"flex-start",minHeight:0}}>
-    <div style={{minWidth:0,flex:1}}>
-      <div className="eyebrow">RALLY365 OPEN</div>
-      <h1 style={{fontSize:29,letterSpacing:"-1px",margin:"5px 0"}}>{t?.name||"Rally365 Open"}</h1>
-      <p style={{margin:0,color:"#6b7d73",fontSize:13}}>
-        <span style={{display:"inline-flex",alignItems:"center",gap:5}}><CalendarDays size={15}/> {date(t?.start_date||null)}</span>
-        <span style={{margin:"0 7px"}}>·</span>
-        <span style={{display:"inline-flex",alignItems:"center",gap:5}}><Map size={15}/> {t?.venue||"Venue TBD"}</span>
-      </p>
-    </div>
-    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,flex:"0 0 auto"}}>
-      <div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div>
-      <span style={{borderRadius:999,background:"#fff3c4",color:"#6d5710",padding:"7px 12px",fontSize:10,fontWeight:850}}>{t?.status||"UPCOMING"}</span>
-    </div>
+    <div style={{minWidth:0,flex:1}}><div className="eyebrow">RALLY365 OPEN</div><h1 style={{fontSize:29,letterSpacing:"-1px",margin:"5px 0"}}>{t?.name||"Rally365 Open"}</h1><p style={{margin:0,color:"#6b7d73",fontSize:13}}><span style={{display:"inline-flex",alignItems:"center",gap:5}}><CalendarDays size={15}/> {date(t?.start_date||null)}</span><span style={{margin:"0 7px"}}>·</span><span style={{display:"inline-flex",alignItems:"center",gap:5}}><Map size={15}/> {t?.venue||"Venue TBD"}</span></p></div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,flex:"0 0 auto"}}><div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div><span style={{borderRadius:999,background:"#fff3c4",color:"#6d5710",padding:"7px 12px",fontSize:10,fontWeight:850}}>{t?.status||"UPCOMING"}</span></div>
   </section>
-  <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("draw")}>Plan</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
-  <div className={s.overviewStats}>
-    <div className={s.overviewStat} style={{background:"#f0f7ff",borderColor:"#c6def8"}}><strong>⚙</strong><span>{label(t?.format||"")}</span></div>
-    <div className={s.overviewStat} style={{background:"#effcf6",borderColor:"#bcebd2"}}><strong>{counts.teams}</strong><span>Duos</span></div>
-    <div className={s.overviewStat} style={{background:"#f7f1ff",borderColor:"#dcc9f5"}}><strong>₹0</strong><span>Entry fee</span></div>
-    <div className={s.overviewStat} style={{background:"#fff8ed",borderColor:"#f5d9ae"}}><strong>🏸</strong><span>Organized by Rally365</span></div>
-  </div>
+  <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
+  <div className={s.overviewStats}><div className={s.overviewStat} style={{background:"#f0f7ff",borderColor:"#c6def8"}}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat} style={{background:"#effcf6",borderColor:"#bcebd2"}}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat} style={{background:"#f7f1ff",borderColor:"#dcc9f5"}}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat} style={{background:"#fff8ed",borderColor:"#f5d9ae"}}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
 
   <section className={s.card} style={{marginTop:14,overflow:"hidden"}}>
-    <button type="button" onClick={()=>setConfigOpen(v=>!v)} aria-expanded={configOpen} style={{display:"flex",width:"100%",alignItems:"center",justifyContent:"space-between",background:"none",border:0,padding:0,textAlign:"left",cursor:"pointer",color:"inherit"}}>
-      <div className={s.sectionHeader} style={{margin:0}}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div>
-      <span aria-hidden="true" style={{display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,borderRadius:10,color:"#17925a",transition:"transform .2s ease",transform:configOpen?"rotate(180deg)":"rotate(0deg)"}}><ChevronDown size={24}/></span>
-    </button>
-    <div style={{maxHeight:configOpen?1000:0,opacity:configOpen?1:0,overflow:"hidden",transition:"max-height .32s ease, opacity .2s ease",pointerEvents:configOpen?"auto":"none"}}>
-      <div style={{paddingTop:14}}>
-        <p className={s.sub} style={{marginTop:0,marginBottom:14}}>These settings stay editable from the dashboard at any time.</p>
-        <div className={s.grid2}>
-          <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
-          <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div>
-          <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
-          {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
-        </div>
-        {error&&<div className={s.error}>{error}</div>}
-        {success&&<div className={s.success}>{success}</div>}
-        <div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div>
-      </div>
-    </div>
+    <button type="button" onClick={()=>setConfigOpen(v=>!v)} aria-expanded={configOpen} style={{display:"flex",width:"100%",alignItems:"center",justifyContent:"space-between",background:"none",border:0,padding:0,textAlign:"left",cursor:"pointer",color:"inherit"}}><div className={s.sectionHeader} style={{margin:0}}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div><span aria-hidden="true" style={{display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,color:"#17925a",transition:"transform .2s ease",transform:configOpen?"rotate(180deg)":"rotate(0deg)"}}><ChevronDown size={24}/></span></button>
+    <div style={{maxHeight:configOpen?1000:0,opacity:configOpen?1:0,overflow:"hidden",transition:"max-height .32s ease, opacity .2s ease",pointerEvents:configOpen?"auto":"none"}}><div style={{paddingTop:14}}><p className={s.sub} style={{marginTop:0,marginBottom:14}}>These settings stay editable from the dashboard at any time.</p><div className={s.grid2}><div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div><div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div><div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>{format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}</div>{error&&<div className={s.error}>{error}</div>}{success&&<div className={s.success}>{success}</div>}<div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div></div></div>
   </section>
 
-  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div className={s.grid2}>{schedulePreview.map(m=><Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={s.matchTile}><div className={s.matchTileTop}><span>Match {m.match_number}</span><span>{m.scheduled_at?new Date(m.scheduled_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_a_score??"-"}</strong></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><strong className={s.teamScore}>{m.team_b_score??"-"}</strong></div></Link>)}</div>{!matches.length&&<p className={s.sub}>No match schedule generated yet.</p>}</section>
+  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:18,padding:"8px 2px 2px"}}><div><strong style={{fontSize:22}}>{matches.length}</strong><div className={s.sub}>matches scheduled</div></div><div style={{textAlign:"right"}}><strong style={{fontSize:22,color:"#078b5c"}}>{counts.completed}</strong><div className={s.sub}>completed</div></div></div>{matches.length===0&&<p className={s.sub} style={{marginTop:14}}>No match schedule generated yet.</p>}</section>
   <div className={s.grid2} style={{marginTop:14}}><Link href={path("draw")} className={s.button}>View plan →</Link><Link href={path("players")} className={`${s.button} ${s.secondary}`}>View players</Link></div>
  </div></main>;
 }

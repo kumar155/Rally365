@@ -24,19 +24,18 @@ export default function TournamentsPage(){
   {loading?<div className={s.card}>Loading tournaments…</div>:!visible.length?<div className={s.hero}><h2>No tournaments here yet</h2><p>Create the first Rally365 tournament and add players, partners and a draw.</p><Link className={s.button} href="/tournaments/create" style={{marginTop:14}}>Create tournament</Link></div>:<div className={s.list}>{visible.map(t=>{
     const state=stateLabel(t.status);
     const accent=state==="LIVE"?"#fee2e2":state==="COMPLETED"?"#edf3f0":"#fff3c4";
-    const metaTag={display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 9px",borderRadius:999,border:"1px solid rgba(73,126,105,.16)",color:"#526c62",fontSize:11,lineHeight:1,whiteSpace:"nowrap" as const,flex:"0 0 auto"};
+    // Match the compact colored chips used on the Rally365 home screen.
+    const metaTag={display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,padding:"7px 12px",borderRadius:999,border:"1px solid rgba(255,255,255,.9)",color:"#526c62",fontSize:11,lineHeight:1.1,fontWeight:600,whiteSpace:"nowrap" as const,flex:"0 0 auto",boxSizing:"border-box" as const};
     const cardBackground="linear-gradient(135deg,#dff5e9,#edf8f3)";
-    const formatChip={...metaTag,background:"rgba(226,215,248,.72)",borderColor:"rgba(125,91,177,.22)",color:"#66508a"};
-    const dateChip={...metaTag,background:"rgba(215,235,255,.76)",borderColor:"rgba(72,130,184,.2)",color:"#4b6e8c"};
-    const venueChip={...metaTag,background:"rgba(211,245,227,.8)",borderColor:"rgba(39,145,92,.2)",color:"#27815b"};
-    const organizerChip={...metaTag,background:"rgba(232,222,251,.78)",borderColor:"rgba(119,91,173,.2)",color:"#70569b"};
+    const dateChip={...metaTag,background:"rgba(215,235,255,.76)",color:"#4b6e8c"};
+    const venueChip={...metaTag,background:"rgba(211,245,227,.8)",color:"#27815b"};
+    const organizerChip={...metaTag,background:"rgba(232,222,251,.78)",color:"#70569b"};
     return <Link key={t.id} href={`/tournaments/manage?id=${encodeURIComponent(t.id)}`} style={{textDecoration:"none",color:"inherit"}}>
       <article className={`${s.card} hero-card`} style={{padding:"22px",borderRadius:24,display:"block",position:"relative",boxShadow:"none",background:cardBackground,border:"1px solid #cbe9d8"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:14}}>
           <div style={{minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8,flexWrap:"wrap"}}>
               <span className={s.pill} style={{background:accent,color:state==="LIVE"?"#a33b3b":state==="COMPLETED"?"#60736b":"#6d5710",padding:"7px 12px",fontSize:10}}>{state}</span>
-              <span style={formatChip}>{formatLabel(t.format)}</span>
             </div>
             <h2 style={{fontSize:29,lineHeight:1.05,margin:"5px 0 6px",letterSpacing:"-1px"}}>{t.name}</h2>
           </div>

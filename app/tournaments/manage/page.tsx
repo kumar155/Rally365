@@ -6,7 +6,7 @@ import s from "../tournament.module.css";
 
 type T={id:string;name:string;venue:string|null;start_date:string|null;format:string;partner_mode:string;status:string;rounds:number|null;group_count:number|null;qualifiers_per_group:number|null;games_per_match:number|null};
 type M={id:string;match_number:number;scheduled_at:string|null;court:number|null;status:string;team_a_score:number|null;team_b_score:number|null;team_a_duo_id:string|null;team_b_duo_id:string|null;team_a:{name:string}|null;team_b:{name:string}|null};
-const label=(v:string)=>({KNOCKOUT:"Doubles Knockout",ROUND_ROBIN:"Round Robin",GROUPS_KNOCKOUT:"Groups + Knockout",RANDOM_ROUNDS:"Random Rounds"}as Record<string,string>)[v]||v.replaceAll("_"," ");
+const label=(v:string)=>({KNOCKOUT:"Doubles Knockout → final",ROUND_ROBIN:"Round Robin",GROUPS_KNOCKOUT:"Groups → final"}as Record<string,string>)[v]||v.replaceAll("_"," ");
 const date=(v:string|null)=>v?new Date(v).toLocaleDateString("en-IN",{month:"short",day:"numeric",year:"numeric"}):"Date TBD";
 
 export default function Dashboard(){
@@ -19,7 +19,6 @@ export default function Dashboard(){
  const[partnerMode,setPartnerMode]=useState("RANDOM");
  const[format,setFormat]=useState("KNOCKOUT");
  const[games,setGames]=useState("1");
- const[rounds,setRounds]=useState("5");
  const[groups,setGroups]=useState("2");
  const[qualifiers,setQualifiers]=useState("2");
  const[saving,setSaving]=useState(false);
@@ -39,7 +38,6 @@ export default function Dashboard(){
      setPartnerMode(tr.data?.partner_mode||"RANDOM");
      setFormat(tr.data?.format||"KNOCKOUT");
      setGames(String(tr.data?.games_per_match||1));
-     setRounds(String(tr.data?.rounds||5));
      setGroups(String(tr.data?.group_count||2));
      setQualifiers(String(tr.data?.qualifiers_per_group||2));
      setCounts({players:pr.count||0,teams:dr.count||0,matches:mr.data?.length||0,completed:(mr.data||[]).filter(x=>x.status==="COMPLETED").length});
@@ -57,7 +55,7 @@ export default function Dashboard(){
      partner_mode:partnerMode,
      format,
      games_per_match:Number(games)||1,
-     rounds:format==="RANDOM_ROUNDS"?Number(rounds)||1:null,
+     rounds:null,
      group_count:format==="GROUPS_KNOCKOUT"?Number(groups)||1:null,
      qualifiers_per_group:format==="GROUPS_KNOCKOUT"?Number(qualifiers)||1:null,
    };
@@ -79,9 +77,8 @@ export default function Dashboard(){
     <p className={s.sub} style={{marginBottom:14}}>These settings stay editable from the dashboard at any time.</p>
     <div className={s.grid2}>
       <div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div>
-      <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → knockout</option><option value="RANDOM_ROUNDS">Random matches by rounds</option></select></div>
+      <div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div>
       <div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>
-      {format==="RANDOM_ROUNDS"&&<div className={s.field}><label>Number of rounds</label><input className={s.input} type="number" min="1" value={rounds} onChange={e=>setRounds(e.target.value)}/></div>}
       {format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}
     </div>
     {error&&<div className={s.error}>{error}</div>}

@@ -94,21 +94,19 @@ export default function Draw() {
   async function generate() {
     if (!t) return;
     if (matches.length > 0) {
-      setError("Draw is locked because matches have already been scheduled. Complete the existing matches before continuing the tournament.");
+      setError("Plan is locked because matches have already been scheduled. Complete the existing matches before continuing the tournament.");
       return;
     }
     if (duos.length < 2) { setError("Create at least two partner teams first."); return; }
     setBusy(true); setError(""); setDone("");
     try {
-      // Re-check the database immediately before destructive regeneration. This prevents
-      // a stale page from regenerating a draw after another screen has already scheduled it.
       const { count, error: ce } = await supabase
         .from("tournament_matches")
         .select("id", { count: "exact", head: true })
         .eq("tournament_id", id);
       if (ce) throw ce;
       if ((count || 0) > 0) {
-        setError("Draw is locked because matches have already been scheduled.");
+        setError("Plan is locked because matches have already been scheduled.");
         await load();
         return;
       }
@@ -167,8 +165,8 @@ export default function Draw() {
 
       const { error: se } = await supabase.from("tournaments").update({ status: "READY" }).eq("id", id);
       if (se) throw se;
-      setSelectedGroupId("ALL"); setDone("Draw generated successfully."); await load();
-    } catch (e: any) { setError(e?.message || "Could not generate draw"); }
+      setSelectedGroupId("ALL"); setDone("Plan generated successfully."); await load();
+    } catch (e: any) { setError(e?.message || "Could not generate plan"); }
     finally { setBusy(false); }
   }
 
@@ -189,10 +187,10 @@ export default function Draw() {
     <main className={s.page}>
       <div className={ds.drawShell}>
         <div className={ds.mobileHeader}><Link href={path("manage")} className={ds.back}>‹</Link><strong>{t?.name || "Rally365 Open"}</strong><span className={ds.menu}>⋮</span></div>
-        <div className={ds.drawTop}><div><div className={s.brand}>RALLY365 OPEN</div><h1 className={ds.drawTitle}>Draw</h1><p className={s.sub}>{t?.name || "Tournament"}</p></div><Link href={path("manage")} className={s.secondaryButton}>Overview</Link></div>
+        <div className={ds.drawTop}><div><div className={s.brand}>RALLY365 OPEN</div><h1 className={ds.drawTitle}>Plan</h1><p className={s.sub}>{t?.name || "Tournament"}</p></div><Link href={path("manage")} className={s.secondaryButton}>Overview</Link></div>
 
         <nav className={s.tabs}>
-          <Link className={s.tab} href={path("manage")}>Overview</Link><Link className={`${s.tab} ${s.tabActive}`} href={path("draw")}>Draw</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link>
+          <Link className={s.tab} href={path("manage")}>Overview</Link><Link className={`${s.tab} ${s.tabActive}`} href={path("draw")}>Plan</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link>
         </nav>
 
         {error && <div className={s.error}>{error}</div>}{done && <div className={s.success}>{done}</div>}
@@ -231,15 +229,15 @@ export default function Draw() {
               <div className={ds.bracketGrid}>{activeMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; const ap = duoParts(a); const bp = duoParts(b); const prefix = prefixForRound(activeRound.name); return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.drawMatch}><div className={ds.drawMatchMeta}><span>{prefix} {m.match_number}</span><span>Court TBD</span></div><div className={`${ds.drawTeam} ${ds.drawTeamA}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{ap.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{a}</span></span><span className={ds.drawScore}>{m.team_a_score ?? "-"}</span></div><div className={`${ds.drawTeam} ${ds.drawTeamB}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{bp.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{b}</span></span><span className={ds.drawScore}>{m.team_b_score ?? "-"}</span></div></Link>; })}</div>
             </section>
           )
-        ) : <section className={s.card}><h2>No draw yet</h2><p className={s.sub}>Generate the draw after partners are ready.</p></section>}
+        ) : <section className={s.card}><h2>No plan yet</h2><p className={s.sub}>Generate the plan after partners are ready.</p></section>}
 
         <section className={ds.drawActions}>
           {drawLocked ? (
-            <div className={`${s.button} ${s.secondary}`} aria-disabled="true" title="Draw regeneration is locked once matches are scheduled">
-              Draw locked · matches scheduled
+            <div className={`${s.button} ${s.secondary}`} aria-disabled="true" title="Plan regeneration is locked once matches are scheduled">
+              Plan locked · matches scheduled
             </div>
           ) : (
-            <button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate draw"}</button>
+            <button className={s.button} onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate plan"}</button>
           )}
           <Link href={path("schedule")} className={`${s.button} ${s.secondary}`}>View schedule →</Link>
         </section>

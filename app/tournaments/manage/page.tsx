@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
+import {CalendarDays,ChevronRight,Map,Trophy,UsersRound} from "lucide-react";
 import {supabase} from "../../../lib/supabase";
 import s from "../tournament.module.css";
 
@@ -69,7 +70,21 @@ export default function Dashboard(){
  if(!id)return <main className={s.page}><div className={s.shell}><div className={s.card}>Loading tournament…</div></div></main>;
  return <main className={s.page}><div className={s.shell}>
   <div className={s.mobileTournamentHeader}><Link href="/tournaments" className={s.iconBack}>‹</Link><strong>{t?.name||"Rally365 Open"}</strong><span className={s.menuDots}>⋮</span></div>
-  <section className={s.tournamentHero}><div><div className={s.brand} style={{color:"#d9d07a"}}>RALLY365 OPEN</div><h1>{t?.name||"Rally365 Open"}</h1><p>📅 {date(t?.start_date||null)} &nbsp; · &nbsp; 📍 {t?.venue||"Venue TBD"}</p></div><span className={s.statusBadge}>{t?.status||"UPCOMING"}</span></section>
+  <section className="hero-card" style={{marginBottom:0,padding:"22px",position:"relative",alignItems:"flex-start",minHeight:0}}>
+    <div style={{minWidth:0,flex:1}}>
+      <div className="eyebrow">RALLY365 OPEN</div>
+      <h1 style={{fontSize:29,letterSpacing:"-1px",margin:"5px 0"}}>{t?.name||"Rally365 Open"}</h1>
+      <p style={{margin:0,color:"#6b7d73",fontSize:13}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:5}}><CalendarDays size={15}/> {date(t?.start_date||null)}</span>
+        <span style={{margin:"0 7px"}}>·</span>
+        <span style={{display:"inline-flex",alignItems:"center",gap:5}}><Map size={15}/> {t?.venue||"Venue TBD"}</span>
+      </p>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,flex:"0 0 auto"}}>
+      <div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div>
+      <span style={{borderRadius:999,background:"#fff3c4",color:"#6d5710",padding:"7px 12px",fontSize:10,fontWeight:850}}>{t?.status||"UPCOMING"}</span>
+    </div>
+  </section>
   <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("draw")}>Plan</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
   <div className={s.overviewStats}><div className={s.overviewStat}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
 

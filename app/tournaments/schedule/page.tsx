@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
@@ -17,7 +18,7 @@ type Match={id:string;round_id:string|null;group_id:string|null;match_number:num
 const time=(v:string|null)=>v?new Date(v).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Time TBD";
 const roundLabel=(name:string|null,number:number|null)=>name||`Round ${number??""}`;
 
-function resultFor(m:Match,side:"A"|"B"){ 
+function resultFor(m:Match,side:"A"|"B"){
  const winner=m.winner_duo_id;
  if(winner){
    if(side==="A") return winner===m.team_a_duo_id?"WIN":"LOSE";
@@ -49,7 +50,7 @@ function MatchCard({m,duoName,compact=false}:{m:Match;duoName:Map<string,string>
  </Link>;
 }
 
-function RoundAccordion({title,count,defaultOpen=true,children}:{title:string;count:number;defaultOpen?:boolean;children:React.ReactNode}){
+function RoundAccordion({title,count,defaultOpen=true,children}:{title:string;count:number;defaultOpen?:boolean;children:ReactNode}){
  const[open,setOpen]=useState(defaultOpen);
  return <section className={sb.roundAccordion}>
    <button type="button" className={`${sb.roundAccordionHeader} ${open?sb.roundAccordionHeaderOpen:""}`} onClick={()=>setOpen(v=>!v)} aria-expanded={open}>
@@ -87,7 +88,7 @@ function GroupStage({round,matches,groups,duoName}:{round:Round;matches:Match[];
  const grouped=groups.map(g=>({g,m:roundMatches.filter(x=>x.group_id===g.id)})).filter(x=>x.m.length);
  const remaining=roundMatches.filter(m=>!m.group_id);
  return <section className={sb.levelSection}>
-   <RoundAccordion title={`${roundLabel(round.name,round.round_number)}`} count={roundMatches.length}>
+   <RoundAccordion title={roundLabel(round.name,round.round_number)} count={roundMatches.length}>
      {grouped.map(({g,m})=><div className={sb.groupLevel} key={g.id}>
        <div className={sb.groupLevelHeader}><div><span>{g.name}</span><small>{m.length} matches</small></div></div>
        <div className={sb.scheduleGrid}>{m.map(x=><MatchCard key={x.id} m={x} duoName={duoName}/>)}</div>

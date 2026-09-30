@@ -69,3 +69,5 @@ jobs:
           git rm .github/workflows/fix-tournament-dashboard.yml
           git commit -m 'Remove dashboard match schedule and keep configuration expanded'
           git push
+
+# Triggered once more to ensure the one-off workflow runs on the default branch.

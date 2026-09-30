@@ -1066,7 +1066,12 @@ export default function Home() {
     const finesForPlayer = fines.filter(f => f.player_id === p.id).reduce((s, f) => s + Number(f.amount || 0), 0);
     // return { ...p, played: ms.length, w, l: ms.length - w, winRate: ms.length ? Math.round(w / ms.length * 100) : 0, diff: pf - pa, fines, owedExpenses: 0 };
     return { ...p,played: ms.length,w,l: ms.length - w,winRate: ms.length ? Math.round(w / ms.length * 100) : 0,diff: pf - pa,fines: finesForPlayer,owedExpenses: 0};
-  }).sort((a, b) => b.w - a.w || b.winRate - a.winRate), [[players, filteredMatches, fines]]);
+  }).sort(
+    (a, b) =>
+      b.winRate - a.winRate ||
+      b.w - a.w ||
+      b.played - a.played
+  ), [[players, filteredMatches, fines]]);
 
   const finePlayerStats = useMemo(() => players.map(p => {
   const rows = fines.filter(f => f.player_id === p.id);

@@ -19,6 +19,18 @@ export default function Partners() {
 
   useEffect(() => setId(new URLSearchParams(window.location.search).get("id") || ""), []);
 
+  async function loadPlayers() {
+    if (!id) return [] as P[];
+    const { data, error } = await supabase
+      .from("tournament_players")
+      .select("id,display_name")
+      .eq("tournament_id", id)
+      .eq("status", "ACTIVE")
+      .order("display_name");
+    if (error) throw error;
+    return (data as P[]) || [];
+  }
+
   async function load() {
     if (!id) return;
     const [{ data: p, error: pe }, { data: d, error: de }] = await Promise.all([
@@ -39,13 +51,24 @@ export default function Partners() {
   }
 
   async function generateRandom() {
-    if (players.length < 2) return setError("Add at least two players.");
-    if (players.length % 2) return setError("Add one more player so everyone can be paired.");
     setBusy(true);
     setError("");
     try {
+      // Re-read the tournament roster immediately before generating. This avoids
+      // using a stale player count after returning from the Players screen.
+      const freshPlayers = await loadPlayers();
+      setPlayers(freshPlayers);
+
+      if (freshPlayers.length < 2) {
+        throw new Error(`Only ${freshPlayers.length} active player${freshPlayers.length === 1 ? " is" : "s are"} selected. Add at least two players.`);
+      }
+      if (freshPlayers.length % 2) {
+        const needed = 1;
+        throw new Error(`You have ${freshPlayers.length} active players selected. Add ${needed} more player so everyone can be paired.`);
+      }
+
       await clearDraft();
-      const pairs = randomPairs(players);
+      const pairs = randomPairs(freshPlayers);
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
         const { error } = await supabase.from("tournament_duos").insert({
@@ -125,6 +148,7 @@ export default function Partners() {
           <section className={s.hero}>
             <h2>Random draw</h2>
             <p>Shuffle all tournament players and create two-player teams. Regenerating replaces the current active pairs.</p>
+            <div className={s.sub} style={{ marginTop: 10 }}><strong>{players.length} active players selected</strong>{players.length % 2 ? " · 1 more player required" : ` · ${players.length / 2} pairs possible`}</div>
             <button className={s.button} style={{ marginTop: 14, background: "#fff", color: "#08754f" }} disabled={busy} onClick={generateRandom}>{busy ? "Generating…" : "Generate random partners"}</button>
           </section>
         ) : (

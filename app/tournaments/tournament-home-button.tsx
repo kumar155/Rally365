@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { Home } from "lucide-react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function TournamentHomeButton() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const tournamentId = searchParams.get("id");
+  const [tournamentId, setTournamentId] = useState("");
+
+  useEffect(() => {
+    setTournamentId(new URLSearchParams(window.location.search).get("id") || "");
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname !== "/tournaments/manage") return;
@@ -46,9 +49,7 @@ export default function TournamentHomeButton() {
       }
 
       const icon = content?.firstElementChild as HTMLElement | null;
-      if (icon) {
-        icon.style.display = "none";
-      }
+      if (icon) icon.style.display = "none";
 
       const textBlock = content?.children[1] as HTMLElement | null;
       if (textBlock) {

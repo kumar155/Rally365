@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { CalendarDays, ChevronRight, Home, Plus, Trophy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, ChevronRight, Plus, Trophy } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import s from "./tournament.module.css";
 
 type Tournament = {
   id: string;
@@ -16,6 +15,7 @@ type Tournament = {
 };
 
 type MatchStatus = { tournament_id: string; status: string };
+type Filter = "ALL" | "UPCOMING" | "LIVE" | "COMPLETED";
 
 const formatLabel = (value: string) =>
   ({
@@ -28,60 +28,56 @@ const formatLabel = (value: string) =>
 const dateLabel = (value: string | null) =>
   value
     ? new Date(value).toLocaleDateString("en-IN", {
+        day: "2-digit",
         month: "short",
-        day: "numeric",
         year: "numeric",
       })
     : "Date TBD";
 
-const stateLabel = (value: string) =>
-  value === "COMPLETED" || value === "FINISHED"
-    ? "COMPLETED"
-    : value === "LIVE" || value === "IN_PROGRESS"
-      ? "LIVE"
-      : "UPCOMING";
+const stateLabel = (value: string): Exclude<Filter, "ALL"> => {
+  if (value === "COMPLETED" || value === "FINISHED") return "COMPLETED";
+  if (value === "LIVE" || value === "IN_PROGRESS") return "LIVE";
+  return "UPCOMING";
+};
 
-const deriveState = (matches: MatchStatus[]) => {
+const deriveState = (matches: MatchStatus[]): Exclude<Filter, "ALL"> => {
   if (!matches.length) return "UPCOMING";
   if (
     matches.every((match) =>
       ["COMPLETED", "WALKOVER", "CANCELLED"].includes(match.status),
     )
-  )
+  ) {
     return "COMPLETED";
+  }
   if (
     matches.some((match) =>
-      ["LIVE", "IN_PROGRESS", "COMPLETED", "WALKOVER"].includes(
-        match.status,
-      ),
+      ["LIVE", "IN_PROGRESS", "COMPLETED", "WALKOVER"].includes(match.status),
     )
-  )
+  ) {
     return "LIVE";
+  }
   return "UPCOMING";
-};
-
-const statusStyle = (status: string) => {
-  if (status === "LIVE") {
-    return { background: "#e8f7f0", color: "#078b5c" };
-  }
-  if (status === "COMPLETED") {
-    return { background: "#f0f4f2", color: "#65776f" };
-  }
-  return { background: "#eef5ff", color: "#3b6fa8" };
 };
 
 export default function TournamentsPage() {
   const [items, setItems] = useState<Tournament[]>([]);
-  const [filter, setFilter] = useState("ALL");
+  const [filter, setFilter] = useState<Filter>("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
+      setLoading(true);
+      setError("");
+
       const { data, error: tournamentError } = await supabase
         .from("tournaments")
         .select("id,name,start_date,venue,format,status")
         .order("created_at", { ascending: false });
+
+      if (!active) return;
 
       if (tournamentError) {
         setError(tournamentError.message);
@@ -92,12 +88,15 @@ export default function TournamentsPage() {
 
       const rows = (data || []) as Tournament[];
       const ids = rows.map((tournament) => tournament.id);
+
       const { data: matchRows } = ids.length
         ? await supabase
             .from("tournament_matches")
             .select("tournament_id,status")
             .in("tournament_id", ids)
         : { data: [] as MatchStatus[] };
+
+      if (!active) return;
 
       const grouped = new Map<string, MatchStatus[]>();
       ((matchRows || []) as MatchStatus[]).forEach((match) => {
@@ -116,8 +115,9 @@ export default function TournamentsPage() {
 
       await Promise.all(
         reconciled
-          .filter((tournament, index) =>
-            tournament.status !== stateLabel(rows[index].status),
+          .filter(
+            (tournament, index) =>
+              tournament.status !== stateLabel(rows[index].status),
           )
           .map((tournament) =>
             supabase
@@ -127,224 +127,171 @@ export default function TournamentsPage() {
           ),
       );
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const visible = items.filter(
-    (tournament) =>
-      filter === "ALL" || filter === stateLabel(tournament.status),
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      upcoming: items.filter((item) => stateLabel(item.status) === "UPCOMING").length,
+      live: items.filter((item) => stateLabel(item.status) === "LIVE").length,
+      completed: items.filter((item) => stateLabel(item.status) === "COMPLETED").length,
+    }),
+    [items],
+  );
+
+  const visible = useMemo(
+    () =>
+      items.filter(
+        (item) => filter === "ALL" || stateLabel(item.status) === filter,
+      ),
+    [filter, items],
   );
 
   return (
-    <main className={s.page}>
-      <div className={s.shell}>
-        <div className={s.mobileTournamentHeader}>
-          <Link
-            href="/"
-            aria-label="Go to Rally365 home"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#09251c",
-              textDecoration: "none",
-            }}
-          >
-            <Home size={20} strokeWidth={1.8} />
-          </Link>
-          <strong>RALLY365</strong>
+    <div className="app-shell">
+      <main className="content">
+        <div className="page-heading">
+          <div className="eyebrow">COMPETITIONS</div>
+          <h1>Tournaments</h1>
+          <p>Manage Rally365 tournaments, draws, matches and standings.</p>
+        </div>
+
+        <div className="money-grid">
+          <div>
+            <b>{counts.all}</b>
+            <small>Tournaments</small>
+          </div>
+          <div>
+            <b>{counts.live}</b>
+            <small>Live</small>
+          </div>
+          <div>
+            <b>{counts.upcoming}</b>
+            <small>Upcoming</small>
+          </div>
+        </div>
+
+        <div className="section-title">
+          <span>Tournament list</span>
           <Link
             href="/tournaments/create"
-            aria-label="Create tournament"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#078b5c",
-            }}
+            className="secondary-button"
+            style={{ gap: 6, textDecoration: "none" }}
           >
-            <Plus size={21} strokeWidth={2} />
+            <Plus size={14} /> Create
           </Link>
         </div>
 
-        <header
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: 16,
-            margin: "18px 0 16px",
-          }}
-        >
-          <div>
-            <div className={s.eyebrow}>COMPETITIONS</div>
-            <h1 className={s.title}>Tournaments</h1>
-            <p className={s.sub}>All Rally365 competitions in one place.</p>
-          </div>
-          <Link className={s.button} href="/tournaments/create">
-            <Plus size={16} /> Create
-          </Link>
-        </header>
-
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 4,
-            background: "#eef3f1",
-            padding: 4,
-            borderRadius: 12,
-            marginBottom: 14,
-          }}
+          className="range-toggle"
+          style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
+          role="tablist"
+          aria-label="Tournament status"
         >
-          {[
-            ["ALL", "All"],
-            ["UPCOMING", "Upcoming"],
-            ["LIVE", "Live"],
-            ["COMPLETED", "Completed"],
-          ].map(([value, label]) => (
+          {(
+            [
+              ["ALL", "All"],
+              ["UPCOMING", "Upcoming"],
+              ["LIVE", "Live"],
+              ["COMPLETED", "Done"],
+            ] as [Filter, string][]
+          ).map(([value, label]) => (
             <button
               key={value}
+              type="button"
+              className={filter === value ? "active" : ""}
               onClick={() => setFilter(value)}
-              style={{
-                border: 0,
-                borderRadius: 9,
-                padding: "9px 5px",
-                background: filter === value ? "#078b5c" : "transparent",
-                color: filter === value ? "#fff" : "#65776f",
-                fontSize: 10,
-                fontWeight: 850,
-                cursor: "pointer",
-              }}
+              style={{ fontSize: 10, padding: "9px 3px" }}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {error && <div className={s.error}>{error}</div>}
+        {error && <div className="error-banner">{error}</div>}
 
         {loading ? (
-          <div className={s.card}>Loading tournaments…</div>
+          <div className="empty-card">Loading tournaments…</div>
         ) : !visible.length ? (
-          <section className={s.card} style={{ padding: 22, textAlign: "center" }}>
-            <Trophy
-              size={32}
-              strokeWidth={1.7}
-              style={{ color: "#078b5c", marginBottom: 8 }}
-            />
-            <h2 style={{ fontSize: 20, margin: "0 0 6px" }}>
+          <div className="empty-card">
+            <Trophy size={30} style={{ color: "#15985c", marginBottom: 8 }} />
+            <div style={{ fontWeight: 800, color: "#10231a" }}>
               No tournaments here yet
-            </h2>
-            <p style={{ color: "#71857d", fontSize: 12, margin: 0 }}>
+            </div>
+            <div style={{ marginTop: 5, fontSize: 12 }}>
               Create a tournament to start managing players, draws and matches.
-            </p>
+            </div>
             <Link
-              className={s.button}
               href="/tournaments/create"
-              style={{ marginTop: 14 }}
+              className="primary-button"
+              style={{ width: "auto", display: "inline-flex", marginTop: 14 }}
             >
               Create tournament
             </Link>
-          </section>
+          </div>
         ) : (
-          <section
-            style={{
-              border: "1px solid #e1ebe7",
-              borderRadius: 18,
-              overflow: "hidden",
-              background: "#fff",
-            }}
-          >
+          <div className="stats-table">
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "34px minmax(0, 1fr) 145px 118px 24px",
-                gap: 8,
-                alignItems: "center",
-                padding: "10px 14px",
-                background: "#f2f7f4",
-                color: "#72867e",
-                fontSize: 9,
-                fontWeight: 900,
-                letterSpacing: ".12em",
-                textTransform: "uppercase",
-              }}
+              className="table-head"
+              style={{ gridTemplateColumns: "28px minmax(0,1fr) 78px 72px 18px" }}
             >
               <span>#</span>
-              <span>Tournament</span>
-              <span>Date</span>
-              <span>Status</span>
+              <span>TOURNAMENT</span>
+              <span>DATE</span>
+              <span>STATUS</span>
               <span />
             </div>
 
             {visible.map((tournament, index) => {
               const state = stateLabel(tournament.status);
+              const statusColor =
+                state === "LIVE"
+                  ? "#15985c"
+                  : state === "COMPLETED"
+                    ? "#718078"
+                    : "#3b6fa8";
+
               return (
                 <Link
                   key={tournament.id}
                   href={`/tournaments/manage?id=${encodeURIComponent(tournament.id)}`}
+                  className="monthly-row"
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "34px minmax(0, 1fr) 145px 118px 24px",
-                    gap: 8,
-                    alignItems: "center",
-                    minHeight: 68,
-                    padding: "10px 14px",
-                    borderTop: "1px solid #e7efec",
-                    background: index % 2 ? "#fbfcfc" : "#fff",
-                    color: "#09251c",
+                    gridTemplateColumns: "28px minmax(0,1fr) 78px 72px 18px",
                     textDecoration: "none",
+                    color: "#10231a",
                   }}
                 >
-                  <strong style={{ color: "#078b5c", fontSize: 13 }}>
-                    {index + 1}
-                  </strong>
-                  <div style={{ minWidth: 0 }}>
+                  <span className="rank">{index + 1}</span>
+                  <span className="player-name">
                     <strong
                       style={{
                         display: "block",
                         fontSize: 13,
-                        whiteSpace: "nowrap",
+                        fontWeight: 800,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {tournament.name}
                     </strong>
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 3,
-                        color: "#7a8b84",
-                        fontSize: 9,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
+                    <small>
                       {formatLabel(tournament.format)}
                       {tournament.venue ? ` · ${tournament.venue}` : ""}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      color: "#52675f",
-                      fontSize: 10,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <CalendarDays size={14} strokeWidth={1.8} />
+                    </small>
+                  </span>
+                  <span style={{ fontSize: 10, color: "#52675f", fontWeight: 700 }}>
+                    <CalendarDays size={12} style={{ verticalAlign: "-2px", marginRight: 3 }} />
                     {dateLabel(tournament.start_date)}
                   </span>
                   <span
                     style={{
-                      ...statusStyle(state),
-                      justifySelf: "start",
-                      borderRadius: 999,
-                      padding: "6px 9px",
+                      color: statusColor,
                       fontSize: 9,
                       fontWeight: 900,
                       letterSpacing: ".04em",
@@ -352,17 +299,13 @@ export default function TournamentsPage() {
                   >
                     {state}
                   </span>
-                  <ChevronRight
-                    size={17}
-                    strokeWidth={2}
-                    style={{ color: "#789087" }}
-                  />
+                  <ChevronRight size={16} style={{ color: "#94a29b" }} />
                 </Link>
               );
             })}
-          </section>
+          </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -40,7 +40,10 @@ export default function CreateTournament() {
       setBusy(false);
       return;
     }
-    router.push(`/tournaments/players?id=${encodeURIComponent(data.id)}`);
+
+    // Creation only establishes the tournament identity. The organiser configures
+    // players, format, partners and scheduling from the tournament dashboard.
+    router.push(`/tournaments/manage?id=${encodeURIComponent(data.id)}`);
   }
 
   return (
@@ -69,7 +72,7 @@ export default function CreateTournament() {
           {error && <div className={s.error}>{error}</div>}
           <div className={s.footerActions}>
             <a href="/tournaments" className={`${s.button} ${s.secondary}`}>Cancel</a>
-            <button className={s.button} disabled={busy}>{busy ? "Creating…" : "Continue to players →"}</button>
+            <button className={s.button} disabled={busy}>{busy ? "Creating…" : "Continue to dashboard →"}</button>
           </div>
         </form>
       </div>

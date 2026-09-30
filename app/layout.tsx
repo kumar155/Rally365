@@ -3,7 +3,6 @@ import "./globals.css";
 import "./loading-splash.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 import LeaderboardGuestOrder from "./leaderboard-guest-order";
-import BottomNavInteractionFix from "./bottom-nav-interaction-fix";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -21,7 +20,6 @@ export default function RootLayout({
         {children}
         <TournamentNavBridge />
         <LeaderboardGuestOrder />
-        <BottomNavInteractionFix />
       </body>
     </html>
   );

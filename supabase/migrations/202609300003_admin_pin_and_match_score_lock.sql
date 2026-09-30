@@ -39,6 +39,7 @@ begin
 
   if existing_hash is null then
     -- The first lock establishes the tournament's 6-digit admin PIN.
+    perform set_config('rally365.admin_lock_change', '1', true);
     update public.tournaments
        set admin_pin_hash = supplied_hash,
            is_locked = true
@@ -105,30 +106,34 @@ set search_path = ''
 as $$
 declare
   tournament_locked boolean;
+  score_or_result_change boolean;
 begin
-  if tg_op = 'UPDATE' and old.status = 'COMPLETED' then
-    if new.team_a_score is distinct from old.team_a_score
-       or new.team_b_score is distinct from old.team_b_score
-       or new.status is distinct from old.status
-       or new.winner_duo_id is distinct from old.winner_duo_id
-       or new.team_a_duo_id is distinct from old.team_a_duo_id
-       or new.team_b_duo_id is distinct from old.team_b_duo_id then
-      select is_locked into tournament_locked
-        from public.tournaments
-       where id = old.tournament_id;
+  select is_locked into tournament_locked
+    from public.tournaments
+   where id = coalesce(new.tournament_id, old.tournament_id);
 
-      if coalesce(tournament_locked, false) = true then
-        raise exception 'Tournament is locked. Completed match scores cannot be changed.';
-      end if;
+  if tg_op = 'UPDATE' then
+    score_or_result_change :=
+      new.team_a_score is distinct from old.team_a_score
+      or new.team_b_score is distinct from old.team_b_score
+      or new.status is distinct from old.status
+      or new.winner_duo_id is distinct from old.winner_duo_id
+      or new.team_a_duo_id is distinct from old.team_a_duo_id
+      or new.team_b_duo_id is distinct from old.team_b_duo_id;
 
-      if coalesce(current_setting('rally365.admin_match_change', true), '') <> '1' then
-        raise exception 'Match score is locked. Admin PIN is required for corrections.';
-      end if;
+    if coalesce(tournament_locked, false) = true and score_or_result_change then
+      raise exception 'Tournament is locked. Match changes are disabled.';
+    end if;
+
+    if old.status = 'COMPLETED' and score_or_result_change
+       and coalesce(current_setting('rally365.admin_match_change', true), '') <> '1' then
+      raise exception 'Match score is locked. Admin PIN is required for corrections.';
     end if;
   end if;
 
   if tg_op = 'DELETE' and old.status = 'COMPLETED' then
-    if coalesce(current_setting('rally365.admin_match_change', true), '') <> '1' then
+    if coalesce(tournament_locked, false) = true
+       or coalesce(current_setting('rally365.admin_match_change', true), '') <> '1' then
       raise exception 'Completed matches cannot be deleted without the admin PIN.';
     end if;
   end if;
@@ -158,19 +163,24 @@ declare
   tournament_id uuid;
   expected_hash text;
   supplied_hash text;
+  tournament_locked boolean;
 begin
   if p_pin is null or p_pin !~ '^[0-9]{6}$' then
     raise exception 'Admin PIN must be exactly 6 digits.';
   end if;
 
-  select m.tournament_id, t.admin_pin_hash
-    into tournament_id, expected_hash
+  select m.tournament_id, t.admin_pin_hash, t.is_locked
+    into tournament_id, expected_hash, tournament_locked
     from public.tournament_matches m
     join public.tournaments t on t.id = m.tournament_id
    where m.id = p_match_id;
 
   if tournament_id is null then
     raise exception 'Match not found.';
+  end if;
+
+  if tournament_locked then
+    raise exception 'Tournament is locked. Unlock the tournament before correcting a score.';
   end if;
 
   if expected_hash is null then

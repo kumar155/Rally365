@@ -12,7 +12,7 @@ import {
   Search,
   Save,
   ShieldCheck,
-  Sitemap,
+  Stamp,
   Trophy,
   Users,
 } from "lucide-react";
@@ -132,7 +132,7 @@ export default function TournamentManagePage() {
 
     {tab === "overview" && <div style={{ display: "grid", gap: 12 }}>
       <div className={s.overviewStats}>
-        <div className={s.overviewStat} style={{ background: "#eff6ff", borderColor: "#c7def7" }}><Sitemap size={18} color="#2563eb" /><strong style={{ fontSize: 12, marginTop: 6 }}>{formatLabel(tournament?.format || "")}</strong><span>Format</span></div>
+        <div className={s.overviewStat} style={{ background: "#eff6ff", borderColor: "#c7def7" }}><Stamp size={18} color="#2563eb" /><strong style={{ fontSize: 12, marginTop: 6 }}>{formatLabel(tournament?.format || "")}</strong><span>Format</span></div>
         <div className={s.overviewStat} style={{ background: "#ecfdf5", borderColor: "#b9ead2" }}><Users size={18} color="#15985c" /><strong>{duos.length}</strong><span>Duos</span></div>
         <div className={s.overviewStat} style={{ background: "#faf5ff", borderColor: "#dfc8f5" }}><strong style={{ fontSize: 16 }}>₹0</strong><span>Entry</span></div>
         <div className={s.overviewStat} style={{ background: "#fff7ed", borderColor: "#f3d7ad" }}><Trophy size={18} color="#b45309" /><strong>{matches.length}</strong><span>Matches</span></div>
@@ -168,5 +168,5 @@ function Counter({ label, value, onChange }: { label: string; value: string; onC
 
 function MatchTile({ match }: { match: Match }) {
   const status = statusLabel(match.status);
-  return <article className={s.matchTile}><div className={s.matchTileTop}><span>MATCH {match.match_number}</span><span>{match.court ? `Court ${match.court}` : timeLabel(match.scheduled_at)}</span></div><div className={s.teamLine}><span className={s.teamName}>{match.team_a?.name || "Team A"}</span><strong className={s.teamScore}>{match.team_a_score ?? "–"}</strong></div><div className={s.teamLine}><span className={s.teamName}>{match.team_b?.name || "Team B"}</span><strong className={s.teamScore}>{match.team_b_score ?? "–"}</strong></div><div className={s.matchTileBottom}><span className={`${s.matchStatusIcon} ${status === "COMPLETED" ? s.completed : status === "LIVE" ? s.live : s.scheduled}`}>{status === "COMPLETED" ? "✓" : status === "LIVE" ? "•" : "○"}</span><span>{status}</span><ChevronRight className={s.chevron} size={15} /></div></article>;
+  return <article className={s.matchTile}><div className={s.matchTileTop}><span>MATCH {match.match_number}</span><span>{match.court ? `Court ${match.court}` : timeLabel(match.scheduled_at)}</span></div><div className={s.teamLine}><span className={s.teamName}>{match.team_a?.name || "Team A"}</span><strong className={s.teamScore}>{match.team_a_score ?? "–"}</strong></div><div className={s.teamLine}><span className={s.teamName}>{match.team_b?.name || "Team B"}</span><strong className={s.teamScore}>{match.team_b?.name ? match.team_b_score ?? "–" : match.team_b_score ?? "–"}</strong></div><div className={s.matchTileBottom}><span className={`${s.matchStatusIcon} ${status === "COMPLETED" ? s.completed : status === "LIVE" ? s.live : s.scheduled}`}>{status === "COMPLETED" ? "✓" : status === "LIVE" ? "•" : "○"}</span><span>{status}</span><ChevronRight className={s.chevron} size={15} /></div></article>;
 }

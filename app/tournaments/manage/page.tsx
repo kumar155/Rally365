@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarCheck2, ChevronDown, ChevronLeft, ChevronRight, Lock, MapPin, Search, Save, ShieldCheck, Stamp, Trophy, Unlock, Users } from "lucide-react";
+import { CalendarCheck2, ChevronLeft, ChevronRight, Lock, MapPin, Search, Save, ShieldCheck, Stamp, Trophy, Unlock, Users } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import s from "../tournament.module.css";
 
@@ -32,7 +32,6 @@ export default function TournamentManagePage() {
   const [duos, setDuos] = useState<Duo[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
-  const [configOpen, setConfigOpen] = useState(false);
   const [sheet, setSheet] = useState<"partner" | "format" | null>(null);
   const [partnerMode, setPartnerMode] = useState("RANDOM");
   const [format, setFormat] = useState("KNOCKOUT");
@@ -131,7 +130,6 @@ export default function TournamentManagePage() {
     setAdminPin("");
     setConfirmPin("");
     setDirty(false);
-    setConfigOpen(false);
     setSuccess(action === "LOCK" ? "Tournament locked. Configuration, players, draw and score changes are now disabled." : "Tournament unlocked with admin PIN. Protected tournament changes are enabled again.");
     await load();
     setLocking(false);
@@ -166,10 +164,13 @@ export default function TournamentManagePage() {
 
     {tab === "overview" && <div style={{ display: "grid", gap: 12 }}>
       <div className={s.overviewStats}><div className={s.overviewStat} style={{ background: "#eff6ff", borderColor: "#c7def7" }}><Stamp size={18} color="#2563eb" /><strong style={{ fontSize: 12, marginTop: 6 }}>{formatLabel(tournament?.format || "")}</strong><span>Format</span></div><div className={s.overviewStat} style={{ background: "#ecfdf5", borderColor: "#b9ead2" }}><Users size={18} color="#15985c" /><strong>{duos.length}</strong><span>Duos</span></div><div className={s.overviewStat} style={{ background: "#faf5ff", borderColor: "#dfc8f5" }}><strong style={{ fontSize: 16 }}>₹0</strong><span>Entry</span></div><div className={s.overviewStat} style={{ background: "#fff7ed", borderColor: "#f3d7ad" }}><Trophy size={18} color="#b45309" /><strong>{matches.length}</strong><span>Matches</span></div></div>
-      <section className={s.card} style={{ padding: 14 }}><button type="button" disabled={locked} onClick={() => setConfigOpen((v) => !v)} style={{ width: "100%", border: 0, background: "none", padding: 0, display: "flex", alignItems: "center", justifyContent: "space-between", color: locked ? "#8a9691" : "inherit", textAlign: "left", cursor: locked ? "not-allowed" : "pointer" }}><div><div className={s.eyebrow}>TOURNAMENT RULES</div><h2 style={{ fontSize: 16, margin: "4px 0 0" }}>Tournament configuration</h2></div><ChevronDown size={19} color={locked ? "#9aa7a1" : "#15985c"} style={{ transform: configOpen ? "rotate(180deg)" : "none" }} /></button>
-        {configOpen && !locked && <div style={{ marginTop: 14, display: "grid", gap: 8 }}><button type="button" onClick={() => setSheet("partner")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>PARTNER MODE</small><b style={{ fontSize: 11 }}>{partnerMode === "RANDOM" ? "Random Partners (Auto-assigned)" : "Already fixed partners"}</b></span><ChevronRight size={16} color="#94a29b" /></button><button type="button" onClick={() => setSheet("format")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>FORMAT MODE</small><b style={{ fontSize: 11 }}>{formatLabel(format)}</b></span><ChevronRight size={16} color="#94a29b" /></button><div style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12 }}><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", marginBottom: 7 }}>GAMES PER MATCH</small><div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4, background: "#e7ece9", borderRadius: 10, padding: 4 }}>{["1", "3", "5"].map(v => <button key={v} type="button" onClick={() => { setGames(v); markDirty(); }} style={{ border: 0, borderRadius: 8, padding: "7px 3px", background: games === v ? "#fff" : "transparent", color: games === v ? "#15985c" : "#65766f", fontSize: 9, fontWeight: 900 }}>{v === "1" ? "1 Game" : `Best of ${v}`}</button>)}</div></div>{format === "GROUPS_KNOCKOUT" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><Counter label="Groups" value={groups} onChange={(v) => { setGroups(v); markDirty(); }} /><Counter label="Qualifiers" value={qualifiers} onChange={(v) => { setQualifiers(v); markDirty(); }} /></div>}</div>}
+      <section className={s.card} style={{ padding: 14 }}>
+        <div>
+          <div className={s.eyebrow}>TOURNAMENT RULES</div>
+          <h2 style={{ fontSize: 16, margin: "4px 0 0" }}>Tournament configuration</h2>
+        </div>
+        {!locked && <div style={{ marginTop: 14, display: "grid", gap: 8 }}><button type="button" onClick={() => setSheet("partner")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>PARTNER MODE</small><b style={{ fontSize: 11 }}>{partnerMode === "RANDOM" ? "Random Partners (Auto-assigned)" : "Already fixed partners"}</b></span><ChevronRight size={16} color="#94a29b" /></button><button type="button" onClick={() => setSheet("format")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>FORMAT MODE</small><b style={{ fontSize: 11 }}>{formatLabel(format)}</b></span><ChevronRight size={16} color="#94a29b" /></button><div style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12 }}><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", marginBottom: 7 }}>GAMES PER MATCH</small><div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4, background: "#e7ece9", borderRadius: 10, padding: 4 }}>{["1", "3", "5"].map(v => <button key={v} type="button" onClick={() => { setGames(v); markDirty(); }} style={{ border: 0, borderRadius: 8, padding: "7px 3px", background: games === v ? "#fff" : "transparent", color: games === v ? "#15985c" : "#65766f", fontSize: 9, fontWeight: 900 }}>{v === "1" ? "1 Game" : `Best of ${v}`}</button>)}</div></div>{format === "GROUPS_KNOCKOUT" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><Counter label="Groups" value={groups} onChange={(v) => { setGroups(v); markDirty(); }} /><Counter label="Qualifiers" value={qualifiers} onChange={(v) => { setQualifiers(v); markDirty(); }} /></div>}</div>}
       </section>
-      <section className={s.card} style={{ padding: 14 }}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2 style={{ fontSize: 16 }}>Match schedule</h2></div><span style={{ color: "#15985c", fontSize: 10 }}>{matches.length} Total Matches</span></div>{matches.slice(0, 3).map(m => <MatchTile key={m.id} match={m} />)}{!matches.length && <p className={s.sub}>No match schedule generated yet.</p>}</section>
       {!locked && dirty && <div style={{ position: "sticky", bottom: 8, zIndex: 5 }}><button type="button" className={s.button} onClick={saveConfig} disabled={saving} style={{ width: "100%", borderRadius: 15, boxShadow: "0 10px 25px rgba(8,139,92,.25)" }}><Save size={15} />{saving ? "Saving…" : "Save Configuration Changes"}</button></div>}
     </div>}
 

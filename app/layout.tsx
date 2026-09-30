@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./loading-splash.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
+import LeaderboardGuestOrder from "./leaderboard-guest-order";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body>
         {children}
         <TournamentNavBridge />
+        <LeaderboardGuestOrder />
       </body>
     </html>
   );

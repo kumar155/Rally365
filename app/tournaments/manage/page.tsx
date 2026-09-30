@@ -1,80 +1,172 @@
 "use client";
+
 import Link from "next/link";
-import {useEffect,useState} from "react";
-import {CalendarDays,ChevronDown,MapPin,Trophy} from "lucide-react";
-import {supabase} from "../../../lib/supabase";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CalendarCheck2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  MoreVertical,
+  Search,
+  Save,
+  ShieldCheck,
+  Sitemap,
+  Trophy,
+  Users,
+} from "lucide-react";
+import { supabase } from "../../../lib/supabase";
 import s from "../tournament.module.css";
 
-type T={id:string;name:string;venue:string|null;start_date:string|null;format:string;partner_mode:string;status:string;rounds:number|null;group_count:number|null;qualifiers_per_group:number|null;games_per_match:number|null};
-type M={id:string;match_number:number;scheduled_at:string|null;court:number|null;status:string;team_a_score:number|null;team_b_score:number|null;team_a_duo_id:string|null;team_b_duo_id:string|null;team_a:{name:string}|null;team_b:{name:string}|null};
-const label=(v:string)=>({KNOCKOUT:"Doubles Knockout → final",ROUND_ROBIN:"Round Robin",GROUPS_KNOCKOUT:"Groups → final"}as Record<string,string>)[v]||v.replaceAll("_"," ");
-const date=(v:string|null)=>v?new Date(v).toLocaleDateString("en-IN",{month:"short",day:"numeric",year:"numeric"}):"Date TBD";
+type Tournament = {
+  id: string; name: string; venue: string | null; start_date: string | null;
+  format: string; partner_mode: string; status: string; rounds: number | null;
+  group_count: number | null; qualifiers_per_group: number | null; games_per_match: number | null;
+};
+type Match = {
+  id: string; match_number: number; scheduled_at: string | null; court: number | null;
+  status: string; team_a_score: number | null; team_b_score: number | null;
+  team_a_duo_id: string | null; team_b_duo_id: string | null;
+  team_a: { name: string } | null; team_b: { name: string } | null;
+};
+type Player = { id: string; display_name: string; avatar_url: string | null; status: string };
+type Duo = { id: string; name: string };
+type Tab = "overview" | "matches" | "standings" | "players";
+type Standing = { id: string; name: string; played: number; wins: number; losses: number; points: number };
 
-export default function Dashboard(){
- const[id,setId]=useState("");
- const[t,setT]=useState<T|null>(null);
- const[matches,setMatches]=useState<M[]>([]);
- const[counts,setCounts]=useState({players:0,teams:0,matches:0,completed:0});
- const[error,setError]=useState("");
- const[success,setSuccess]=useState("");
- const[partnerMode,setPartnerMode]=useState("RANDOM");
- const[format,setFormat]=useState("KNOCKOUT");
- const[games,setGames]=useState("1");
- const[groups,setGroups]=useState("2");
- const[qualifiers,setQualifiers]=useState("2");
- const[saving,setSaving]=useState(false);
- const[configOpen,setConfigOpen]=useState(false);
+const formatLabel = (value: string) => ({ KNOCKOUT: "Single Elimination", ROUND_ROBIN: "Round Robin", GROUPS_KNOCKOUT: "Groups → Final" } as Record<string, string>)[value] || value.replaceAll("_", " ");
+const dateLabel = (value: string | null) => value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Date TBD";
+const timeLabel = (value: string | null) => value ? new Date(value).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : "Schedule TBD";
+const statusLabel = (value: string) => value === "COMPLETED" ? "COMPLETED" : value === "LIVE" || value === "IN_PROGRESS" ? "LIVE" : "SCHEDULED";
 
- useEffect(()=>setId(new URLSearchParams(window.location.search).get("id")||""),[]);
- useEffect(()=>{
-   if(!id)return;
-   (async()=>{
-     const[tr,pr,dr,mr]=await Promise.all([
-       supabase.from("tournaments").select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").eq("id",id).single(),
-       supabase.from("tournament_players").select("id",{count:"exact",head:true}).eq("tournament_id",id),
-       supabase.from("tournament_duos").select("id",{count:"exact",head:true}).eq("tournament_id",id),
-       supabase.from("tournament_matches").select("id,match_number,scheduled_at,court,status,team_a_score,team_b_score,team_a_duo_id,team_b_duo_id,team_a:tournament_duos!tournament_matches_team_a_duo_id_fkey(name),team_b:tournament_duos!tournament_matches_team_b_duo_id_fkey(name)").eq("tournament_id",id).order("match_number")
-     ]);
-     if(tr.error){setError(tr.error.message);return}
-     setT(tr.data as T);
-     setPartnerMode(tr.data?.partner_mode||"RANDOM");
-     setFormat(tr.data?.format||"KNOCKOUT");
-     setGames(String(tr.data?.games_per_match||1));
-     setGroups(String(tr.data?.group_count||2));
-     setQualifiers(String(tr.data?.qualifiers_per_group||2));
-     setCounts({players:pr.count||0,teams:dr.count||0,matches:mr.data?.length||0,completed:(mr.data||[]).filter(x=>x.status==="COMPLETED").length});
-     setMatches((mr.data||[])as any);
-   })();
- },[id]);
+export default function TournamentManagePage() {
+  const [id, setId] = useState("");
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [duos, setDuos] = useState<Duo[]>([]);
+  const [tab, setTab] = useState<Tab>("overview");
+  const [search, setSearch] = useState("");
+  const [configOpen, setConfigOpen] = useState(false);
+  const [sheet, setSheet] = useState<"partner" | "format" | null>(null);
+  const [partnerMode, setPartnerMode] = useState("RANDOM");
+  const [format, setFormat] = useState("KNOCKOUT");
+  const [games, setGames] = useState("1");
+  const [groups, setGroups] = useState("2");
+  const [qualifiers, setQualifiers] = useState("1");
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
- const path=(p:string)=>`/tournaments/${p}?id=${encodeURIComponent(id)}`;
+  useEffect(() => setId(new URLSearchParams(window.location.search).get("id") || ""), []);
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    (async () => {
+      const [tr, mr, pr, dr] = await Promise.all([
+        supabase.from("tournaments").select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").eq("id", id).single(),
+        supabase.from("tournament_matches").select("id,match_number,scheduled_at,court,status,team_a_score,team_b_score,team_a_duo_id,team_b_duo_id,team_a:tournament_duos!tournament_matches_team_a_duo_id_fkey(name),team_b:tournament_duos!tournament_matches_team_b_duo_id_fkey(name)").eq("tournament_id", id).order("match_number"),
+        supabase.from("tournament_players").select("id,display_name,avatar_url,status").eq("tournament_id", id).eq("status", "ACTIVE").order("created_at"),
+        supabase.from("tournament_duos").select("id,name").eq("tournament_id", id).order("created_at"),
+      ]);
+      if (!active) return;
+      if (tr.error) { setError(tr.error.message); return; }
+      const next = tr.data as Tournament;
+      setTournament(next); setPartnerMode(next.partner_mode || "RANDOM"); setFormat(next.format || "KNOCKOUT");
+      setGames(String(next.games_per_match || 1)); setGroups(String(next.group_count || 2)); setQualifiers(String(next.qualifiers_per_group || 1));
+      setMatches((mr.data || []) as unknown as Match[]); setPlayers((pr.data || []) as Player[]); setDuos((dr.data || []) as Duo[]); setDirty(false);
+    })();
+    return () => { active = false; };
+  }, [id]);
 
- async function saveControls(){
-   if(!id)return;
-   setSaving(true);setError("");setSuccess("");
-   const payload={partner_mode:partnerMode,format,games_per_match:Number(games)||1,rounds:null,group_count:format==="GROUPS_KNOCKOUT"?Number(groups)||1:null,qualifiers_per_group:format==="GROUPS_KNOCKOUT"?Number(qualifiers)||1:null};
-   const {data,error:saveError}=await supabase.from("tournaments").update(payload).eq("id",id).select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").single();
-   if(saveError){setError(saveError.message);setSaving(false);return;}
-   setT(data as T);setSuccess("Tournament configuration saved.");setSaving(false);
- }
+  const completed = matches.filter((m) => statusLabel(m.status) === "COMPLETED").length;
+  const progress = matches.length ? Math.round((completed / matches.length) * 100) : 0;
+  const standings = useMemo<Standing[]>(() => {
+    const map = new Map<string, Standing>();
+    duos.forEach((d) => map.set(d.id, { id: d.id, name: d.name, played: 0, wins: 0, losses: 0, points: 0 }));
+    matches.forEach((m) => {
+      if (m.status !== "COMPLETED" || !m.team_a_duo_id || !m.team_b_duo_id || m.team_a_score == null || m.team_b_score == null) return;
+      const a = map.get(m.team_a_duo_id); const b = map.get(m.team_b_duo_id); if (!a || !b) return;
+      a.played += 1; b.played += 1;
+      if (m.team_a_score > m.team_b_score) { a.wins += 1; a.points += 2; b.losses += 1; }
+      else if (m.team_b_score > m.team_a_score) { b.wins += 1; b.points += 2; a.losses += 1; }
+    });
+    return [...map.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name));
+  }, [duos, matches]);
+  const filteredPlayers = players.filter((p) => p.display_name.toLowerCase().includes(search.toLowerCase()));
+  const markDirty = () => { setDirty(true); setSuccess(""); };
 
- if(error&&!t)return <main className={s.page}><div className={s.shell}><div className={s.error}>{error}</div></div></main>;
- if(!id)return <main className={s.page}><div className={s.shell}><div className={s.card}>Loading tournament…</div></div></main>;
- return <main className={s.page}><div className={s.shell}>
-  <div className={s.mobileTournamentHeader}><Link href="/tournaments" className={s.iconBack}>‹</Link><strong>{t?.name||"Rally365 Open"}</strong><span className={s.menuDots}>⋮</span></div>
-  <section className="hero-card" style={{marginBottom:0,padding:"22px",position:"relative",alignItems:"flex-start",minHeight:0}}>
-    <div style={{minWidth:0,flex:1}}><div className="eyebrow">RALLY365 OPEN</div><h1 style={{fontSize:29,letterSpacing:"-1px",margin:"5px 0"}}>{t?.name||"Rally365 Open"}</h1><p style={{margin:0,color:"#6b7d73",fontSize:13}}><span style={{display:"inline-flex",alignItems:"center",gap:5}}><CalendarDays size={15}/> {date(t?.start_date||null)}</span><span style={{margin:"0 7px"}}>·</span><span style={{display:"inline-flex",alignItems:"center",gap:5}}><MapPin size={15}/> {t?.venue||"Venue TBD"}</span></p></div>
-    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,flex:"0 0 auto"}}><div style={{width:58,height:58,borderRadius:18,background:"rgba(255,255,255,.72)",display:"flex",alignItems:"center",justifyContent:"center",color:"#1a9b60"}}><Trophy size={32} strokeWidth={1.7}/></div><span style={{borderRadius:999,background:"#fff3c4",color:"#6d5710",padding:"7px 12px",fontSize:10,fontWeight:850}}>{t?.status||"UPCOMING"}</span></div>
-  </section>
-  <nav className={s.tabs}><Link className={`${s.tab} ${s.tabActive}`} href={path("manage")}>Overview</Link><Link className={s.tab} href={path("matches")}>Matches</Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link></nav>
-  <div className={s.overviewStats}><div className={s.overviewStat} style={{background:"#f0f7ff",borderColor:"#c6def8"}}><strong>⚙</strong><span>{label(t?.format||"")}</span></div><div className={s.overviewStat} style={{background:"#effcf6",borderColor:"#bcebd2"}}><strong>{counts.teams}</strong><span>Duos</span></div><div className={s.overviewStat} style={{background:"#f7f1ff",borderColor:"#dcc9f5"}}><strong>₹0</strong><span>Entry fee</span></div><div className={s.overviewStat} style={{background:"#fff8ed",borderColor:"#f5d9ae"}}><strong>🏸</strong><span>Organized by Rally365</span></div></div>
+  async function saveConfig() {
+    if (!id) return; setSaving(true); setError(""); setSuccess("");
+    const payload = { partner_mode: partnerMode, format, games_per_match: Number(games) || 1, rounds: null, group_count: format === "GROUPS_KNOCKOUT" ? Number(groups) || 1 : null, qualifiers_per_group: format === "GROUPS_KNOCKOUT" ? Number(qualifiers) || 1 : null };
+    const { data, error: saveError } = await supabase.from("tournaments").update(payload).eq("id", id).select("id,name,venue,start_date,format,partner_mode,status,rounds,group_count,qualifiers_per_group,games_per_match").single();
+    if (saveError) setError(saveError.message); else { setTournament(data as Tournament); setDirty(false); setSuccess("Tournament settings saved."); }
+    setSaving(false);
+  }
 
-  <section className={s.card} style={{marginTop:14,overflow:"hidden"}}>
-    <button type="button" onClick={()=>setConfigOpen(v=>!v)} aria-expanded={configOpen} style={{display:"flex",width:"100%",alignItems:"center",justifyContent:"space-between",background:"none",border:0,padding:0,textAlign:"left",cursor:"pointer",color:"inherit"}}><div className={s.sectionHeader} style={{margin:0}}><div><div className={s.eyebrow}>TOURNAMENT CONFIGURATION</div><h2>Tournament configuration</h2></div></div><span aria-hidden="true" style={{display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,color:"#17925a",transition:"transform .2s ease",transform:configOpen?"rotate(180deg)":"rotate(0deg)"}}><ChevronDown size={24}/></span></button>
-    <div style={{maxHeight:configOpen?1000:0,opacity:configOpen?1:0,overflow:"hidden",transition:"max-height .32s ease, opacity .2s ease",pointerEvents:configOpen?"auto":"none"}}><div style={{paddingTop:14}}><p className={s.sub} style={{marginTop:0,marginBottom:14}}>These settings stay editable from the dashboard at any time.</p><div className={s.grid2}><div className={s.field}><label>Partner mode</label><select className={s.select} value={partnerMode} onChange={e=>setPartnerMode(e.target.value)}><option value="RANDOM">Random partners</option><option value="FIXED">Already fixed partners</option></select></div><div className={s.field}><label>Tournament format</label><select className={s.select} value={format} onChange={e=>setFormat(e.target.value)}><option value="KNOCKOUT">All knockout → final</option><option value="ROUND_ROBIN">Round robin</option><option value="GROUPS_KNOCKOUT">Groups → final</option></select></div><div className={s.field}><label>Games per match</label><select className={s.select} value={games} onChange={e=>setGames(e.target.value)}><option value="1">1 game</option><option value="3">Best of 3</option></select></div>{format==="GROUPS_KNOCKOUT"&&<><div className={s.field}><label>Number of groups</label><input className={s.input} type="number" min="1" value={groups} onChange={e=>setGroups(e.target.value)}/></div><div className={s.field}><label>Qualifiers per group</label><input className={s.input} type="number" min="1" value={qualifiers} onChange={e=>setQualifiers(e.target.value)}/></div></>}</div>{error&&<div className={s.error}>{error}</div>}{success&&<div className={s.success}>{success}</div>}<div className={s.actions}><button className={s.button} onClick={saveControls} disabled={saving}>{saving?"Saving…":"Save tournament configuration"}</button></div></div></div>
-  </section>
+  if (!id) return <main className={s.page}><div className={s.shell}><div className={s.card}>Tournament ID is missing.</div></div></main>;
+  if (error && !tournament) return <main className={s.page}><div className={s.shell}><div className={s.error}>{error}</div></div></main>;
 
-  <section className={s.card} style={{marginTop:14}}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2>Match schedule</h2></div><Link href={path("draw")} className={s.secondaryButton}>View plan →</Link></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:18,padding:"8px 2px 2px"}}><div><strong style={{fontSize:22}}>{matches.length}</strong><div className={s.sub}>matches scheduled</div></div><div style={{textAlign:"right"}}><strong style={{fontSize:22,color:"#078b5c"}}>{counts.completed}</strong><div className={s.sub}>completed</div></div></div>{matches.length===0&&<p className={s.sub} style={{marginTop:14}}>No match schedule generated yet.</p>}</section>
-  <div className={s.grid2} style={{marginTop:14}}><Link href={path("draw")} className={s.button}>View plan →</Link><Link href={path("players")} className={`${s.button} ${s.secondary}`}>View players</Link></div>
- </div></main>;
+  return <main className={s.page} style={{ paddingTop: 8 }}><div className={s.shell} style={{ maxWidth: 440 }}>
+    <header style={{ height: 48, display: "grid", gridTemplateColumns: "40px 1fr 40px", alignItems: "center", textAlign: "center", marginBottom: 2 }}>
+      <Link href="/tournaments" aria-label="Back" style={{ width: 40, height: 40, borderRadius: 20, background: "#fff", border: "1px solid #e2ebe7", display: "flex", alignItems: "center", justifyContent: "center", color: "#17352a" }}><ChevronLeft size={18} /></Link>
+      <div><div className={s.eyebrow} style={{ fontSize: 8 }}>RALLY365 OPEN</div><strong style={{ fontSize: 13 }}>{tournament?.name || "Tournament"}</strong></div>
+      <button type="button" aria-label="More" style={{ width: 40, height: 40, borderRadius: 20, background: "#fff", border: "1px solid #e2ebe7", display: "flex", alignItems: "center", justifyContent: "center", color: "#17352a" }}><MoreVertical size={18} /></button>
+    </header>
+
+    <section style={{ background: "linear-gradient(135deg,#166534 0%,#14532d 52%,#0f172a 100%)", color: "#fff", borderRadius: 24, padding: 20, position: "relative", overflow: "hidden", boxShadow: "0 8px 24px rgba(8,45,28,.16)" }}>
+      <Trophy size={110} style={{ position: "absolute", right: -16, bottom: -25, opacity: .07 }} />
+      <div style={{ position: "relative", zIndex: 1 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", fontSize: 9, fontWeight: 900 }}><span style={{ width: 7, height: 7, borderRadius: 99, background: tournament?.status === "COMPLETED" ? "#86efac" : "#facc15" }} />{tournament?.status || "UPCOMING"}</span>
+        <span style={{ padding: "6px 9px", borderRadius: 9, background: "rgba(0,0,0,.2)", color: "#bbf7d0", fontSize: 9, fontWeight: 800 }}><ShieldCheck size={11} style={{ verticalAlign: -2 }} /> Vega Club</span>
+      </div><h1 style={{ fontSize: 27, lineHeight: 1, margin: "18px 0 8px", letterSpacing: "-.04em" }}>{tournament?.name || "Tournament"}</h1><div style={{ display: "flex", gap: 9, flexWrap: "wrap", color: "#d1fae5", fontSize: 10, fontWeight: 700 }}><span><CalendarCheck2 size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{dateLabel(tournament?.start_date || null)}</span><span>•</span><span><MapPin size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{tournament?.venue || "Venue TBD"}</span></div>
+      <div style={{ marginTop: 18 }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: "#bbf7d0", marginBottom: 5 }}><span>Tournament Progress</span><span>{progress}% Completed</span></div><div style={{ height: 7, borderRadius: 99, background: "rgba(0,0,0,.35)", overflow: "hidden" }}><div style={{ width: `${progress}%`, height: "100%", borderRadius: 99, background: "#34d399" }} /></div></div></div>
+    </section>
+
+    <div style={{ margin: "10px 0 12px", background: "#e9eeeb", border: "1px solid #dce5e0", borderRadius: 18, padding: 5, display: "flex", gap: 4, overflowX: "auto" }}>
+      {([["overview", "Overview"], ["matches", `Matches${matches.length ? ` · ${matches.length}` : ""}`], ["standings", "Standings"], ["players", `Players${players.length ? ` · ${players.length}` : ""}`]] as [Tab, string][]).map(([value, label]) => <button key={value} type="button" onClick={() => setTab(value)} style={{ flex: "1 0 auto", border: 0, borderRadius: 13, padding: "9px 11px", background: tab === value ? "#fff" : "transparent", color: tab === value ? "#15985c" : "#61736b", fontSize: 10, fontWeight: 900, boxShadow: tab === value ? "0 2px 7px rgba(20,60,42,.08)" : "none" }}>{label}</button>)}
+    </div>
+    {error && <div className={s.error}>{error}</div>}{success && <div className={s.success}>{success}</div>}
+
+    {tab === "overview" && <div style={{ display: "grid", gap: 12 }}>
+      <div className={s.overviewStats}>
+        <div className={s.overviewStat} style={{ background: "#eff6ff", borderColor: "#c7def7" }}><Sitemap size={18} color="#2563eb" /><strong style={{ fontSize: 12, marginTop: 6 }}>{formatLabel(tournament?.format || "")}</strong><span>Format</span></div>
+        <div className={s.overviewStat} style={{ background: "#ecfdf5", borderColor: "#b9ead2" }}><Users size={18} color="#15985c" /><strong>{duos.length}</strong><span>Duos</span></div>
+        <div className={s.overviewStat} style={{ background: "#faf5ff", borderColor: "#dfc8f5" }}><strong style={{ fontSize: 16 }}>₹0</strong><span>Entry</span></div>
+        <div className={s.overviewStat} style={{ background: "#fff7ed", borderColor: "#f3d7ad" }}><Trophy size={18} color="#b45309" /><strong>{matches.length}</strong><span>Matches</span></div>
+      </div>
+      <section className={s.card} style={{ padding: 14 }}><button type="button" onClick={() => setConfigOpen((v) => !v)} style={{ width: "100%", border: 0, background: "none", padding: 0, display: "flex", alignItems: "center", justifyContent: "space-between", color: "inherit", textAlign: "left" }}><div><div className={s.eyebrow}>TOURNAMENT RULES</div><h2 style={{ fontSize: 16, margin: "4px 0 0" }}>Tournament configuration</h2></div><ChevronDown size={19} color="#15985c" style={{ transform: configOpen ? "rotate(180deg)" : "none" }} /></button>
+        {configOpen && <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <button type="button" onClick={() => setSheet("partner")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>PARTNER MODE</small><b style={{ fontSize: 11 }}>{partnerMode === "RANDOM" ? "Random Partners (Auto-assigned)" : "Already fixed partners"}</b></span><ChevronRight size={16} color="#94a29b" /></button>
+          <button type="button" onClick={() => setSheet("format")} style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}><span><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em" }}>FORMAT MODE</small><b style={{ fontSize: 11 }}>{formatLabel(format)}</b></span><ChevronRight size={16} color="#94a29b" /></button>
+          <div style={{ border: "1px solid #e0e9e5", background: "#f7faf8", borderRadius: 14, padding: 12 }}><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", marginBottom: 7 }}>GAMES PER MATCH</small><div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4, background: "#e7ece9", borderRadius: 10, padding: 4 }}>{["1", "3", "5"].map(v => <button key={v} type="button" onClick={() => { setGames(v); markDirty(); }} style={{ border: 0, borderRadius: 8, padding: "7px 3px", background: games === v ? "#fff" : "transparent", color: games === v ? "#15985c" : "#65766f", fontSize: 9, fontWeight: 900 }}>{v === "1" ? "1 Game" : `Best of ${v}`}</button>)}</div></div>
+          {format === "GROUPS_KNOCKOUT" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><Counter label="Groups" value={groups} onChange={(v) => { setGroups(v); markDirty(); }} /><Counter label="Qualifiers" value={qualifiers} onChange={(v) => { setQualifiers(v); markDirty(); }} /></div>}
+        </div>}
+      </section>
+      <section className={s.card} style={{ padding: 14 }}><div className={s.sectionHeader}><div><div className={s.eyebrow}>MATCH SCHEDULE</div><h2 style={{ fontSize: 16 }}>Match schedule</h2></div><span style={{ color: "#15985c", fontSize: 10 }}>{matches.length} Total Matches</span></div>{matches.slice(0, 3).map(m => <MatchTile key={m.id} match={m} />)}{!matches.length && <p className={s.sub}>No match schedule generated yet.</p>}</section>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><button type="button" className={s.button} onClick={() => setTab("matches")}>View Matches</button><button type="button" className={`${s.button} ${s.secondary}`} onClick={() => setTab("standings")}>View Standings</button></div>
+    </div>}
+
+    {tab === "matches" && <section style={{ display: "grid", gap: 9 }}><div style={{ padding: "0 2px" }}><div className={s.eyebrow}>MATCHES</div><h2 style={{ fontSize: 18, margin: "4px 0" }}>Match schedule</h2><p className={s.sub}>{matches.length} matches · {completed} completed</p></div>{matches.map(m => <MatchTile key={m.id} match={m} />)}{!matches.length && <div className={s.card}>No matches scheduled yet.</div>}</section>}
+
+    {tab === "standings" && <section style={{ display: "grid", gap: 10 }}><div style={{ padding: "0 2px" }}><div className={s.eyebrow}>STANDINGS</div><h2 style={{ fontSize: 18, margin: "4px 0" }}>Leaderboard</h2><p className={s.sub}>Points and match results from recorded scores.</p></div><div className={s.leaderboardCard} style={{ padding: 0, overflow: "hidden" }}><div style={{ background: "#f2f7f4", padding: "9px 10px", display: "grid", gridTemplateColumns: "25px 1fr 35px 35px 35px", color: "#72867e", fontSize: 8, fontWeight: 900 }}><span>#</span><span>DUO</span><span>P</span><span>W</span><span>PTS</span></div>{standings.map((row, i) => <div key={row.id} style={{ display: "grid", gridTemplateColumns: "25px 1fr 35px 35px 35px", alignItems: "center", padding: "10px", borderTop: "1px solid #e7efec", background: i === 0 ? "#f4fbf7" : "#fff", fontSize: 10 }}><b style={{ color: i === 0 ? "#15985c" : "#72867e" }}>{i + 1}</b><strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.name}</strong><span>{row.played}</span><span>{row.wins}</span><b style={{ color: "#006a47" }}>{row.points}</b></div>)}{!standings.length && <div style={{ padding: 18, color: "#71857d", fontSize: 11 }}>No duos yet.</div>}</div></section>}
+
+    {tab === "players" && <section style={{ display: "grid", gap: 9 }}><div style={{ position: "relative" }}><Search size={14} color="#94a29b" style={{ position: "absolute", left: 12, top: 13 }} /><input className={s.input} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search players or teams..." style={{ paddingLeft: 34, borderRadius: 15 }} /></div><div className={s.playerList}>{filteredPlayers.map(p => <div className={s.playerRow} key={p.id}><div className={s.playerRowIdentity}><div className={s.avatar}>{p.avatar_url ? <img src={p.avatar_url} alt="" /> : p.display_name.charAt(0).toUpperCase()}</div><div><strong>{p.display_name}</strong><span>{p.status === "ACTIVE" ? "Active in tournament" : p.status}</span></div></div><ChevronRight size={16} color="#94a29b" /></div>)}{!filteredPlayers.length && <div style={{ padding: 18, textAlign: "center", color: "#71857d", fontSize: 11 }}>No players found.</div>}</div></section>}
+
+    {dirty && <div style={{ position: "sticky", bottom: 8, marginTop: 12, zIndex: 5 }}><button type="button" className={s.button} onClick={saveConfig} disabled={saving} style={{ width: "100%", borderRadius: 15, boxShadow: "0 10px 25px rgba(8,139,92,.25)" }}><Save size={15} />{saving ? "Saving…" : "Save Configuration Changes"}</button></div>}
+
+    {sheet && <div role="dialog" aria-modal="true" onClick={() => setSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.48)", backdropFilter: "blur(3px)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}><div onClick={e => e.stopPropagation()} style={{ width: "min(440px,100%)", background: "#fff", borderRadius: "26px 26px 0 0", padding: 20, boxShadow: "0 -12px 35px rgba(0,0,0,.16)" }}><div style={{ width: 48, height: 5, background: "#d7dfdb", borderRadius: 99, margin: "-3px auto 16px" }} /><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}><h3 style={{ margin: 0, fontSize: 16 }}>{sheet === "partner" ? "Select Partner Mode" : "Select Tournament Format"}</h3><button type="button" onClick={() => setSheet(null)} style={{ border: 0, background: "#eef3f1", width: 32, height: 32, borderRadius: 99 }}>×</button></div>{(sheet === "partner" ? [["RANDOM", "Random Partners (Auto-assigned)"], ["FIXED", "Already fixed partners"]] : [["KNOCKOUT", "Single Elimination"], ["ROUND_ROBIN", "Round Robin"], ["GROUPS_KNOCKOUT", "Groups → Final"]]).map(([value, label]) => <button key={value} type="button" onClick={() => { if (sheet === "partner") setPartnerMode(value); else setFormat(value); markDirty(); setSheet(null); }} style={{ width: "100%", border: "1px solid #e0e9e5", background: ((sheet === "partner" ? partnerMode : format) === value) ? "#eaf8f1" : "#f8faf9", borderRadius: 14, padding: 13, marginTop: 7, textAlign: "left", fontSize: 11, fontWeight: 800, color: "#17352a" }}>{label}{((sheet === "partner" ? partnerMode : format) === value) && <span style={{ float: "right", color: "#15985c" }}>✓</span>}</button>)}</div></div>}
+  </div></main>;
+}
+
+function Counter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const current = Math.max(1, Number(value) || 1);
+  return <div style={{ padding: 11, background: "#f7faf8", border: "1px solid #e0e9e5", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}><div><small style={{ display: "block", color: "#81918b", fontSize: 8, fontWeight: 900 }}>{label}</small><b style={{ fontSize: 12 }}>{current}</b></div><div style={{ display: "flex", gap: 4 }}><button type="button" onClick={() => onChange(String(Math.max(1, current - 1)))} style={{ width: 27, height: 27, border: 0, borderRadius: 8, background: "#e3e9e6", fontWeight: 900 }}>−</button><button type="button" onClick={() => onChange(String(current + 1))} style={{ width: 27, height: 27, border: 0, borderRadius: 8, background: "#e3e9e6", fontWeight: 900 }}>+</button></div></div>;
+}
+
+function MatchTile({ match }: { match: Match }) {
+  const status = statusLabel(match.status);
+  return <article className={s.matchTile}><div className={s.matchTileTop}><span>MATCH {match.match_number}</span><span>{match.court ? `Court ${match.court}` : timeLabel(match.scheduled_at)}</span></div><div className={s.teamLine}><span className={s.teamName}>{match.team_a?.name || "Team A"}</span><strong className={s.teamScore}>{match.team_a_score ?? "–"}</strong></div><div className={s.teamLine}><span className={s.teamName}>{match.team_b?.name || "Team B"}</span><strong className={s.teamScore}>{match.team_b_score ?? "–"}</strong></div><div className={s.matchTileBottom}><span className={`${s.matchStatusIcon} ${status === "COMPLETED" ? s.completed : status === "LIVE" ? s.live : s.scheduled}`}>{status === "COMPLETED" ? "✓" : status === "LIVE" ? "•" : "○"}</span><span>{status}</span><ChevronRight className={s.chevron} size={15} /></div></article>;
 }

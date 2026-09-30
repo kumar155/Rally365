@@ -23,7 +23,13 @@ export default function Players() {
     setDirectory((allPlayers as DirectoryPlayer[]) || []); setMembers((tournamentPlayers as TournamentPlayer[]) || []); setLocked(!!tournament?.is_locked);
   }
   useEffect(() => { load(); }, [id]);
-  async function addExisting(player: DirectoryPlayer) { if (!id || locked) return; setBusyId(player.id); setError(""); const { error: insertError } = await supabase.from("tournament_players").insert({ tournament_id: id, directory_player_id: player.id, display_name: player.display_name, avatar_url: player.avatar_url, status: "ACTIVE" }); if (insertError && insertError.code !== "23505") setError(insertError.message); await load(); setBusyId(null); }
+  async function addExisting(player: DirectoryPlayer) {
+    if (!id || locked) return;
+    setBusyId(player.id); setError("");
+    const { error: upsertError } = await supabase.from("tournament_players").upsert({ tournament_id: id, directory_player_id: player.id, display_name: player.display_name, avatar_url: player.avatar_url, status: "ACTIVE" }, { onConflict: "tournament_id,directory_player_id" });
+    if (upsertError) setError(upsertError.message);
+    await load(); setBusyId(null);
+  }
   async function addNew(e: React.FormEvent) { e.preventDefault(); const displayName = name.trim(); if (!id || !displayName || locked) return; setBusyId("new"); setError(""); try { const { data: directoryPlayer, error: directoryError } = await supabase.from("tournament_player_directory").upsert({ display_name: displayName }, { onConflict: "display_name" }).select("id,display_name,avatar_url").single(); if (directoryError || !directoryPlayer) throw directoryError || new Error("Could not create player."); const { error: membershipError } = await supabase.from("tournament_players").upsert({ tournament_id: id, directory_player_id: directoryPlayer.id, display_name: directoryPlayer.display_name, avatar_url: directoryPlayer.avatar_url, status: "ACTIVE" }, { onConflict: "tournament_id,directory_player_id" }); if (membershipError) throw membershipError; setName(""); setShowAdd(false); await load(); } catch (e: any) { setError(e?.message || "Could not add player."); } finally { setBusyId(null); } }
   async function removeFromTournament(player: TournamentPlayer) { if (!id || locked) return; setBusyId(player.directory_player_id); setError(""); const { error: removeError } = await supabase.from("tournament_players").delete().eq("id", player.id).eq("tournament_id", id); if (removeError) setError(removeError.message); await load(); setBusyId(null); }
   const memberIds = useMemo(() => new Set(members.map((p) => p.directory_player_id)), [members]); const filtered = directory.filter((p) => p.display_name.toLowerCase().includes(search.toLowerCase())); const path = (p: string) => `/tournaments/${p}?id=${encodeURIComponent(id)}`;

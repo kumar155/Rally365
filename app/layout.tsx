@@ -18,6 +18,13 @@ export default function RootLayout({
       <body>
         {children}
         <TournamentNavBridge />
+        <style>{`
+          /* Temporarily hide Fines by player without removing its implementation. */
+          .section-title:has(+ .stats-table .fine-player-header),
+          .stats-table:has(.fine-player-header) {
+            display: none !important;
+          }
+        `}</style>
       </body>
     </html>
   );

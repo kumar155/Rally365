@@ -12,6 +12,24 @@ type Match = {
   status: string;
 };
 
+async function syncTournamentStatus(tournamentId: string, matches: Match[]) {
+  // Tournament lifecycle is derived from match progress:
+  // - LIVE once a match is live or at least one match has been completed.
+  // - COMPLETED once every generated match is terminal.
+  // - UPCOMING while no match has started.
+  const terminal = new Set(["COMPLETED", "WALKOVER", "CANCELLED"]);
+  const hasMatches = matches.length > 0;
+  const allTerminal = hasMatches && matches.every((m) => terminal.has(m.status));
+  const inProgress = matches.some((m) => m.status === "LIVE") || matches.some((m) => terminal.has(m.status));
+  const nextStatus = allTerminal ? "COMPLETED" : inProgress ? "LIVE" : "UPCOMING";
+
+  await supabase
+    .from("tournaments")
+    .update({ status: nextStatus })
+    .eq("id", tournamentId)
+    .neq("status", "CANCELLED");
+}
+
 /**
  * Progress only already-confirmed knockout matches.
  * Group qualification is intentionally manual: the organiser selects the
@@ -41,6 +59,10 @@ export async function syncTournamentProgression(tournamentId: string) {
 
   const roundRows = rounds as Round[];
   const matchRows = matches as Match[];
+
+  // Keep lifecycle state synchronized even when group qualification is still
+  // locked and knockout progression must intentionally stop here.
+  await syncTournamentStatus(tournamentId, matchRows);
 
   // Never auto-select group qualifiers. The organiser must explicitly confirm
   // them from the standings/qualification screen first.
@@ -83,21 +105,4 @@ export async function syncTournamentProgression(tournamentId: string) {
         .eq("id", target.id);
     }
   }
-
-  // Tournament lifecycle is derived from match progress:
-  // - LIVE once a match is live or at least one match has been completed.
-  // - COMPLETED once every generated match is terminal.
-  // - UPCOMING while no match has started.
-  // This keeps the tournament list in sync automatically whenever a score is saved.
-  const terminal = new Set(["COMPLETED", "WALKOVER", "CANCELLED"]);
-  const hasMatches = matchRows.length > 0;
-  const allTerminal = hasMatches && matchRows.every((m) => terminal.has(m.status));
-  const inProgress = matchRows.some((m) => m.status === "LIVE") || matchRows.some((m) => terminal.has(m.status));
-  const nextStatus = allTerminal ? "COMPLETED" : inProgress ? "LIVE" : "UPCOMING";
-
-  await supabase
-    .from("tournaments")
-    .update({ status: nextStatus })
-    .eq("id", tournamentId)
-    .neq("status", "CANCELLED");
 }

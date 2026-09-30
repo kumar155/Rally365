@@ -1,0 +1,57 @@
+name: Fix task bar tabs once
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'Fix task bar tab navigation') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch task bar tabs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app/page.tsx')
+          text = path.read_text()
+
+          old_state = '''  const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");'''
+          new_state = '''  const [taskView, setTaskView] = useState<"tasks" | "history">("tasks");
+  const [taskKindFilter, setTaskKindFilter] = useState<"rivalry" | "partnership" | "streak" | "milestone" | "performance" | null>(null);'''
+
+          old_tasks = '''  const selectedDailyTasks = taskPlayerId ? (dailyTasksByPlayer.get(taskPlayerId) || []) : [];'''
+          new_tasks = '''  const selectedDailyTasks = taskPlayerId
+    ? (dailyTasksByPlayer.get(taskPlayerId) || []).filter(task => !taskKindFilter || task.kind === taskKindFilter)
+    : [];'''
+
+          old_tags = '''<div className={`home-task-tag home-task-tag-${kind}`}>{kind === "rivalry" ? "Rivalries" : kind === "partnership" ? "Partnerships" : kind === "streak" ? "Streaks" : kind === "milestone" ? "Milestones" : "Performance"}</span>'''
+          new_tags = '''<button type="button" className={`home-task-tag home-task-tag-${kind}`} onClick={e => { e.stopPropagation(); setTaskKindFilter(kind as "rivalry" | "partnership" | "streak" | "milestone" | "performance"); setTaskView("tasks"); setTab("tasks"); }}>{kind === "rivalry" ? "Rivalries" : kind === "partnership" ? "Partnerships" : kind === "streak" ? "Streaks" : kind === "milestone" ? "Milestones" : "Performance"}</button>'''
+
+          if old_state not in text:
+              raise SystemExit('task state pattern not found')
+          if old_tasks not in text:
+              raise SystemExit('selected task pattern not found')
+          if old_tags not in text:
+              raise SystemExit('task tag pattern not found')
+
+          text = text.replace(old_state, new_state, 1)
+          text = text.replace(old_tasks, new_tasks, 1)
+          text = text.replace(old_tags, new_tags, 1)
+          path.write_text(text)
+
+      - name: Commit fix and remove one-time workflow
+        run: |
+          rm .github/workflows/fix-task-tabs-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx .github/workflows/fix-task-tabs-once.yml
+          git commit -m "Fix task bar tab navigation"
+          git push origin main

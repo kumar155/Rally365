@@ -48,9 +48,9 @@
 
 /*
  * Rally365 tournament branding.
- * Keep the tournament actions underneath the brand row while using the
- * existing circular app logo asset and the same clean wordmark treatment
- * as the Rally365 home screen.
+ * Match the home-screen treatment: Rally365 wordmark first, circular
+ * Rally365 mark immediately to its right, then the existing tournament
+ * actions on the row below.
  */
 .tournamentMobileHeader {
   position: relative !important;
@@ -61,20 +61,9 @@
 }
 
 .tournamentMobileHeader::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 2px;
-  width: 39px;
-  height: 39px;
-  background: url('/rally365-circle-logo.png') center / contain no-repeat;
-  pointer-events: none;
-}
-
-.tournamentMobileHeader::after {
   content: "Rally365\A Everyday badminton";
   position: absolute;
-  left: 47px;
+  left: 0;
   top: 0;
   white-space: pre;
   text-align: left;
@@ -83,6 +72,17 @@
   line-height: 1.12;
   letter-spacing: -.045em;
   font-weight: 850;
+  pointer-events: none;
+}
+
+.tournamentMobileHeader::after {
+  content: "";
+  position: absolute;
+  left: 151px;
+  top: 1px;
+  width: 39px;
+  height: 39px;
+  background: url('/rally365-circle-logo.png') center / contain no-repeat;
   pointer-events: none;
 }
 

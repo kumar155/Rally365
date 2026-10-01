@@ -164,7 +164,7 @@ export default function TournamentHomeButton() {
         }}
       >
         <ArrowLeft size={16} strokeWidth={2.3} />
-        <span>{isTournamentDashboard ? "Rally365 Home" : "Tournament"}</span>
+        <span>{isTournamentDashboard ? "Rally365 Home" : "Tournament dashboard"}</span>
       </Link>
 
       <Link

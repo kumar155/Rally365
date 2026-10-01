@@ -50,6 +50,8 @@ function MatchDetailContent() {
   const [busy, setBusy] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [adminPin, setAdminPin] = useState("");
+  const [verifiedAdminPin, setVerifiedAdminPin] = useState("");
+  const [adminEditAuthorized, setAdminEditAuthorized] = useState(false);
 
   useEffect(() => setMatchId(legacy || queryId), [queryId, legacy]);
 
@@ -134,7 +136,7 @@ function MatchDetailContent() {
   }, [matchId]);
 
   function chooseResult(side: "A" | "B", result: Exclude<Result, null>) {
-    if (m?.status === "COMPLETED" || tournamentLocked) return;
+    if ((m?.status === "COMPLETED" && !adminEditAuthorized) || tournamentLocked) return;
     if (side === "A") {
       setResultA(result);
       setResultB(result === "WIN" ? "LOSE" : "WIN");
@@ -201,13 +203,39 @@ function MatchDetailContent() {
     setBusy(false);
   }
 
-  async function correctCompletedScore() {
+  async function verifyAdminPin() {
     if (!m || m.status !== "COMPLETED") return;
     const pin = adminPin.trim();
     if (!/^\d{6}$/.test(pin)) {
       setError("Admin PIN must be exactly 6 digits.");
       return;
     }
+    if (tournamentLocked) {
+      setError("Tournament is locked. Unlock the tournament before correcting a score.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    const { error: verifyError } = await supabase.rpc("verify_match_admin_pin", {
+      p_match_id: m.id,
+      p_pin: pin,
+    });
+
+    if (verifyError) {
+      setError(verifyError.message);
+    } else {
+      setVerifiedAdminPin(pin);
+      setAdminEditAuthorized(true);
+      setCorrectionOpen(false);
+      setAdminPin("");
+      setError("");
+    }
+    setBusy(false);
+  }
+
+  async function correctCompletedScore() {
+    if (!m || m.status !== "COMPLETED" || !adminEditAuthorized) return;
     if (tournamentLocked) {
       setError("Tournament is locked. Unlock the tournament before correcting a score.");
       return;
@@ -223,7 +251,7 @@ function MatchDetailContent() {
     setError("");
     const { error: correctionError } = await supabase.rpc("admin_correct_match_score", {
       p_match_id: m.id,
-      p_pin: pin,
+      p_pin: verifiedAdminPin,
       p_team_a_score: Number(a),
       p_team_b_score: Number(b),
       p_winner_duo_id: winnerId,
@@ -232,8 +260,8 @@ function MatchDetailContent() {
     if (correctionError) {
       setError(correctionError.message);
     } else {
-      setCorrectionOpen(false);
-      setAdminPin("");
+      setAdminEditAuthorized(false);
+      setVerifiedAdminPin("");
       await syncTournamentProgression(m.tournament_id);
       await loadMatch();
     }
@@ -251,7 +279,7 @@ function MatchDetailContent() {
 
   const roundTitle = round?.name || "Match";
   const matchLocked = m?.status === "COMPLETED";
-  const inputsDisabled = busy || matchLocked || tournamentLocked;
+  const inputsDisabled = busy || tournamentLocked || (matchLocked && !adminEditAuthorized);
 
   const outcomeButtonStyle = (selected: boolean, type: "WIN" | "LOSE") => ({
     border: selected ? `1.5px solid ${type === "WIN" ? "#078b5c" : "#c84a4a"}` : "1px solid #d9e5e0",
@@ -310,7 +338,8 @@ function MatchDetailContent() {
             </div>
 
             {tournamentLocked && <div className={s.error} style={{ marginTop: 10 }}>Tournament is locked. Match changes are disabled until an admin unlocks it.</div>}
-            {matchLocked && !tournamentLocked && <div className={s.success} style={{ marginTop: 10 }}>Score saved and locked. Admin PIN is required for corrections.</div>}
+            {matchLocked && !tournamentLocked && !adminEditAuthorized && <div className={s.success} style={{ marginTop: 10 }}>Score saved and locked. Admin PIN is required for corrections.</div>}
+            {adminEditAuthorized && <div className={s.success} style={{ marginTop: 10 }}>Admin correction mode enabled. Update the score/result, then save the correction.</div>}
 
             <section className={s.liveScore}>
               <div className={s.teamLine} style={{ minHeight: 74, padding: "12px 8px" }}>
@@ -361,13 +390,32 @@ function MatchDetailContent() {
 
               <div className={s.actions} style={{ marginTop: 18 }}>
                 {matchLocked ? (
-                  <button
-                    className={s.button}
-                    disabled={busy || tournamentLocked}
-                    onClick={() => { setAdminPin(""); setCorrectionOpen(true); setError(""); }}
-                  >
-                    {tournamentLocked ? "Tournament locked" : "Admin correct score"}
-                  </button>
+                  adminEditAuthorized ? (
+                    <>
+                      <button
+                        className={s.button}
+                        disabled={busy}
+                        onClick={correctCompletedScore}
+                      >
+                        {busy ? "Saving…" : "Save correction"}
+                      </button>
+                      <button
+                        className={s.button + " " + s.secondary}
+                        disabled={busy}
+                        onClick={() => { setAdminEditAuthorized(false); setVerifiedAdminPin(""); setError(""); loadMatch(); }}
+                      >
+                        Cancel correction
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className={s.button}
+                      disabled={busy || tournamentLocked}
+                      onClick={() => { setAdminPin(""); setCorrectionOpen(true); setError(""); }}
+                    >
+                      {tournamentLocked ? "Tournament locked" : "Admin correct score"}
+                    </button>
+                  )
                 ) : (
                   <button
                     className={s.button}
@@ -396,7 +444,7 @@ function MatchDetailContent() {
               </div>
             </section>
 
-            {correctionOpen && <div role="dialog" aria-modal="true" onClick={() => !busy && setCorrectionOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.48)", backdropFilter: "blur(3px)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}><div onClick={e => e.stopPropagation()} style={{ width: "min(440px,100%)", background: "#fff", borderRadius: "26px 26px 0 0", padding: 20, boxShadow: "0 -12px 35px rgba(0,0,0,.16)" }}><div style={{ width: 48, height: 5, background: "#d7dfdb", borderRadius: 99, margin: "-3px auto 16px" }} /><h3 style={{ margin: 0, fontSize: 17 }}>Admin score correction</h3><p style={{ margin: "6px 0 14px", fontSize: 10, color: "#72867e" }}>This completed match is locked. Enter the tournament's 6-digit admin PIN to edit the saved score.</p><label style={{ display: "block", fontSize: 9, fontWeight: 900, color: "#61736b", letterSpacing: ".08em", marginBottom: 6 }}>ADMIN PIN</label><input autoFocus inputMode="numeric" maxLength={6} type="password" value={adminPin} onChange={e => setAdminPin(e.target.value.replace(/\D/g, "").slice(0, 6))} className={s.input} placeholder="6-digit PIN" style={{ letterSpacing: ".28em", fontWeight: 900, textAlign: "center" }} />{error && <div className={s.error} style={{ marginTop: 10 }}>{error}</div>}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}><button type="button" disabled={busy} onClick={() => setCorrectionOpen(false)} className={`${s.button} ${s.secondary}`}>Cancel</button><button type="button" disabled={busy} onClick={correctCompletedScore} className={s.button}>{busy ? "Checking…" : "Save correction"}</button></div></div></div>}
+            {correctionOpen && <div role="dialog" aria-modal="true" onClick={() => !busy && setCorrectionOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.48)", backdropFilter: "blur(3px)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}><div onClick={e => e.stopPropagation()} style={{ width: "min(440px,100%)", background: "#fff", borderRadius: "26px 26px 0 0", padding: 20, boxShadow: "0 -12px 35px rgba(0,0,0,.16)" }}><div style={{ width: 48, height: 5, background: "#d7dfdb", borderRadius: 99, margin: "-3px auto 16px" }} /><h3 style={{ margin: 0, fontSize: 17 }}>Admin score correction</h3><p style={{ margin: "6px 0 14px", fontSize: 10, color: "#72867e" }}>This completed match is locked. Enter the tournament's 6-digit admin PIN to edit the saved score.</p><label style={{ display: "block", fontSize: 9, fontWeight: 900, color: "#61736b", letterSpacing: ".08em", marginBottom: 6 }}>ADMIN PIN</label><input autoFocus inputMode="numeric" maxLength={6} type="password" value={adminPin} onChange={e => setAdminPin(e.target.value.replace(/\D/g, "").slice(0, 6))} className={s.input} placeholder="6-digit PIN" style={{ letterSpacing: ".28em", fontWeight: 900, textAlign: "center" }} />{error && <div className={s.error} style={{ marginTop: 10 }}>{error}</div>}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}><button type="button" disabled={busy} onClick={() => setCorrectionOpen(false)} className={`${s.button} ${s.secondary}`}>Cancel</button><button type="button" disabled={busy} onClick={verifyAdminPin} className={s.button}>{busy ? "Checking…" : "Verify PIN & edit"}</button></div></div></div>}
           </>
         )}
       </div>

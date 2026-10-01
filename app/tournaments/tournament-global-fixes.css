@@ -4,3 +4,8 @@
 .heroSubtitle {
   display: none !important;
 }
+
+/* Reserve space only when the shared tournament header is actually rendered. */
+body:has(.rallyTournamentGlobalHeader) .typography {
+  padding-top: 58px !important;
+}

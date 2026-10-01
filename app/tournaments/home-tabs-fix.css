@@ -1,0 +1,121 @@
+/* Compact tournament home navigation — mobile reference alignment. */
+@media (max-width: 800px) {
+  .tournamentNavRef {
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    align-items: center !important;
+    gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    margin: 10px 0 9px !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border: 1px solid #dfe9e4 !important;
+    border-radius: 26px !important;
+    background: #f4f8f6 !important;
+    box-shadow: 0 3px 10px rgba(22,58,46,.04) !important;
+  }
+
+  .tournamentNavRef .tNavItem,
+  .tournamentNavRef .drawNav {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 4px 3px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    border-right: 1px solid #d9e3df !important;
+    border-radius: 22px !important;
+    background: transparent !important;
+    color: #657a71 !important;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+  }
+
+  .tournamentNavRef .tNavItem:last-child,
+  .tournamentNavRef .drawNav:last-child {
+    border-right: 0 !important;
+  }
+
+  /* Never allow the icons to collapse when the label/count is present. */
+  .tournamentNavRef .tNavItem > svg,
+  .tournamentNavRef .drawNav > svg {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    flex: 0 0 16px !important;
+    display: block !important;
+  }
+
+  .tournamentNavRef .tNavItem > span,
+  .tournamentNavRef .drawNav > span {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    flex: 0 1 auto !important;
+  }
+
+  .tournamentNavRef .tNavItem > em {
+    box-sizing: border-box !important;
+    flex: 0 0 15px !important;
+    width: 15px !important;
+    min-width: 15px !important;
+    height: 15px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-grid !important;
+    place-items: center !important;
+    border-radius: 50% !important;
+    background: #e1e9e6 !important;
+    color: #65766f !important;
+    font-size: 7.5px !important;
+    line-height: 1 !important;
+    font-style: normal !important;
+    font-weight: 850 !important;
+  }
+
+  /* Active item remains a compact pill and keeps its count fully visible. */
+  .tournamentNavRef .tNavItem.active {
+    background: #0aa16c !important;
+    color: #fff !important;
+    border-right: 0 !important;
+    box-shadow: 0 3px 8px rgba(5,132,87,.16) !important;
+  }
+
+  .tournamentNavRef .tNavItem.active > em {
+    background: rgba(255,255,255,.2) !important;
+    color: #fff !important;
+  }
+}
+
+@media (max-width: 370px) {
+  .tournamentNavRef .tNavItem,
+  .tournamentNavRef .drawNav {
+    gap: 2px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    font-size: 8px !important;
+  }
+
+  .tournamentNavRef .tNavItem > svg,
+  .tournamentNavRef .drawNav > svg {
+    width: 15px !important;
+    height: 15px !important;
+    min-width: 15px !important;
+    flex-basis: 15px !important;
+  }
+}

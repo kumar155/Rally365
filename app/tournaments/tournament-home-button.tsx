@@ -193,7 +193,7 @@ export default function TournamentHomeButton() {
           <ArrowLeft size={17} strokeWidth={2.2} />
         </Link>
 
-        {isTournamentDashboard ? (
+        {/* {isTournamentDashboard ? (
           <button
             type="button"
             onClick={shareTournament}
@@ -215,9 +215,9 @@ export default function TournamentHomeButton() {
           >
             <Share2 size={17} strokeWidth={2.1} />
           </button>
-        ) : null}
+        ) : null} */}
 
-        <div
+        {/* <div
           className="rallyTournamentVenuePill"
           style={{
             display: "flex",
@@ -234,7 +234,7 @@ export default function TournamentHomeButton() {
         >
           <MapPin size={15} color="#19a463" />
           <span>Vega Badminton</span>
-        </div>
+        </div> */}
       </div>
     </header>
   );

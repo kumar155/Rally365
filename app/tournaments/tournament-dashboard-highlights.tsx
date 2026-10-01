@@ -175,7 +175,7 @@ export default function TournamentDashboardHighlights() {
       <style jsx global>{`
         .rally365-dashboard-highlights{display:flex;flex-direction:column;gap:10px;margin:14px 0 18px}
         .rally365-winner-card,.rally365-mvp-card{position:relative;display:flex;align-items:center;gap:12px;min-width:0;padding:14px 15px;border-radius:18px;overflow:hidden}
-        .rally365-winner-card{border:1px solid #bfe5d1;background:linear-gradient(105deg,#e7f9ef 0%,#f7fcf9 58%,#dff5e9 100%);box-shadow:0 4px 14px rgba(20,110,75,.07)}
+        .rally365-winner-card{border:1px solid #bfe5d1;background:linear-gradient(105deg,#e7f9ef 0%,#f7fcf9 58%,#f7f5a2 100%);box-shadow:0 4px 14px rgba(20,110,75,.07)}
         .rally365-highlight-icon{width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;border-radius:15px;background:#ccefdc;color:#128752}
         .rally365-highlight-copy,.rally365-mvp-copy{min-width:0;flex:1}
         .rally365-highlight-eyebrow,.rally365-mvp-eyebrow{display:block;margin-bottom:2px;font-size:9px;font-weight:800;letter-spacing:1.2px}

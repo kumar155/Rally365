@@ -42,7 +42,7 @@
 }
 
 .tone-blue { background: linear-gradient(135deg,#f1f7ff,#eaf3ff); border-color:#cfe0f7; color:#1671d8; }
-.tone-green { background: linear-gradient(135deg,#f0fdf4 0%, #dcfee9 100%); border-color:#ccebdc; color:#078b5c; }
+.tone-green { background: linear-gradient(135deg,#f0fdf4 0%, #FFF 100%); border-color:#ccebdc; color:#078b5c; }
 .tone-purple { background: linear-gradient(135deg,#faf4ff,#f6edff); border-color:#e5d5f5; color:#7028ce; }
 .tone-orange { background: linear-gradient(135deg,#fff9ef,#fff2df); border-color:#f1ddb9; color:#c8730a; }
 
@@ -307,7 +307,7 @@
 .tournamentHeroRef .progressFoot { color:#fff !important; }
 .tournamentHeroRef .heroContent h1 { font-size:28px !important; font-weight:700 !important; }
 .tournamentHeroRef .heroSubtitle { font-size:16px !important; font-weight:500 !important; margin:5px 0 10px !important; }
-.tournamentHeroRef .heroMeta { font-size:11px !important; font-weight:500 !important; }
+.tournamentHeroRef .heroMeta { font-size:11px !important; font-weight:500 !important; margin-top: 5px; }
 .tournamentHeroRef .progressLabel { margin-top:19px !important; font-size:10px !important; }
 .tournamentHeroRef .progressTrack { background:rgba(0,32,34,.45) !important; height:8px !important; }
 .tournamentHeroRef .progressTrack > div { background:#17df99 !important; box-shadow:0 0 8px rgba(23,223,153,.25) !important; }

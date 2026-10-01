@@ -5,3 +5,6 @@
 
 /* Tournament typography: every visible tournament element uses normal weight. */
 .page,.page h1,.page h2,.page h3,.page h4,.page h5,.page h6,.page p,.page a,.page button,.page input,.page select,.page label,.page span,.page strong,.page b,.page small,.page div,.page li,.page td,.page th,.page option,.page::before,.page::after,.page *::before,.page *::after{font-weight:400 !important;font-synthesis:none !important}
+
+/* Tournament overview tiles: remove decorative background bubbles. */
+.page :global(.overviewCardRef::after){display:none !important}

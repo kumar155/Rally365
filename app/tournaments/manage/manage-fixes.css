@@ -188,6 +188,117 @@
   font-weight: 800;
 }
 
+/* Compact mobile tournament dashboard: preserve the reference styling without excessive vertical space. */
+.tournamentHeroRef {
+  min-height: 220px !important;
+  padding: 16px !important;
+  border-radius: 22px !important;
+}
+
+.heroContent {
+  margin-top: 20px !important;
+}
+
+.heroContent h1 {
+  font-size: 27px !important;
+}
+
+.heroSubtitle {
+  margin: 3px 0 11px !important;
+  font-size: 16px !important;
+}
+
+.progressLabel {
+  margin-top: 20px !important;
+}
+
+.progressTrack {
+  height: 8px !important;
+  margin-top: 6px !important;
+}
+
+.progressFoot {
+  margin-top: 7px !important;
+}
+
+.heroDecor.racket {
+  right: 68px !important;
+  top: 58px !important;
+  font-size: 56px !important;
+}
+
+.heroDecor.trophy {
+  right: -18px !important;
+  bottom: -28px !important;
+}
+
+.overviewGridRef {
+  gap: 8px !important;
+}
+
+.overviewCardRef {
+  min-height: 96px !important;
+  height: 96px !important;
+  padding: 10px 11px !important;
+  border-radius: 17px !important;
+}
+
+.overviewCardRef::after {
+  width: 82px;
+  height: 82px;
+  right: -24px;
+  bottom: -27px;
+}
+
+.overviewIconRef {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+}
+
+.overviewIconRef svg {
+  width: 18px;
+  height: 18px;
+}
+
+.overviewValueRef {
+  margin-top: 5px !important;
+  font-size: 20px !important;
+}
+
+.overviewLabelRef {
+  margin-top: 1px !important;
+  font-size: 10px !important;
+}
+
+.configRef {
+  padding: 13px !important;
+  border-radius: 20px !important;
+}
+
+.configTitleRow h2 {
+  font-size: 19px !important;
+  margin-bottom: 9px !important;
+}
+
+.configRows {
+  gap: 7px !important;
+}
+
+.configRowRef {
+  padding: 10px 10px !important;
+  border-radius: 15px !important;
+}
+
+.configIcon {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.gameSegmentRef button {
+  padding: 7px 4px !important;
+}
+
 @media (min-width: 801px) {
   .overviewGridRef {
     grid-template-columns: repeat(4, 1fr);

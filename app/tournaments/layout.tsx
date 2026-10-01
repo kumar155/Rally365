@@ -4,6 +4,7 @@ import "./manage/manage-fixes.css";
 import "./manage/tournament-header-fix.css";
 import "./tournament-nav-fix.css";
 import "./overview-nav-fix.css";
+import "./home-tabs-fix.css";
 import TournamentHomeButton from "./tournament-home-button";
 import TournamentTableRoute from "./tournament-table-route";
 

@@ -8,12 +8,14 @@ import "./home-tabs-fix.css";
 import "./tournament-global-fixes.css";
 import TournamentHomeButton from "./tournament-home-button";
 import TournamentTableRoute from "./tournament-table-route";
+import TournamentDashboardHighlights from "./tournament-dashboard-highlights";
 
 export default function TournamentLayout({ children }: { children: ReactNode }) {
   return (
     <div className={`${typography.typography} tournamentLayoutRoot`}>
       <TournamentHomeButton />
       <TournamentTableRoute />
+      <TournamentDashboardHighlights />
       {children}
     </div>
   );

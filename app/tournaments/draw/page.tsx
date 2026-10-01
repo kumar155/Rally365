@@ -9,13 +9,21 @@ import ds from "./draw.module.css";
 
 type D = { id: string; name: string };
 type T = { id: string; name: string; format: string; rounds: number | null; group_count: number | null; qualifiers_per_group: number | null };
-type R = { id: string; round_number: number; name: string; round_type: string };
+type R = { id: string; round_number: number; name: string; round_type: string; status: "SCHEDULED" | "LIVE" | "COMPLETED" };
 type M = { id: string; round_id: string; group_id: string | null; match_number: number; team_a_duo_id: string | null; team_b_duo_id: string | null; team_a_score: number | null; team_b_score: number | null; status: string };
 type G = { id: string; name: string; group_number: number; qualifying_teams: number | null };
 type GD = { group_id: string; duo_id: string; seed: number | null };
 
 function initials(name: string) {
   return name.split(/\s*&\s*|\s*\+\s*/).map((x) => x.trim()[0] || "").join("").slice(0, 2).toUpperCase();
+}
+
+function stageLabel(name: string) {
+  return name.replace(/\s+/g, " ").trim();
+}
+
+function isFinishedMatch(status: string) {
+  return status === "COMPLETED" || status === "WALKOVER";
 }
 
 export default function Draw() {
@@ -31,6 +39,7 @@ export default function Draw() {
   const [done, setDone] = useState("");
   const [selectedRound, setSelectedRound] = useState(0);
   const [selectedGroupId, setSelectedGroupId] = useState("ALL");
+  const [completingRound, setCompletingRound] = useState(false);
 
   useEffect(() => {
     setId(new URLSearchParams(window.location.search).get("id") || "");
@@ -43,7 +52,7 @@ export default function Draw() {
     const [{ data: tournament, error: te }, { data: teams, error: de }, { data: r, error: re }, { data: m, error: me }, { data: g, error: ge }] = await Promise.all([
       supabase.from("tournaments").select("id,name,format,rounds,group_count,qualifiers_per_group").eq("id", id).single(),
       supabase.from("tournament_duos").select("id,name").eq("tournament_id", id).eq("status", "ACTIVE").order("created_at"),
-      supabase.from("tournament_rounds").select("id,round_number,name,round_type").eq("tournament_id", id).order("round_number"),
+      supabase.from("tournament_rounds").select("id,round_number,name,round_type,status").eq("tournament_id", id).order("round_number"),
       supabase.from("tournament_matches").select("id,round_id,group_id,match_number,team_a_duo_id,team_b_duo_id,team_a_score,team_b_score,status").eq("tournament_id", id).order("match_number"),
       supabase.from("tournament_groups").select("id,name,group_number,qualifying_teams").eq("tournament_id", id).order("group_number"),
     ]);
@@ -180,6 +189,32 @@ export default function Draw() {
   const prefixForRound = (name: string) => /quarter/i.test(name) ? "QF" : /semi/i.test(name) ? "SF" : /final/i.test(name) ? "F" : "Match";
   const visibleGroups = selectedGroupId === "ALL" ? groups : groups.filter((group) => group.id === selectedGroupId);
   const drawLocked = matches.length > 0;
+  const completedMatches = activeMatches.filter((m) => isFinishedMatch(m.status)).length;
+  const stageComplete = !!activeRound && activeMatches.length > 0 && completedMatches === activeMatches.length;
+  const stageAlreadyCompleted = activeRound?.status === "COMPLETED";
+  const stageCanBeCompleted = stageComplete && !stageAlreadyCompleted;
+
+  async function completeStage() {
+    if (!activeRound || !stageComplete || stageAlreadyCompleted) return;
+    setCompletingRound(true); setError(""); setDone("");
+    try {
+      const { error: roundError } = await supabase.from("tournament_rounds").update({ status: "COMPLETED" }).eq("id", activeRound.id).eq("tournament_id", id);
+      if (roundError) throw roundError;
+
+      if (activeRound.round_type === "GROUP" && groups.length) {
+        const groupIds = groups.map((group) => group.id);
+        const { error: groupError } = await supabase.from("tournament_groups").update({ status: "COMPLETED" }).in("id", groupIds).eq("tournament_id", id);
+        if (groupError) throw groupError;
+      }
+
+      setDone(`${stageLabel(activeRound.name)} completed. Choose what to do next.`);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Could not complete the stage");
+    } finally {
+      setCompletingRound(false);
+    }
+  }
 
   if (!id) return <main className={s.page}><div className={s.shell}><div className={s.card}>Tournament ID is missing.</div></div></main>;
 
@@ -196,7 +231,7 @@ export default function Draw() {
         {error && <div className={s.error}>{error}</div>}{done && <div className={s.success}>{done}</div>}
 
         <div className={ds.drawRoundTabs}>
-          {rounds.map((r) => <button type="button" key={r.id} className={`${ds.drawRoundTab} ${r.round_number === activeRound?.round_number ? ds.drawRoundTabActive : ""}`} onClick={() => setSelectedRound(r.round_number)}>{r.name}</button>)}
+          {rounds.map((r) => <button type="button" key={r.id} className={`${ds.drawRoundTab} ${r.round_number === activeRound?.round_number ? ds.drawRoundTabActive : ""}`} onClick={() => setSelectedRound(r.round_number)}>{r.name}{r.status === "COMPLETED" ? " ✓" : ""}</button>)}
         </div>
 
         {activeRound?.round_type === "GROUP" && groups.length > 0 && (
@@ -218,18 +253,46 @@ export default function Draw() {
                     <div className={ds.groupCardHeader}><div><span className={s.eyebrow}>GROUP {String.fromCharCode(64 + group.group_number)}</span><h3>{group.name}</h3></div><span>{members.length} teams</span></div>
                     <div className={ds.groupTeams}>{members.map((member) => { const name = names.get(member.duo_id) || "TBD"; return <div className={ds.groupTeam} key={member.duo_id}><span className={ds.groupTeamIdentity}><span className={ds.miniAvatar}>{initials(name)}</span><span>{name}</span></span><span className={ds.groupSeed}>#{member.seed ?? "-"}</span></div>; })}</div>
                     <div className={ds.groupMatchesHeader}><span>Match schedule</span><span>{groupMatches.length} matches</span></div>
-                    <div className={ds.groupMatches}>{groupMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.groupMatch}><div className={ds.groupMatchMeta}><span>Match {m.match_number}</span><span>{m.status === "COMPLETED" ? "Completed" : "Scheduled"}</span></div><div className={ds.groupMatchTeam}><span>{a}</span><strong>{m.team_a_score ?? "-"}</strong></div><div className={ds.groupMatchTeam}><span>{b}</span><strong>{m.team_b_score ?? "-"}</strong></div></Link>; })}</div>
+                    <div className={ds.groupMatches}>{groupMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.groupMatch}><div className={ds.groupMatchMeta}><span>Match {m.match_number}</span><span>{isFinishedMatch(m.status) ? "Completed" : "Scheduled"}</span></div><div className={ds.groupMatchTeam}><span>{a}</span><strong>{m.team_a_score ?? "-"}</strong></div><div className={ds.groupMatchTeam}><span>{b}</span><strong>{m.team_b_score ?? "-"}</strong></div></Link>; })}</div>
                   </section>;
                 })}
               </div>
+              <StageCompletion activeRound={activeRound} completedMatches={completedMatches} totalMatches={activeMatches.length} stageAlreadyCompleted={!!stageAlreadyCompleted} stageCanBeCompleted={stageCanBeCompleted} completingRound={completingRound} onComplete={completeStage} />
             </section>
           ) : (
             <section className={ds.bracketStage}>
               <div className={ds.bracketHeading}><div><span className={s.eyebrow}>ROUND {activeRound.round_number}</span><h2>{activeRound.name}</h2></div><span>{activeMatches.length} matches</span></div>
-              <div className={ds.bracketGrid}>{activeMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; const ap = duoParts(a); const bp = duoParts(b); const prefix = prefixForRound(activeRound.name); return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.drawMatch}><div className={ds.drawMatchMeta}><span>{prefix} {m.match_number}</span><span>Court TBD</span></div><div className={`${ds.drawTeam} ${ds.drawTeamA}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{ap.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{a}</span></span><span className={ds.drawScore}>{m.team_a_score ?? "-"}</span></div><div className={`${ds.drawTeam} ${ds.drawTeamB}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{bp.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{b}</span></span><span className={ds.drawScore}>{m.team_b_score ?? "-"}</span></div></Link>; })}</div>
+              <div className={ds.bracketGrid}>{activeMatches.map((m) => { const a = names.get(m.team_a_duo_id || "") || "TBD"; const b = names.get(m.team_b_duo_id || "") || "TBD"; const ap = duoParts(a); const bp = duoParts(b); const prefix = prefixForRound(activeRound.name); return <Link key={m.id} href={`/tournaments/match?id=${m.id}`} className={ds.drawMatch}><div className={ds.drawMatchMeta}><span>{prefix} {m.match_number}</span><span>{isFinishedMatch(m.status) ? "Completed" : "Court TBD"}</span></div><div className={`${ds.drawTeam} ${ds.drawTeamA}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{ap.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{a}</span></span><span className={ds.drawScore}>{m.team_a_score ?? "-"}</span></div><div className={`${ds.drawTeam} ${ds.drawTeamB}`}><span className={ds.drawTeamPeople}><span className={ds.miniAvatars}>{bp.map((p, i) => <span key={i} className={ds.miniAvatar}>{p[0]}</span>)}</span><span>{b}</span></span><span className={ds.drawScore}>{m.team_b_score ?? "-"}</span></div></Link>; })}</div>
+              <StageCompletion activeRound={activeRound} completedMatches={completedMatches} totalMatches={activeMatches.length} stageAlreadyCompleted={!!stageAlreadyCompleted} stageCanBeCompleted={stageCanBeCompleted} completingRound={completingRound} onComplete={completeStage} />
             </section>
           )
         ) : <section className={s.card}><h2>No plan yet</h2><p className={s.sub}>Generate the plan after partners are ready.</p></section>}
+
+        {stageAlreadyCompleted && (
+          <section className={ds.nextStageCard}>
+            <div className={s.eyebrow}>STAGE COMPLETED</div>
+            <h2>What do you want to do next?</h2>
+            <p className={s.sub}>Choose how to continue from {stageLabel(activeRound?.name || "this stage")}.</p>
+            <div className={ds.nextStageOptions}>
+              <button type="button" className={ds.nextStageOption} onClick={() => setDone("Next-stage setup selected. Use the plan to configure the next stage.")}>
+                <span className={ds.nextStageOptionTitle}>Create next stage <span>→</span></span>
+                <span className={ds.nextStageOptionText}>Continue with the teams that qualify from this stage.</span>
+              </button>
+              <button type="button" className={ds.nextStageOption} onClick={() => setDone("Custom match mapping selected. Choose the teams and create the matches manually.")}>
+                <span className={ds.nextStageOptionTitle}>Custom match mapping <span>⇄</span></span>
+                <span className={ds.nextStageOptionText}>Manually decide who plays whom, including byes.</span>
+              </button>
+              <button type="button" className={ds.nextStageOption} onClick={() => setDone("Additional match setup selected. You can use this for eliminator or consolation matches.")}>
+                <span className={ds.nextStageOptionTitle}>Additional / consolation matches <span>+</span></span>
+                <span className={ds.nextStageOptionText}>Schedule matches for eliminated teams or placement decisions.</span>
+              </button>
+              <Link href={path("manage")} className={ds.nextStageOption}>
+                <span className={ds.nextStageOptionTitle}>Finish tournament <span>✓</span></span>
+                <span className={ds.nextStageOptionText}>End the tournament without creating another stage.</span>
+              </Link>
+            </div>
+          </section>
+        )}
 
         <section className={ds.drawActions}>
           {drawLocked ? (
@@ -244,4 +307,32 @@ export default function Draw() {
       </div>
     </main>
   );
+}
+
+function StageCompletion({
+  activeRound,
+  completedMatches,
+  totalMatches,
+  stageAlreadyCompleted,
+  stageCanBeCompleted,
+  completingRound,
+  onComplete,
+}: {
+  activeRound: R;
+  completedMatches: number;
+  totalMatches: number;
+  stageAlreadyCompleted: boolean;
+  stageCanBeCompleted: boolean;
+  completingRound: boolean;
+  onComplete: () => void;
+}) {
+  return <div className={ds.stageCompletion}>
+    <div className={ds.stageCompletionSummary}>
+      <span>{stageAlreadyCompleted ? "✓ Stage completed" : `${completedMatches} of ${totalMatches} matches completed`}</span>
+      {!stageAlreadyCompleted && <span>{stageCanBeCompleted ? "Ready to complete" : "Complete every match to continue"}</span>}
+    </div>
+    <button type="button" className={ds.completeStageButton} disabled={!stageCanBeCompleted || completingRound} onClick={onComplete}>
+      {completingRound ? "Completing…" : stageAlreadyCompleted ? `✓ ${stageLabel(activeRound.name)} completed` : `Complete ${stageLabel(activeRound.name)}`}
+    </button>
+  </div>;
 }

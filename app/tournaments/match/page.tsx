@@ -167,10 +167,30 @@ function MatchDetailContent() {
     const patch = sourceSide === "A"
       ? { team_a_source_match_id: sourceMatchId, team_a_source_result: result, team_a_duo_id: resolvedTeam }
       : { team_b_source_match_id: sourceMatchId, team_b_source_result: result, team_b_duo_id: resolvedTeam };
+    const selectedTeamName = resolvedTeam
+      ? teams.find((team) => team.id === resolvedTeam)?.name
+        || (resolvedTeam === source.team_a_duo_id ? source.team_a?.name : resolvedTeam === source.team_b_duo_id ? source.team_b?.name : undefined)
+      : undefined;
+    const selectedTeam = resolvedTeam && selectedTeamName ? { name: selectedTeamName } : null;
+
     setBusy(true); setError("");
     const { error: updateError } = await supabase.from("tournament_matches").update(patch).eq("id", m.id);
-    if (updateError) setError(updateError.message);
-    else { setM({ ...m, ...patch } as M); setSourceSide(null); await syncTournamentProgression(m.tournament_id); await loadMatch(); }
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      const nextMatch = sourceSide === "A"
+        ? { ...m, ...patch, team_a: selectedTeam } as M
+        : { ...m, ...patch, team_b: selectedTeam } as M;
+      // Update the visible match immediately. Do not reload here: a concurrent
+      // stale read could overwrite this optimistic state with the old TBD value.
+      setM(nextMatch);
+      setSourceSide(null);
+      try {
+        await syncTournamentProgression(m.tournament_id);
+      } catch (e: any) {
+        setError(e?.message || "Team selected, but progression could not be updated.");
+      }
+    }
     setBusy(false);
   }
 
@@ -179,10 +199,18 @@ function MatchDetailContent() {
     const patch = sourceSide === "A"
       ? { team_a_source_match_id: null, team_a_source_result: null, team_a_duo_id: teamId }
       : { team_b_source_match_id: null, team_b_source_result: null, team_b_duo_id: teamId };
+    const selectedTeam = teams.find((team) => team.id === teamId);
     setBusy(true); setError("");
     const { error: updateError } = await supabase.from("tournament_matches").update(patch).eq("id", m.id);
-    if (updateError) setError(updateError.message);
-    else { setM({ ...m, ...patch } as M); setSourceSide(null); }
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      const nextMatch = sourceSide === "A"
+        ? { ...m, ...patch, team_a: selectedTeam ? { name: selectedTeam.name } : null } as M
+        : { ...m, ...patch, team_b: selectedTeam ? { name: selectedTeam.name } : null } as M;
+      setM(nextMatch);
+      setSourceSide(null);
+    }
     setBusy(false);
   }
 

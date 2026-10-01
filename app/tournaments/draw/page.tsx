@@ -179,7 +179,7 @@ export default function Draw() {
     finally { setBusy(false); }
   }
 
-  const names = new Map(duos.map((d) => [d.id, d.name]));
+  const names = new Map<string, string>(duos.map((d) => [d.id, d.name] as const));
   const path = (p: string) => `/tournaments/${p}?id=${encodeURIComponent(id)}`;
   const activeRound = rounds.find((r) => r.round_number === selectedRound) || rounds[0];
   const activeMatches = useMemo(() => activeRound ? matches.filter((m) => m.round_id === activeRound.id) : [], [activeRound, matches]);

@@ -254,3 +254,62 @@
 @media (min-width:801px) {
   .overviewGridRef { grid-template-columns:repeat(4,1fr) !important; }
 }
+
+/* Latest tournament header reference: green hero with fully visible live data. */
+.tournamentMobileHeader .roundIcon:first-child svg { display:block !important; }
+.tournamentMobileHeader .roundIcon:first-child::before { content:none !important; }
+.tournamentMobileHeader .roundIcon:first-child { color:#16372c !important; }
+
+.tournamentHeroRef {
+  min-height:208px !important;
+  height:208px !important;
+  padding:16px !important;
+  border:0 !important;
+  border-radius:22px !important;
+  background:linear-gradient(135deg,#03aa6d 0%,#078c61 50%,#0a5265 100%) !important;
+  color:#fff !important;
+  box-shadow:0 8px 24px rgba(9,79,57,.15) !important;
+}
+.tournamentHeroRef::after {
+  content:"" !important;
+  position:absolute !important;
+  inset:0 !important;
+  background:radial-gradient(circle at 84% 12%,rgba(255,255,255,.18),transparent 25%),linear-gradient(145deg,transparent 45%,rgba(0,43,59,.2)) !important;
+  pointer-events:none !important;
+}
+.tournamentHeroRef::before {
+  width:250px !important;
+  height:250px !important;
+  right:-90px !important;
+  top:-130px !important;
+  background:rgba(255,255,255,.03) !important;
+}
+.tournamentHeroRef .heroTopRow { z-index:3 !important; }
+.tournamentHeroRef .livePill,
+.tournamentHeroRef .clubPill {
+  min-height:31px !important;
+  padding:0 12px !important;
+  border-radius:999px !important;
+  border:1px solid rgba(255,255,255,.12) !important;
+  background:rgba(0,48,39,.28) !important;
+  color:#fff !important;
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+}
+.tournamentHeroRef .livePill { letter-spacing:.04em !important; }
+.tournamentHeroRef .clubPill { background:rgba(3,47,53,.30) !important; }
+.tournamentHeroRef .statusDot.locked { background:#fbbf24 !important; }
+.tournamentHeroRef .heroContent { margin-top:22px !important; z-index:3 !important; }
+.tournamentHeroRef .heroContent h1,
+.tournamentHeroRef .heroSubtitle,
+.tournamentHeroRef .heroMeta,
+.tournamentHeroRef .progressLabel,
+.tournamentHeroRef .progressFoot { color:#fff !important; }
+.tournamentHeroRef .heroContent h1 { font-size:28px !important; font-weight:700 !important; }
+.tournamentHeroRef .heroSubtitle { font-size:16px !important; font-weight:500 !important; margin:5px 0 10px !important; }
+.tournamentHeroRef .heroMeta { font-size:11px !important; font-weight:500 !important; }
+.tournamentHeroRef .progressLabel { margin-top:19px !important; font-size:10px !important; }
+.tournamentHeroRef .progressTrack { background:rgba(0,32,34,.45) !important; height:8px !important; }
+.tournamentHeroRef .progressTrack > div { background:#17df99 !important; box-shadow:0 0 8px rgba(23,223,153,.25) !important; }
+.tournamentHeroRef .progressFoot { color:#9ff5d2 !important; }
+.tournamentHeroRef .heroDecor.trophy { color:#d7fff0 !important; opacity:.16 !important; }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, Plus, Trophy } from "lucide-react";
+import { CalendarDays, ChevronRight, Plus, Radio, Trophy } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 type Tournament = {
@@ -152,46 +152,47 @@ export default function TournamentsPage() {
   );
 
   return (
-    <div className="app-shell">
+    <div className="app-shell tournament-list-page">
       <main className="content">
-        <div className="page-heading">
-          <div className="eyebrow">COMPETITIONS</div>
-          <h1>Tournaments</h1>
-          <p>Manage Rally365 tournaments, draws, matches and standings.</p>
-        </div>
+        <section className="tournament-list-hero" aria-label="Tournament overview">
+          <div className="hero-copy">
+            <div className="eyebrow">COMPETITIONS</div>
+            <h1>Tournaments</h1>
+            <p>Manage Rally365 tournaments, draws, matches and standings.</p>
+            <div className="hero-stats">
+              <span className="hero-pill">{counts.all} tournaments</span>
+              <span className="hero-pill live">● {counts.live} live</span>
+              <span className="hero-pill upcoming">{counts.upcoming} upcoming</span>
+            </div>
+          </div>
+        </section>
 
-        <div className="money-grid">
-          <div>
+        <section className="tournament-summary" aria-label="Tournament counts">
+          <div className="tournament-summary-card">
+            <div className="summary-icon"><Trophy size={17} /></div>
             <b>{counts.all}</b>
             <small>Tournaments</small>
           </div>
-          <div>
+          <div className="tournament-summary-card">
+            <div className="summary-icon"><Radio size={17} /></div>
             <b>{counts.live}</b>
             <small>Live</small>
           </div>
-          <div>
+          <div className="tournament-summary-card">
+            <div className="summary-icon"><CalendarDays size={17} /></div>
             <b>{counts.upcoming}</b>
             <small>Upcoming</small>
           </div>
-        </div>
+        </section>
 
-        <div className="section-title">
-          <span>Tournament list</span>
-          <Link
-            href="/tournaments/create"
-            className="secondary-button"
-            style={{ gap: 6, textDecoration: "none" }}
-          >
-            <Plus size={14} /> Create
+        <div className="tournament-list-heading">
+          <h2>Tournament List</h2>
+          <Link href="/tournaments/create" className="tournament-list-create">
+            <Plus size={18} /> Create
           </Link>
         </div>
 
-        <div
-          className="range-toggle"
-          style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
-          role="tablist"
-          aria-label="Tournament status"
-        >
+        <div className="tournament-status-toggle" role="tablist" aria-label="Tournament status">
           {(
             [
               ["ALL", "All"],
@@ -205,7 +206,8 @@ export default function TournamentsPage() {
               type="button"
               className={filter === value ? "active" : ""}
               onClick={() => setFilter(value)}
-              style={{ fontSize: 10, padding: "9px 3px" }}
+              role="tab"
+              aria-selected={filter === value}
             >
               {label}
             </button>
@@ -215,30 +217,21 @@ export default function TournamentsPage() {
         {error && <div className="error-banner">{error}</div>}
 
         {loading ? (
-          <div className="empty-card">Loading tournaments…</div>
+          <div className="empty-card tournament-list-empty">Loading tournaments…</div>
         ) : !visible.length ? (
-          <div className="empty-card">
+          <div className="empty-card tournament-list-empty">
             <Trophy size={30} style={{ color: "#15985c", marginBottom: 8 }} />
-            <div style={{ fontWeight: 800, color: "#10231a" }}>
-              No tournaments here yet
-            </div>
+            <div style={{ fontWeight: 800, color: "#10231a" }}>No tournaments here yet</div>
             <div style={{ marginTop: 5, fontSize: 12 }}>
               Create a tournament to start managing players, draws and matches.
             </div>
-            <Link
-              href="/tournaments/create"
-              className="primary-button"
-              style={{ width: "auto", display: "inline-flex", marginTop: 14 }}
-            >
+            <Link href="/tournaments/create" className="primary-button" style={{ width: "auto", display: "inline-flex", marginTop: 14 }}>
               Create tournament
             </Link>
           </div>
         ) : (
-          <div className="stats-table">
-            <div
-              className="table-head"
-              style={{ gridTemplateColumns: "28px minmax(0,1fr) 78px 72px 18px" }}
-            >
+          <div className="tournament-list-table">
+            <div className="tournament-list-table-head">
               <span>#</span>
               <span>TOURNAMENT</span>
               <span>DATE</span>
@@ -248,58 +241,30 @@ export default function TournamentsPage() {
 
             {visible.map((tournament, index) => {
               const state = stateLabel(tournament.status);
-              const statusColor =
-                state === "LIVE"
-                  ? "#15985c"
-                  : state === "COMPLETED"
-                    ? "#718078"
-                    : "#3b6fa8";
+              const stateClass = state.toLowerCase();
 
               return (
                 <Link
                   key={tournament.id}
                   href={`/tournaments/manage?id=${encodeURIComponent(tournament.id)}`}
-                  className="monthly-row"
-                  style={{
-                    gridTemplateColumns: "28px minmax(0,1fr) 78px 72px 18px",
-                    textDecoration: "none",
-                    color: "#10231a",
-                  }}
+                  className="tournament-list-row"
                 >
-                  <span className="rank">{index + 1}</span>
-                  <span className="player-name">
-                    <strong
-                      style={{
-                        display: "block",
-                        fontSize: 13,
-                        fontWeight: 800,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {tournament.name}
-                    </strong>
+                  <span className="tournament-list-rank">{index + 1}</span>
+                  <span className="tournament-list-name">
+                    <strong>{tournament.name}</strong>
                     <small>
-                      {formatLabel(tournament.format)}
+                      🏸 {formatLabel(tournament.format)}
                       {tournament.venue ? ` · ${tournament.venue}` : ""}
                     </small>
                   </span>
-                  <span style={{ fontSize: 10, color: "#52675f", fontWeight: 700 }}>
-                    <CalendarDays size={12} style={{ verticalAlign: "-2px", marginRight: 3 }} />
+                  <span className="tournament-list-date">
+                    <CalendarDays size={12} />
                     {dateLabel(tournament.start_date)}
                   </span>
-                  <span
-                    style={{
-                      color: statusColor,
-                      fontSize: 9,
-                      fontWeight: 900,
-                      letterSpacing: ".04em",
-                    }}
-                  >
-                    {state}
+                  <span className={`tournament-list-status ${stateClass}`}>
+                    {state === "COMPLETED" ? "COMPLETED" : state}
                   </span>
-                  <ChevronRight size={16} style={{ color: "#94a29b" }} />
+                  <ChevronRight className="tournament-list-chevron" size={17} />
                 </Link>
               );
             })}

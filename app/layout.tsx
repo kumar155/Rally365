@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./loading-splash.css";
 import "./tournaments/manage/manage-fixes.css";
+import "./tournaments/tournament-list.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 
 export const metadata: Metadata = {

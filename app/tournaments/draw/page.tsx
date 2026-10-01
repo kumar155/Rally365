@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Lock, ChevronDown, Trash2, Plus, Pencil } from "lucide-react";
+import { Lock, Trash2, Plus, Pencil } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { shuffle, knockoutSize, knockoutRoundName, knockoutRoundType } from "../../../lib/tournament";
 import { syncTournamentProgression } from "../../../lib/tournamentProgression";
@@ -98,51 +98,35 @@ export default function Draw() {
 
   function toggleQualifier(groupId: string, duoId: string, limit: number) { const current = selectedQualifiers[groupId] || []; if (current.includes(duoId)) { setSelectedQualifiers({ ...selectedQualifiers, [groupId]: current.filter((x) => x !== duoId) }); return; } if (current.length >= limit) return; setSelectedQualifiers({ ...selectedQualifiers, [groupId]: [...current, duoId] }); }
   const groupMatches = matches.filter((m) => m.group_id); const allGroupMatchesComplete = groups.length > 0 && groupMatches.length > 0 && groupMatches.every((m) => completed(m.status)); const allQualificationsConfirmed = groups.length > 0 && groups.every((g) => g.qualification_confirmed); const firstKnockoutRound = rounds.find((r) => r.round_type !== "GROUP"); const knockoutSeeded = !!firstKnockoutRound && matches.some((m) => m.round_id === firstKnockoutRound.id && (m.team_a_duo_id || m.team_b_duo_id)); const names = new Map(duos.map((d) => [d.id, d.name])); const path = (p: string) => `/tournaments/${p}?id=${encodeURIComponent(id)}`; const isGroupsKnockout = t?.format === "GROUPS_KNOCKOUT"; const finalRounds = rounds.filter((r) => r.round_type !== "GROUP").sort((a, b) => a.round_number - b.round_number); const displayRounds = isGroupsKnockout ? finalRounds : rounds; const activeFinalRound = displayRounds.find((r) => r.round_number === selectedFinalRound) || displayRounds[0]; const selectedGroupData = groups.find((g) => g.id === selectedGroup); const groupMatchesFor = (groupId: string) => matches.filter((m) => m.group_id === groupId); const finalMatchesFor = (roundId: string) => matches.filter((m) => m.round_id === roundId).sort((a, b) => a.match_number - b.match_number); const duoParts = (name: string) => name.split(/\s*&\s*/).map((x) => x.trim()).filter(Boolean).slice(0, 2);
-
+  const knockoutSlots = matches.filter((m) => m.round_id === firstKnockoutRound?.id).sort((a, b) => a.match_number - b.match_number);
   const qualifiedIds = groups.flatMap((group) => standingsForGroup(duos, groupDuos, matches, group.id).filter((row) => groupDuos.some((x) => x.group_id === group.id && x.duo_id === row.id && x.qualified)).map((row) => row.id));
   const qualifiedNames = new Map(duos.filter((d) => qualifiedIds.includes(d.id)).map((d) => [d.id, d.name]));
 
   function openCustomSchedule() {
     if (!firstKnockoutRound || !qualifiedIds.length) return;
-    const slots = matches.filter((m) => m.round_id === firstKnockoutRound.id).sort((a, b) => a.match_number - b.match_number);
-    const existing = slots.map((m) => ({ a: m.team_a_duo_id || "", b: m.team_b_duo_id || "" }));
+    const existing = knockoutSlots.map((m) => ({ a: m.team_a_duo_id || "", b: m.team_b_duo_id || "" }));
     const hasMapped = existing.some((p) => p.a || p.b);
-    if (hasMapped) {
-      setCustomPairs(existing);
-    } else {
+    if (hasMapped) setCustomPairs(existing);
+    else {
       const initial: CustomPair[] = [];
       for (let i = 0; i < Math.ceil(qualifiedIds.length / 2); i++) initial.push({ a: qualifiedIds[i * 2] || "", b: qualifiedIds[i * 2 + 1] || "" });
       setCustomPairs(initial);
     }
     setNextStageMode("custom"); setError(""); setDone("");
   }
-
   function resetCustomSchedule() {
     const initial: CustomPair[] = [];
     for (let i = 0; i < Math.ceil(qualifiedIds.length / 2); i++) initial.push({ a: qualifiedIds[i * 2] || "", b: qualifiedIds[i * 2 + 1] || "" });
     setCustomPairs(initial); setError(""); setDone("");
   }
-
-  function updateCustomPair(index: number, side: "a" | "b", value: string) {
-    setCustomPairs((current) => current.map((pair, i) => i === index ? { ...pair, [side]: value } : pair));
-    setError(""); setDone("");
-  }
-
-  function addCustomMatch() {
-    if (customPairs.length >= Math.max(1, matches.filter((m) => m.round_id === firstKnockoutRound?.id).length)) return;
-    setCustomPairs((current) => [...current, { a: "", b: "" }]);
-  }
-
-  function removeCustomMatch(index: number) {
-    setCustomPairs((current) => current.filter((_, i) => i !== index));
-  }
+  function updateCustomPair(index: number, side: "a" | "b", value: string) { setCustomPairs((current) => current.map((pair, i) => i === index ? { ...pair, [side]: value } : pair)); setError(""); setDone(""); }
+  function addCustomMatch() { if (customPairs.length >= knockoutSlots.length) return; setCustomPairs((current) => [...current, { a: "", b: "" }]); }
+  function removeCustomMatch(index: number) { setCustomPairs((current) => current.filter((_, i) => i !== index)); }
 
   async function createCustomKnockoutSchedule() {
     if (t?.is_locked) return setError("Tournament is locked. Final draw changes are disabled.");
     if (!firstKnockoutRound) return setError("The knockout round is not ready yet.");
-    const slots = matches.filter((m) => m.round_id === firstKnockoutRound.id).sort((a, b) => a.match_number - b.match_number);
-    const used = new Set<string>();
-    let mappedCount = 0;
+    const used = new Set<string>(); let mappedCount = 0;
     for (const pair of customPairs) {
       if (!pair.a && !pair.b) continue;
       if (!pair.a) return setError("A match must have a team in the first position, or remove the empty match.");
@@ -152,20 +136,14 @@ export default function Draw() {
       used.add(pair.a); if (pair.b) used.add(pair.b); mappedCount++;
     }
     if (used.size !== qualifiedIds.length) return setError(`Map all ${qualifiedIds.length} qualified teams before creating the schedule.`);
-    if (mappedCount > slots.length) return setError("There are not enough knockout match slots for this schedule.");
+    if (mappedCount > knockoutSlots.length) return setError("There are not enough knockout match slots for this schedule.");
     setBusy(true); setError(""); setDone("");
     try {
-      for (let i = 0; i < slots.length; i++) {
-        const pair = customPairs[i] || { a: "", b: "" };
-        const a = pair.a || null, b = pair.b || null;
-        const bye = !!a && !b;
-        const empty = !a && !b;
-        const { error } = await supabase.from("tournament_matches").update({ team_a_duo_id: a, team_b_duo_id: b, status: empty ? "SCHEDULED" : bye ? "COMPLETED" : "SCHEDULED", winner_duo_id: bye ? a : null }).eq("id", slots[i].id);
-        if (error) throw error;
+      for (let i = 0; i < knockoutSlots.length; i++) {
+        const pair = customPairs[i] || { a: "", b: "" }; const a = pair.a || null, b = pair.b || null; const bye = !!a && !b; const empty = !a && !b;
+        const { error } = await supabase.from("tournament_matches").update({ team_a_duo_id: a, team_b_duo_id: b, status: empty ? "SCHEDULED" : bye ? "COMPLETED" : "SCHEDULED", winner_duo_id: bye ? a : null }).eq("id", knockoutSlots[i].id); if (error) throw error;
       }
-      await syncTournamentProgression(id);
-      setDone("Custom knockout schedule created.");
-      setDrawView("final"); setNextStageMode("auto"); await load();
+      await syncTournamentProgression(id); setDone("Custom knockout schedule created."); setDrawView("final"); setNextStageMode("auto"); await load();
     } catch (e: any) { setError(e?.message || "Could not create custom knockout schedule"); } finally { setBusy(false); }
   }
 
@@ -190,7 +168,7 @@ export default function Draw() {
       {nextStageMode === "auto" && <div style={{ marginTop: 10, display: "grid", gap: 8 }}><p className={s.sub} style={{ margin: 0 }}>Let Rally365 place the qualified teams into the next knockout round. If the bracket is not balanced, byes are assigned automatically.</p><button className={`${s.button} ${s.secondary}`} onClick={createKnockoutDraw} disabled={busy || knockoutSeeded || t?.is_locked}>{knockoutSeeded ? "Knockout draw created" : t?.is_locked ? "Tournament locked" : busy ? "Creating…" : "Create knockout draw →"}</button></div>}
       {nextStageMode === "custom" && <div style={{ marginTop: 12, padding: 14, border: "1px solid #dce7e2", borderRadius: 16, background: "#fbfdfc" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}><div><strong style={{ display: "block", fontSize: 14, color: "#102d25" }}>Create knockout schedule</strong><span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#71857d", lineHeight: 1.45 }}>Map every qualified team. Leave the second team as Bye when needed.</span></div><button type="button" onClick={resetCustomSchedule} disabled={busy} style={{ border: "1px solid #cfe5dc", background: "#fff", color: "#078b5c", borderRadius: 10, padding: "7px 10px", fontSize: 10, fontWeight: 700 }}>Reset</button></div>
         <div style={{ display: "grid", gap: 8 }}>{customPairs.map((pair, index) => <div key={index} style={{ display: "grid", gridTemplateColumns: "54px minmax(0,1fr) 20px minmax(0,1fr) 34px", alignItems: "center", gap: 6, padding: "9px 0", borderTop: index ? "1px solid #edf2ef" : undefined }}><div><strong style={{ display: "block", fontSize: 11, color: "#17352a" }}>Match {index + 1}</strong><small style={{ display: "block", marginTop: 2, color: "#8a9a94", fontSize: 8 }}>{pair.a && !pair.b ? "Bye" : `Slot ${index + 1}`}</small></div><select value={pair.a} onChange={(e) => updateCustomPair(index, "a", e.target.value)} disabled={busy} style={{ minWidth: 0, width: "100%", border: "1px solid #dce7e2", borderRadius: 10, background: "#fff", color: "#17352a", padding: "9px 7px", fontSize: 10, outline: "none" }}><option value="">Select team</option>{qualifiedIds.map((teamId) => <option key={teamId} value={teamId}>{qualifiedNames.get(teamId)}</option>)}</select><span style={{ textAlign: "center", color: "#8a9a94", fontSize: 10 }}>VS</span><select value={pair.b} onChange={(e) => updateCustomPair(index, "b", e.target.value)} disabled={busy} style={{ minWidth: 0, width: "100%", border: "1px solid #dce7e2", borderRadius: 10, background: pair.b ? "#fff" : "#f2f8f5", color: pair.b ? "#17352a" : "#71857d", padding: "9px 7px", fontSize: 10, outline: "none" }}><option value="">Bye</option>{qualifiedIds.map((teamId) => <option key={teamId} value={teamId}>{qualifiedNames.get(teamId)}</option>)}</select><button type="button" aria-label={`Remove match ${index + 1}`} onClick={() => removeCustomMatch(index)} disabled={busy || customPairs.length <= 1} style={{ width: 30, height: 30, border: "1px solid #dce7e2", borderRadius: 9, background: "#fff", color: "#7a8b85", display: "grid", placeItems: "center" }}><Trash2 size={13} /></button></div>)}</div>
-        <button type="button" onClick={addCustomMatch} disabled={busy || customPairs.length >= slots.length} style={{ width: "100%", marginTop: 10, border: "1px solid #078b5c", borderRadius: 11, background: "#f2faf6", color: "#078b5c", padding: "10px 12px", fontSize: 11, fontWeight: 700 }}><Plus size={14} style={{ verticalAlign: "-3px", marginRight: 5 }} />Add another match</button>
+        <button type="button" onClick={addCustomMatch} disabled={busy || customPairs.length >= knockoutSlots.length} style={{ width: "100%", marginTop: 10, border: "1px solid #078b5c", borderRadius: 11, background: "#f2faf6", color: "#078b5c", padding: "10px 12px", fontSize: 11, fontWeight: 700 }}><Plus size={14} style={{ verticalAlign: "-3px", marginRight: 5 }} />Add another match</button>
         <button type="button" onClick={createCustomKnockoutSchedule} disabled={busy || t?.is_locked} className={s.button} style={{ width: "100%", marginTop: 10 }}>{busy ? "Creating…" : "Create knockout schedule"}</button>
       </div>}
     </div></section>}

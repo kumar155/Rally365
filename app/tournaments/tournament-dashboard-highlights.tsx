@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sparkles, Trophy } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
@@ -33,6 +34,7 @@ function getInitials(name: string) {
 }
 
 export default function TournamentDashboardHighlights() {
+  const pathname = usePathname();
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [id, setId] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
@@ -40,12 +42,17 @@ export default function TournamentDashboardHighlights() {
   const [rounds, setRounds] = useState<Round[]>([]);
 
   useEffect(() => {
-    if (window.location.pathname !== "/tournaments/manage") return;
-    setId(new URLSearchParams(window.location.search).get("id") || "");
-  }, []);
+    if (pathname !== "/tournaments/manage") {
+      setId("");
+      setTarget(null);
+      return;
+    }
+    const nextId = new URLSearchParams(window.location.search).get("id") || "";
+    setId(nextId);
+  }, [pathname]);
 
   useEffect(() => {
-    if (window.location.pathname !== "/tournaments/manage") return;
+    if (pathname !== "/tournaments/manage") return;
 
     let cancelled = false;
     let raf = 0;
@@ -73,10 +80,10 @@ export default function TournamentDashboardHighlights() {
       window.cancelAnimationFrame(raf);
       setTarget(null);
     };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
-    if (!id || window.location.pathname !== "/tournaments/manage") return;
+    if (!id || pathname !== "/tournaments/manage") return;
     let cancelled = false;
 
     async function load() {
@@ -100,7 +107,7 @@ export default function TournamentDashboardHighlights() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, pathname]);
 
   const teamStats = useMemo(() => {
     const map = new Map<string, TeamStat>();

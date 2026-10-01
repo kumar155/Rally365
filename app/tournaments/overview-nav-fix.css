@@ -1,0 +1,9 @@
+/* Overview navigation tiles are cards, not text links. */
+a.overviewCardRef,
+a.overviewCardRef:visited,
+a.overviewCardRef:hover,
+a.overviewCardRef:active,
+a.overviewCardRef:focus,
+a.overviewCardRef * {
+  text-decoration: none !important;
+}

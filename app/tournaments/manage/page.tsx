@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Coins,
   Gamepad2,
+  DatabaseZap,
   Home,
   Lock,
   MapPin,
@@ -284,10 +285,10 @@ export default function TournamentManagePage() {
         {tab === "overview" && (
           <div className="overviewRef">
             <div className="overviewGridRef">
-              <Link href={`/tournaments?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-blue overviewNavCard" aria-label="Open tournament table">
+              <Link href={`/tournaments/standings?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-blue overviewNavCard" aria-label="Open tournament table">
                 <div className="overviewIconRef"><Table2 /></div>
-                <div className="overviewValueRef">Tournament Table</div>
-                <div className="overviewLabelRef">View all tournaments</div>
+                <div className="overviewValueRef">Table</div>
+                <div className="overviewLabelRef">View all stats</div>
                 <ChevronRight className="overviewNavArrow" />
               </Link>
               <OverviewCard icon={<Users />} value={String(duos.length)} label="Duos / Teams" tone="green" />
@@ -326,7 +327,7 @@ export default function TournamentManagePage() {
                   <ChevronRight size={20} />
                 </button>
                 <button type="button" className="configRowRef" disabled={locked} onClick={() => setSheet("format")}>
-                  <div className="configIcon"><Gamepad2 size={23} /></div>
+                  <div className="configIcon"><ShieldCheck size={23} /></div>
                   <div className="configText"><small>FORMAT MODE</small><strong>{formatLabel(format)}</strong><span>{format === "KNOCKOUT" ? "Knockout format – one loss and you're out" : format === "GROUPS_KNOCKOUT" ? "Group stage followed by final rounds" : "Everyone plays the configured schedule"}</span></div>
                   <ChevronRight size={20} />
                 </button>

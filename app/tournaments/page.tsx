@@ -253,7 +253,7 @@ export default function TournamentsPage() {
                   <span className="tournament-list-name">
                     <strong>{tournament.name}</strong>
                     <small>
-                      🏸 {formatLabel(tournament.format)}
+                      {formatLabel(tournament.format)}
                       {tournament.venue ? ` · ${tournament.venue}` : ""}
                     </small>
                   </span>

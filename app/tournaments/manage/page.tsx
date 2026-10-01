@@ -285,20 +285,20 @@ export default function TournamentManagePage() {
         {tab === "overview" && (
           <div className="overviewRef">
             <div className="overviewGridRef">
-              <Link href={`/tournaments/standings?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-blue overviewNavCard" aria-label="Open tournament table">
+              <Link href={`/tournaments/standings?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-green overviewNavCard" aria-label="Open tournament table">
                 <div className="overviewIconRef"><Table2 /></div>
                 <div className="overviewValueRef">Table</div>
                 <div className="overviewLabelRef">View all stats</div>
                 <ChevronRight className="overviewNavArrow" />
               </Link>
               <OverviewCard icon={<Users />} value={String(duos.length)} label="Duos / Teams" tone="green" />
-              <Link href={`/tournaments/matches?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-purple overviewNavCard" aria-label="Open match schedule">
+              <Link href={`/tournaments/matches?id=${encodeURIComponent(id)}`} className="overviewCardRef tone-green overviewNavCard" aria-label="Open match schedule">
                 <div className="overviewIconRef"><CalendarClock /></div>
                 <div className="overviewValueRef">{completed} / {matches.length}</div>
                 <div className="overviewLabelRef">Match Schedule</div>
                 <ChevronRight className="overviewNavArrow" />
               </Link>
-              <OverviewCard icon={<Trophy />} value={String(matches.length)} label="Total Matches" tone="orange" />
+              <OverviewCard icon={<Trophy />} value={String(matches.length)} label="Total Matches" tone="green" />
             </div>
 
             <section className="configRef">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home } from "lucide-react";
+import { Home, Share2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -100,11 +100,57 @@ export default function TournamentHomeButton() {
 
   if (pathname === "/tournaments" || pathname === "/") return null;
 
+  if (isTournamentDashboard) {
+    const shareTournament = async () => {
+      const url = window.location.href;
+      const title = document.title || "Rally365 Tournament";
+      const text = "View this Rally365 tournament";
+
+      try {
+        if (navigator.share) {
+          await navigator.share({ title, text, url });
+          return;
+        }
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // Share sheets can be dismissed; do not surface a false error.
+      }
+    };
+
+    return (
+      <button
+        type="button"
+        onClick={shareTournament}
+        aria-label="Share tournament"
+        title="Share tournament"
+        style={{
+          position: "fixed",
+          top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+          right: 60,
+          width: 40,
+          height: 40,
+          borderRadius: 50,
+          background: "rgba(255,255,255,.96)",
+          border: "1px solid #dfe8e3",
+          color: "#17352a",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 80,
+          boxShadow: "0 4px 14px rgba(20,53,42,.08)",
+          WebkitTapHighlightColor: "transparent",
+          cursor: "pointer",
+        }}
+      >
+        <Share2 size={18} strokeWidth={2.1} />
+      </button>
+    );
+  }
+
   return (
     <Link
       href={href}
-      aria-label={isTournamentDashboard ? "Home" : "Tournament dashboard"}
-      title={isTournamentDashboard ? "Home" : "Tournament dashboard"}
+      aria-label="Tournament dashboard"
+      title="Tournament dashboard"
       style={{
         position: "fixed",
         top: "calc(env(safe-area-inset-top, 0px) + 12px)",

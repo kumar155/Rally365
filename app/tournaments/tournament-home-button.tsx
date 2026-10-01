@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, Share2 } from "lucide-react";
+import { ArrowLeft, Share2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -96,79 +96,128 @@ export default function TournamentHomeButton() {
   }, [pathname]);
 
   const isTournamentDashboard = pathname === "/tournaments/manage";
-  const href = isTournamentDashboard ? "/" : tournamentId ? `/tournaments/manage?id=${encodeURIComponent(tournamentId)}` : "/tournaments";
+  const dashboardHref = tournamentId
+    ? `/tournaments/manage?id=${encodeURIComponent(tournamentId)}`
+    : "/tournaments/manage";
 
   if (pathname === "/tournaments" || pathname === "/") return null;
 
-  if (isTournamentDashboard) {
-    const shareTournament = async () => {
-      const url = window.location.href;
-      const title = document.title || "Rally365 Tournament";
-      const text = "View this Rally365 tournament";
+  const shareTournament = async () => {
+    const url = window.location.href;
+    const title = document.title || "Rally365 Tournament";
+    const text = "View this Rally365 tournament";
 
-      try {
-        if (navigator.share) {
-          await navigator.share({ title, text, url });
-          return;
-        }
-        await navigator.clipboard.writeText(url);
-      } catch {
-        // Share sheets can be dismissed; do not surface a false error.
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        return;
       }
-    };
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Share sheets can be dismissed; do not surface a false error.
+    }
+  };
 
-    return (
-      <button
-        type="button"
-        onClick={shareTournament}
-        aria-label="Share tournament"
-        title="Share tournament"
+  return (
+    <header
+      className="rallyTournamentGlobalHeader"
+      aria-label="Rally365 tournament navigation"
+      style={{
+        position: "fixed",
+        top: "env(safe-area-inset-top, 0px)",
+        left: 0,
+        right: 0,
+        height: 58,
+        padding: "7px 12px",
+        display: "grid",
+        gridTemplateColumns: "1fr auto 1fr",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(247,250,248,.92)",
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
+        borderBottom: "1px solid rgba(221,232,226,.78)",
+        zIndex: 100,
+      }}
+    >
+      <Link
+        href={isTournamentDashboard ? "/" : dashboardHref}
+        aria-label={isTournamentDashboard ? "Back to Rally365 home" : "Back to tournament dashboard"}
+        title={isTournamentDashboard ? "Back to Rally365 home" : "Back to tournament dashboard"}
         style={{
-          position: "fixed",
-          top: "calc(env(safe-area-inset-top, 0px) + 12px)",
-          right: 60,
-          width: 40,
-          height: 40,
-          borderRadius: 50,
+          justifySelf: "start",
+          minHeight: 38,
+          padding: "0 12px",
+          borderRadius: 14,
           background: "rgba(255,255,255,.96)",
           border: "1px solid #dfe8e3",
           color: "#17352a",
-          display: "grid",
-          placeItems: "center",
-          zIndex: 80,
-          boxShadow: "0 4px 14px rgba(20,53,42,.08)",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          boxShadow: "0 4px 14px rgba(20,53,42,.07)",
+          textDecoration: "none",
+          fontSize: 12,
+          fontWeight: 750,
+          whiteSpace: "nowrap",
           WebkitTapHighlightColor: "transparent",
-          cursor: "pointer",
         }}
       >
-        <Share2 size={18} strokeWidth={2.1} />
-      </button>
-    );
-  }
+        <ArrowLeft size={16} strokeWidth={2.3} />
+        <span>{isTournamentDashboard ? "Rally365 Home" : "Tournament"}</span>
+      </Link>
 
-  return (
-    <Link
-      href={href}
-      aria-label="Tournament dashboard"
-      title="Tournament dashboard"
-      style={{
-        position: "fixed",
-        top: "calc(env(safe-area-inset-top, 0px) + 12px)",
-        left: 12,
-        width: 40,
-        height: 40,
-        borderRadius: 14,
-        background: "rgba(255,255,255,.96)",
-        border: "1px solid #dfe8e3",
-        color: "#17352a",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 80,
-        boxShadow: "0 4px 14px rgba(20,53,42,.08)",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      <Home size={20} strokeWidth={2.2} />
-    </Link>
+      <Link
+        href="/"
+        aria-label="Rally365"
+        title="Rally365"
+        style={{
+          justifySelf: "center",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 42,
+          height: 42,
+          borderRadius: 14,
+          overflow: "hidden",
+          background: "#fff",
+          border: "1px solid #dfe8e3",
+          boxShadow: "0 4px 14px rgba(20,53,42,.07)",
+          textDecoration: "none",
+        }}
+      >
+        <img
+          src="/rally365-logo-recommended.png"
+          alt="Rally365"
+          style={{ width: 34, height: 34, objectFit: "contain", display: "block" }}
+        />
+      </Link>
+
+      <div style={{ justifySelf: "end", minWidth: 38, display: "flex", justifyContent: "flex-end" }}>
+        {isTournamentDashboard ? (
+          <button
+            type="button"
+            onClick={shareTournament}
+            aria-label="Share tournament"
+            title="Share tournament"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 14,
+              background: "rgba(255,255,255,.96)",
+              border: "1px solid #dfe8e3",
+              color: "#17352a",
+              display: "grid",
+              placeItems: "center",
+              boxShadow: "0 4px 14px rgba(20,53,42,.07)",
+              WebkitTapHighlightColor: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            <Share2 size={17} strokeWidth={2.1} />
+          </button>
+        ) : null}
+      </div>
+    </header>
   );
 }

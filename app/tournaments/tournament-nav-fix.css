@@ -1,0 +1,14 @@
+/* Tournament navigation + match-page mobile refinements */
+.tabCount{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:3px;border-radius:999px;background:#e8efec;color:#71857d;font-size:9px;font-weight:850;line-height:1}
+.matchesHeading{margin:24px 0 18px}.matchesHeading h2{margin:5px 0 6px;font-size:32px;line-height:1.05;letter-spacing:-.04em}.matchesHeading p{margin:0;color:#71857d;font-size:14px}
+.viewAllMatches{display:flex;justify-content:center;margin:24px 0 6px}.viewAllMatchesLink{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:12px;min-height:48px;border-radius:15px;background:#078b5c;color:#fff;text-decoration:none;font-size:14px;font-weight:850;box-shadow:0 8px 20px rgba(7,139,92,.16)}
+.viewAllMatchesLink span:last-child{font-size:22px;line-height:1}
+@media(max-width:800px){
+  .tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;overflow:hidden;margin:0 -2px 16px;padding:4px;background:#f0f5f3;border:1px solid #dfe9e5;border-radius:28px;box-shadow:0 4px 12px rgba(10,50,35,.04)}
+  .tab{min-width:0;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;border-radius:22px;padding:10px 3px;font-size:9px;line-height:1.1;font-weight:800;color:#657a71}
+  .tabActive{background:#078b5c;color:#fff;border:0;box-shadow:0 4px 10px rgba(7,139,92,.18)}
+  .tabActive .tabCount{background:rgba(255,255,255,.2);color:#fff}
+  .tabCount{min-width:15px;height:15px;padding:0 4px;margin-left:1px;font-size:8px;background:#e1e9e6}
+  .matchesHeading{margin:22px 8px 16px}.matchesHeading h2{font-size:30px}.matchesHeading p{font-size:13px}
+  .viewAllMatches{margin:22px 0 4px;padding-bottom:4px}.viewAllMatchesLink{min-height:50px;border-radius:16px;font-size:14px}
+}

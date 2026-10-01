@@ -6,6 +6,6 @@
 }
 
 /* Reserve space only when the shared tournament header is actually rendered. */
-body:has(.rallyTournamentGlobalHeader) .typography {
+body:has(.rallyTournamentGlobalHeader) .tournamentLayoutRoot {
   padding-top: 58px !important;
 }

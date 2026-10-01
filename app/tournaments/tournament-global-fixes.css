@@ -5,7 +5,45 @@
   display: none !important;
 }
 
-/* Reserve space only when the shared tournament header is actually rendered. */
+/* Reserve space for the shared Rally365-branded tournament header. */
 body:has(.rallyTournamentGlobalHeader) .tournamentLayoutRoot {
-  padding-top: 58px !important;
+  padding-top: 82px !important;
+}
+
+/* The manage page keeps its local title/lock row below the global brand header. */
+.tournamentMobileHeader {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  height: 44px !important;
+  padding: 0 !important;
+  margin: 0 0 8px !important;
+}
+
+.tournamentMobileHeader::before,
+.tournamentMobileHeader::after {
+  display: none !important;
+  content: none !important;
+}
+
+.tournamentMobileHeader > .roundIcon,
+.tournamentMobileHeader > .roundIcon:first-child,
+.tournamentMobileHeader > .roundIcon:last-child {
+  position: static !important;
+  flex: 0 0 auto !important;
+}
+
+.tournamentMobileHeader .tournamentHeaderTitle {
+  position: static !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  padding: 0 10px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }

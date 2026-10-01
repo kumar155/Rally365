@@ -1,0 +1,47 @@
+/* Final tournament hero correction: keep all header data inside the compact card. */
+.tournamentHeroRef {
+  min-height: 208px !important;
+  height: 208px !important;
+  padding: 16px !important;
+}
+
+/* The reference uses the trophy as the only hero decoration. */
+.tournamentHeroRef .heroDecor.racket {
+  display: none !important;
+}
+
+.tournamentHeroRef .heroDecor.trophy {
+  display: block !important;
+  right: -15px !important;
+  bottom: -27px !important;
+  color: #d7fff0 !important;
+  opacity: .18 !important;
+  transform: rotate(-5deg) !important;
+  z-index: 1 !important;
+}
+
+/* Pull the content upward so the progress summary is never clipped. */
+.tournamentHeroRef .heroContent {
+  margin-top: 18px !important;
+  z-index: 3 !important;
+}
+
+.tournamentHeroRef .heroSubtitle {
+  margin: 3px 0 9px !important;
+}
+
+.tournamentHeroRef .progressLabel {
+  margin-top: 14px !important;
+}
+
+.tournamentHeroRef .progressFoot {
+  margin-top: 5px !important;
+  color: #b0f5d9 !important;
+  position: relative;
+  z-index: 3;
+  white-space: nowrap;
+}
+
+.tournamentHeroRef .heroTopRow {
+  z-index: 4 !important;
+}

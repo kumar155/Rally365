@@ -1,0 +1,6 @@
+/* Shared tournament-page refinements */
+
+/* The tournament name already identifies the page; keep the hero compact. */
+.heroSubtitle {
+  display: none !important;
+}

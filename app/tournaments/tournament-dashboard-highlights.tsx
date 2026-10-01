@@ -24,15 +24,6 @@ type TeamStat = { id: string; name: string; played: number; wins: number; losses
 
 const terminal = new Set(["COMPLETED", "WALKOVER"]);
 
-function getInitials(name: string) {
-  return name
-    .split(/\s*\+\s*|\s+/)
-    .map((part) => part.trim().charAt(0).toUpperCase())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("");
-}
-
 export default function TournamentDashboardHighlights() {
   const pathname = usePathname();
   const [target, setTarget] = useState<HTMLElement | null>(null);
@@ -75,8 +66,11 @@ export default function TournamentDashboardHighlights() {
     };
 
     mountTarget();
+    const observer = new MutationObserver(() => mountTarget());
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       cancelled = true;
+      observer.disconnect();
       window.cancelAnimationFrame(raf);
       setTarget(null);
     };
@@ -189,7 +183,7 @@ export default function TournamentDashboardHighlights() {
         .rally365-highlight-copy strong{display:block;color:#123f30;font-size:18px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .rally365-highlight-copy p,.rally365-mvp-copy p{margin:4px 0 0;font-size:11px;line-height:1.35}
         .rally365-highlight-copy p{color:#55776a}.rally365-mvp-copy p{color:#7c683b}
-        .rally365-highlight-team-mark{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#f8d98a;color:#17352a;font-size:13px;font-weight:900;border:3px solid rgba(255,255,255,.72)}
+        .rally365-winner-stats{display:flex;align-items:center;flex:0 0 auto;padding-left:4px}.rally365-winner-stats>div{min-width:46px;padding:0 7px;text-align:center}.rally365-winner-stats>div+div{border-left:1px solid #c5e4d2}.rally365-winner-stats b{display:block;color:#11764a;font-size:17px;line-height:1.15}.rally365-winner-stats span{display:block;margin-top:3px;color:#5e806f;font-size:9px;font-weight:700;line-height:1.1}
         .rally365-mvp-card{border:1px solid #ecd58f;background:linear-gradient(105deg,#fff8df 0%,#fffdf4 58%,#fff1c4 100%);box-shadow:0 4px 14px rgba(126,92,20,.07)}
         .rally365-mvp-badge{width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;border-radius:15px;background:#ffefb5;font-size:25px}
         .rally365-mvp-copy strong{display:block;color:#5e4308;font-size:18px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -197,7 +191,7 @@ export default function TournamentDashboardHighlights() {
         .rally365-mvp-stats>div{min-width:46px;padding:0 7px;text-align:center}.rally365-mvp-stats>div+div{border-left:1px solid #ead58e}
         .rally365-mvp-stats b{display:block;color:#765208;font-size:17px;line-height:1.15}.rally365-mvp-stats span{display:block;margin-top:3px;color:#8b774c;font-size:9px;font-weight:700;line-height:1.1}
         .rally365-mvp-sparkle{position:absolute;right:8px;top:7px;color:#c69a2b;opacity:.45}
-        @media(max-width:600px){.rally365-dashboard-highlights{margin:12px 0 16px}.rally365-winner-card,.rally365-mvp-card{gap:10px;padding:12px}.rally365-highlight-icon,.rally365-mvp-badge{width:42px;height:42px;border-radius:13px}.rally365-highlight-icon svg{width:21px;height:21px}.rally365-mvp-badge{font-size:22px}.rally365-highlight-copy strong,.rally365-mvp-copy strong{font-size:16px}.rally365-highlight-copy p,.rally365-mvp-copy p{font-size:10px}.rally365-highlight-team-mark{width:40px;height:40px;font-size:12px}.rally365-mvp-stats{padding-left:5px}.rally365-mvp-stats>div{min-width:40px;padding:0 4px}.rally365-mvp-stats b{font-size:15px}.rally365-mvp-stats span{font-size:8px}}
+        @media(max-width:600px){.rally365-dashboard-highlights{margin:12px 0 16px}.rally365-winner-card,.rally365-mvp-card{gap:10px;padding:12px}.rally365-highlight-icon,.rally365-mvp-badge{width:42px;height:42px;border-radius:13px}.rally365-highlight-icon svg{width:21px;height:21px}.rally365-mvp-badge{font-size:22px}.rally365-highlight-copy strong,.rally365-mvp-copy strong{font-size:16px}.rally365-highlight-copy p,.rally365-mvp-copy p{font-size:10px}.rally365-winner-stats{padding-left:5px}.rally365-winner-stats>div{min-width:40px;padding:0 4px}.rally365-winner-stats b{font-size:15px}.rally365-winner-stats span{font-size:8px}.rally365-mvp-stats{padding-left:5px}.rally365-mvp-stats>div{min-width:40px;padding:0 4px}.rally365-mvp-stats b{font-size:15px}.rally365-mvp-stats span{font-size:8px}}
       `}</style>
       <section className="rally365-dashboard-highlights" aria-label="Tournament highlights">
         {winner && (
@@ -208,7 +202,10 @@ export default function TournamentDashboardHighlights() {
               <strong>{winner.name}</strong>
               <p>Champions · {winner.wins} win{winner.wins === 1 ? "" : "s"} from {winner.played} match{winner.played === 1 ? "" : "es"}.</p>
             </div>
-            <div className="rally365-highlight-team-mark">{getInitials(winner.name)}</div>
+            <div className="rally365-winner-stats">
+              <div><b>{winner.wins}</b><span>Wins</span></div>
+              <div><b>{winner.played}</b><span>Matches</span></div>
+            </div>
           </article>
         )}
 

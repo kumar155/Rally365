@@ -45,3 +45,75 @@
 .tournamentHeroRef .heroTopRow {
   z-index: 4 !important;
 }
+
+/*
+ * Rally365 tournament branding.
+ * Keep the tournament actions underneath the brand row while using the
+ * existing circular app logo asset and the same clean wordmark treatment
+ * as the Rally365 home screen.
+ */
+.tournamentMobileHeader {
+  position: relative !important;
+  display: block !important;
+  height: 94px !important;
+  padding-top: 47px !important;
+  margin-bottom: 8px !important;
+}
+
+.tournamentMobileHeader::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 39px;
+  height: 39px;
+  background: url('/rally365-circle-logo.png') center / contain no-repeat;
+  pointer-events: none;
+}
+
+.tournamentMobileHeader::after {
+  content: "Rally365\A Everyday badminton";
+  position: absolute;
+  left: 47px;
+  top: 0;
+  white-space: pre;
+  text-align: left;
+  color: #10231a;
+  font-size: 21px;
+  line-height: 1.12;
+  letter-spacing: -.045em;
+  font-weight: 850;
+  pointer-events: none;
+}
+
+/* Keep the existing tournament actions visible below the Rally365 brand. */
+.tournamentMobileHeader > .roundIcon {
+  position: absolute !important;
+  top: 50px !important;
+  z-index: 2;
+}
+
+.tournamentMobileHeader > .roundIcon:first-child {
+  left: 0 !important;
+}
+
+.tournamentMobileHeader > .roundIcon:last-child {
+  right: 0 !important;
+}
+
+.tournamentMobileHeader .tournamentHeaderTitle {
+  position: absolute !important;
+  left: 50px !important;
+  right: 50px !important;
+  top: 56px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  text-align: center !important;
+  z-index: 1;
+}
+
+@media (min-width: 801px) {
+  .tournamentMobileHeader {
+    display: none !important;
+  }
+}

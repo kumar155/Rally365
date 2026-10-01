@@ -1,7 +1,266 @@
 "use client";
-import Link from "next/link";import {useEffect,useState} from "react";import {supabase} from "../../../lib/supabase";import s from "../tournament.module.css";
-type M={id:string;match_number:number;scheduled_at:string|null;court:number|null;team_a_score:number|null;team_b_score:number|null;status:string;team_a_duo_id:string|null;team_b_duo_id:string|null;team_a:{name:string}|null;team_b:{name:string}|null};
-type Winner="A"|"B"|null;
-const resultButtonStyle={border:"1px solid #d8e5df",background:"#f7faf8",color:"#71857d",borderRadius:7,padding:"5px 6px",fontSize:8,fontWeight:800,lineHeight:1,cursor:"pointer"} as const;
-export default function Matches(){const[id,setId]=useState("");const[matches,setMatches]=useState<M[]>([]);const[error,setError]=useState("");const[busy,setBusy]=useState<string|null>(null);useEffect(()=>setId(new URLSearchParams(window.location.search).get("id")||""),[]);async function load(){if(!id)return;const{data,error}=await supabase.from("tournament_matches").select("id,match_number,scheduled_at,court,team_a_score,team_b_score,status,team_a_duo_id,team_b_duo_id,team_a:tournament_duos!tournament_matches_team_a_duo_id_fkey(name),team_b:tournament_duos!tournament_matches_team_b_duo_id_fkey(name)").eq("tournament_id",id).order("match_number");if(error)setError(error.message);setMatches((data||[])as any)}useEffect(()=>{load()},[id]);async function save(m:M,a:number,b:number,winner:Winner,status="COMPLETED"){setBusy(m.id);const winnerId=status==="COMPLETED"?(winner==="A"?m.team_a_duo_id:winner==="B"?m.team_b_duo_id:null):null;const{error}=await supabase.from("tournament_matches").update({team_a_score:a,team_b_score:b,status,winner_duo_id:winnerId}).eq("id",m.id);if(error)setError(error.message);else await load();setBusy(null)}const path=(p:string)=>`/tournaments/${p}?id=${encodeURIComponent(id)}`;if(!id)return <main className={s.page}><div className={s.shell}><div className={s.card}>Tournament ID is missing.</div></div></main>;const completed=matches.filter(m=>m.status==="COMPLETED").length;return <main className={s.page}><div className={s.shell}><div className={s.top}><div><div className={s.brand}>RALLY365 OPEN</div><h1 className={s.title}>Matches</h1><p className={s.sub}>Live scoring and completed results.</p></div><Link href={path("schedule")} className={s.secondaryButton}>Schedule →</Link></div><nav className={s.tabs} aria-label="Tournament navigation"><Link className={s.tab} href={path("manage")}>Overview</Link><Link className={`${s.tab} ${s.tabActive}`} href={path("matches")}>Matches <span className={s.tabCount}>{matches.length}</span></Link><Link className={s.tab} href={path("standings")}>Standings</Link><Link className={s.tab} href={path("players")}>Players</Link><Link className={s.tab} href={path("draw")}>Draw</Link></nav>{error&&<div className={s.error}>{error}</div>}<div className={s.matchesHeading}><div className={s.eyebrow}>MATCHES</div><h2>Match schedule</h2><p>{matches.length} matches · {completed} completed</p></div><div className={s.grid2}>{matches.map(m=><MatchCard key={m.id} m={m} busy={busy===m.id} onSave={save}/>)}</div>{!matches.length&&<div className={s.card}>No matches yet. Generate the draw first.</div>}<div className={s.viewAllMatches}><Link href={path("matches")} className={s.viewAllMatchesLink}>View All Matches <span aria-hidden="true">→</span></Link></div></div></main>}
-function MatchCard({m,busy,onSave}:{m:M;busy:boolean;onSave:(m:M,a:number,b:number,winner:Winner,status?:string)=>void}){const[a,setA]=useState(String(m.team_a_score??0));const[b,setB]=useState(String(m.team_b_score??0));const initialWinner:Winner=m.team_a_score!=null&&m.team_b_score!=null?(m.team_a_score>m.team_b_score?"A":m.team_b_score>m.team_a_score?"B":null):null;const[winner,setWinner]=useState<Winner>(initialWinner);const live=m.status==="LIVE";function selectWinner(side:Exclude<Winner,null>){setWinner(side)}const choice=(side:Exclude<Winner,null>,label:"WIN"|"LOSE")=>{const selected=label==="WIN"?winner===side:winner!==null&&winner!==side;const style=selected?(label==="WIN"?{...resultButtonStyle,background:"#e3f6ed",borderColor:"#75c5a4",color:"#078b5c"}:{...resultButtonStyle,background:"#fff0f0",borderColor:"#e8a6a6",color:"#b73b3b"}):resultButtonStyle;return <button type="button" style={style} onClick={()=>selectWinner(label==="WIN"?side:side==="A"?"B":"A")}>{label}</button>};return <div className={s.matchTile}><div className={s.matchTileTop}><span className={live?s.gold:""}>{live?"● LIVE":m.status}</span><span>Match {m.match_number} · {m.court?`Court ${m.court}`:"Court TBD"}</span></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>A</span><span className={s.teamName}>{m.team_a?.name||"TBD"}</span></span><div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><input className={s.scoreInput} type="number" min="0" value={a} onChange={e=>setA(e.target.value)}/><div style={{display:"flex",gap:3}}>{choice("A","WIN")}{choice("A","LOSE")}</div></div></div><div className={s.teamLine}><span className={s.teamIdentity}><span className={s.avatar}>B</span><span className={s.teamName}>{m.team_b?.name||"TBD"}</span></span><div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><input className={s.scoreInput} type="number" min="0" value={b} onChange={e=>setB(e.target.value)}/><div style={{display:"flex",gap:3}}>{choice("B","WIN")}{choice("B","LOSE")}</div></div></div><div className={s.actions} style={{marginTop:10}}><Link href={`/tournaments/match?id=${m.id}`} className={s.button+" "+s.ghost}>Open</Link><button className={s.button} disabled={busy||!m.team_a_duo_id||!m.team_b_duo_id||!winner} onClick={()=>onSave(m,Number(a),Number(b),winner,"COMPLETED")}>{busy?"Saving…":"Save score"}</button></div></div>}
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../../lib/supabase";
+import s from "./matches.module.css";
+
+type Match = {
+  id: string;
+  match_number: number;
+  scheduled_at: string | null;
+  court: number | null;
+  team_a_score: number | null;
+  team_b_score: number | null;
+  status: string;
+  team_a_duo_id: string | null;
+  team_b_duo_id: string | null;
+  team_a: { name: string } | null;
+  team_b: { name: string } | null;
+};
+
+type Winner = "A" | "B" | null;
+type Filter = "ALL" | "PENDING" | "COMPLETED";
+
+const isCompleted = (m: Match) => m.status?.toUpperCase() === "COMPLETED";
+const hasRecordedScore = (m: Match) =>
+  m.team_a_score !== null || m.team_b_score !== null || isCompleted(m);
+
+function inferredWinner(m: Match): Winner {
+  if (m.team_a_score == null || m.team_b_score == null) return null;
+  if (m.team_a_score === m.team_b_score) return null;
+  return m.team_a_score > m.team_b_score ? "A" : "B";
+}
+
+function resultFor(m: Match, side: "A" | "B"): "WIN" | "LOSE" | null {
+  const winner = inferredWinner(m);
+  if (!winner) return null;
+  return winner === side ? "WIN" : "LOSE";
+}
+
+function ResultButton({
+  label,
+  selected,
+  lose,
+  onClick,
+}: {
+  label: "WIN" | "LOSE";
+  selected: boolean;
+  lose?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${s.resultButton} ${selected ? (lose ? s.resultLoseSelected : s.resultWinSelected) : ""}`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MatchCard({
+  match,
+  busy,
+  onSave,
+}: {
+  match: Match;
+  busy: boolean;
+  onSave: (match: Match, a: number, b: number, winner: Winner) => void;
+}) {
+  const [a, setA] = useState(String(match.team_a_score ?? 0));
+  const [b, setB] = useState(String(match.team_b_score ?? 0));
+  const [winner, setWinner] = useState<Winner>(inferredWinner(match));
+  const recorded = hasRecordedScore(match);
+
+  useEffect(() => {
+    setA(String(match.team_a_score ?? 0));
+    setB(String(match.team_b_score ?? 0));
+    setWinner(inferredWinner(match));
+  }, [match.team_a_score, match.team_b_score, match.status]);
+
+  const setResult = (side: "A" | "B") => setWinner(side);
+  const teamAResult = winner === "A" ? "WIN" : winner === "B" ? "LOSE" : resultFor(match, "A");
+  const teamBResult = winner === "B" ? "WIN" : winner === "A" ? "LOSE" : resultFor(match, "B");
+
+  return (
+    <article className={s.matchCard}>
+      <div className={s.matchHeader}>
+        <span className={s.matchStatus}>{isCompleted(match) ? "COMPLETED" : (match.status || "SCHEDULED")}</span>
+        <span className={s.matchMeta}>
+          Match {match.match_number} · {match.court ? `Court ${match.court}` : "Court TBD"}
+        </span>
+      </div>
+
+      <div className={s.teamRow}>
+        <div className={s.teamIdentity}>
+          <span className={s.avatar}>A</span>
+          <span className={s.teamName}>{match.team_a?.name || "TBD"}</span>
+        </div>
+        <input
+          className={s.scoreInput}
+          aria-label={`Match ${match.match_number} team A score`}
+          type="number"
+          min="0"
+          value={a}
+          onChange={(e) => setA(e.target.value)}
+        />
+        {recorded && (
+          <div className={s.resultGroup}>
+            <ResultButton label="WIN" selected={teamAResult === "WIN"} onClick={() => setResult("A")} />
+            <ResultButton label="LOSE" lose selected={teamAResult === "LOSE"} onClick={() => setResult("B")} />
+          </div>
+        )}
+      </div>
+
+      <div className={`${s.teamRow} ${s.teamRowAlt}`}>
+        <div className={s.teamIdentity}>
+          <span className={s.avatar}>B</span>
+          <span className={s.teamName}>{match.team_b?.name || "TBD"}</span>
+        </div>
+        <input
+          className={s.scoreInput}
+          aria-label={`Match ${match.match_number} team B score`}
+          type="number"
+          min="0"
+          value={b}
+          onChange={(e) => setB(e.target.value)}
+        />
+        {recorded && (
+          <div className={s.resultGroup}>
+            <ResultButton label="WIN" selected={teamBResult === "WIN"} onClick={() => setResult("B")} />
+            <ResultButton label="LOSE" lose selected={teamBResult === "LOSE"} onClick={() => setResult("A")} />
+          </div>
+        )}
+      </div>
+
+      <div className={s.actions}>
+        <Link href={`/tournaments/match?id=${match.id}`} className={s.openButton}>
+          Open
+        </Link>
+        <button
+          type="button"
+          className={s.saveButton}
+          disabled={busy || !match.team_a_duo_id || !match.team_b_duo_id || !winner}
+          onClick={() => onSave(match, Number(a) || 0, Number(b) || 0, winner)}
+        >
+          {busy ? "Saving…" : "Save score"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+export default function Matches() {
+  const [id, setId] = useState("");
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("ALL");
+
+  useEffect(() => {
+    setId(new URLSearchParams(window.location.search).get("id") || "");
+  }, []);
+
+  async function load() {
+    if (!id) return;
+    const { data, error: loadError } = await supabase
+      .from("tournament_matches")
+      .select(
+        "id,match_number,scheduled_at,court,team_a_score,team_b_score,status,team_a_duo_id,team_b_duo_id,team_a:tournament_duos!tournament_matches_team_a_duo_id_fkey(name),team_b:tournament_duos!tournament_matches_team_b_duo_id_fkey(name)"
+      )
+      .eq("tournament_id", id)
+      .order("match_number");
+
+    if (loadError) setError(loadError.message);
+    setMatches((data || []) as unknown as Match[]);
+  }
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  async function save(match: Match, a: number, b: number, winner: Winner) {
+    if (!winner) return;
+    setBusy(match.id);
+    setError("");
+
+    const winnerId = winner === "A" ? match.team_a_duo_id : match.team_b_duo_id;
+    const { error: saveError } = await supabase
+      .from("tournament_matches")
+      .update({
+        team_a_score: a,
+        team_b_score: b,
+        status: "COMPLETED",
+        winner_duo_id: winnerId,
+      })
+      .eq("id", match.id);
+
+    if (saveError) setError(saveError.message);
+    else await load();
+    setBusy(null);
+  }
+
+  const completed = useMemo(() => matches.filter(isCompleted).length, [matches]);
+  const pending = matches.length - completed;
+  const visibleMatches = useMemo(() => {
+    if (filter === "COMPLETED") return matches.filter(isCompleted);
+    if (filter === "PENDING") return matches.filter((m) => !isCompleted(m));
+    return matches;
+  }, [filter, matches]);
+
+  if (!id) {
+    return <main className={s.page}><div className={s.empty}>Tournament ID is missing.</div></main>;
+  }
+
+  return (
+    <main className={s.page}>
+      <div className={s.shell}>
+        <nav className={s.tabs} aria-label="Tournament navigation">
+          <Link className={s.tab} href={`/tournaments/manage?id=${encodeURIComponent(id)}`}>Overview</Link>
+          <Link className={`${s.tab} ${s.tabActive}`} href={`/tournaments/matches?id=${encodeURIComponent(id)}`}>
+            Matches <span className={s.tabCount}>{matches.length}</span>
+          </Link>
+          <Link className={s.tab} href={`/tournaments/standings?id=${encodeURIComponent(id)}`}>Standings</Link>
+          <Link className={s.tab} href={`/tournaments/players?id=${encodeURIComponent(id)}`}>Players</Link>
+          <Link className={s.tab} href={`/tournaments/draw?id=${encodeURIComponent(id)}`}>Draw</Link>
+        </nav>
+
+        <section className={s.content}>
+          <div className={s.eyebrow}>MATCHES</div>
+          <h1 className={s.heading}>Match schedule</h1>
+          <p className={s.summary}>{matches.length} matches · {completed} completed</p>
+
+          {matches.length > 0 && (
+            <div className={s.filterBar} aria-label="Match filters">
+              <div className={s.filters}>
+                <button type="button" className={`${s.filter} ${filter === "ALL" ? s.filterActive : ""}`} onClick={() => setFilter("ALL")}>
+                  All <span className={s.filterCount}>{matches.length}</span>
+                </button>
+                <button type="button" className={`${s.filter} ${filter === "PENDING" ? s.filterActive : ""}`} onClick={() => setFilter("PENDING")}>
+                  Pending <span className={s.filterCount}>{pending}</span>
+                </button>
+                <button type="button" className={`${s.filter} ${filter === "COMPLETED" ? s.filterActive : ""}`} onClick={() => setFilter("COMPLETED")}>
+                  Completed <span className={s.filterCount}>{completed}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && <div className={s.error}>{error}</div>}
+
+          {!matches.length ? (
+            <div className={s.empty}>No matches yet. Generate the draw first.</div>
+          ) : (
+            <div className={s.matchList}>
+              {visibleMatches.map((match) => (
+                <MatchCard key={match.id} match={match} busy={busy === match.id} onSave={save} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}

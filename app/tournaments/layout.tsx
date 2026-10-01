@@ -11,7 +11,7 @@ import TournamentTableRoute from "./tournament-table-route";
 
 export default function TournamentLayout({ children }: { children: ReactNode }) {
   return (
-    <div className={typography.typography}>
+    <div className={`${typography.typography} tournamentLayoutRoot`}>
       <TournamentHomeButton />
       <TournamentTableRoute />
       {children}

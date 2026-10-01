@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft, MapPin, Share2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -102,6 +102,9 @@ export default function TournamentHomeButton() {
 
   if (pathname === "/tournaments" || pathname === "/") return null;
 
+  const actionHref = isTournamentDashboard ? "/" : dashboardHref;
+  const actionLabel = isTournamentDashboard ? "Back to Rally365 home" : "Back to tournament dashboard";
+
   const shareTournament = async () => {
     const url = window.location.href;
     const title = document.title || "Rally365 Tournament";
@@ -127,73 +130,69 @@ export default function TournamentHomeButton() {
         top: "env(safe-area-inset-top, 0px)",
         left: 0,
         right: 0,
-        height: 58,
-        padding: "7px 12px",
-        display: "grid",
-        gridTemplateColumns: "1fr auto 1fr",
+        height: 82,
+        padding: "12px 20px",
+        display: "flex",
         alignItems: "center",
-        gap: 8,
-        background: "rgba(247,250,248,.92)",
+        justifyContent: "space-between",
+        gap: 12,
+        background: "rgba(255,255,255,.97)",
         backdropFilter: "blur(14px)",
         WebkitBackdropFilter: "blur(14px)",
-        borderBottom: "1px solid rgba(221,232,226,.78)",
+        borderBottom: "1px solid #e2eae5",
         zIndex: 100,
       }}
     >
       <Link
-        href={isTournamentDashboard ? "/" : dashboardHref}
-        aria-label={isTournamentDashboard ? "Back to Rally365 home" : "Back to tournament dashboard"}
-        title={isTournamentDashboard ? "Back to Rally365 home" : "Back to tournament dashboard"}
-        style={{
-          justifySelf: "start",
-          minHeight: 38,
-          padding: "0 12px",
-          borderRadius: 14,
-          background: "rgba(255,255,255,.96)",
-          border: "1px solid #dfe8e3",
-          color: "#17352a",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          boxShadow: "0 4px 14px rgba(20,53,42,.07)",
-          textDecoration: "none",
-          fontSize: 12,
-          fontWeight: 750,
-          whiteSpace: "nowrap",
-          WebkitTapHighlightColor: "transparent",
-        }}
-      >
-        <ArrowLeft size={16} strokeWidth={2.3} />
-        <span>{isTournamentDashboard ? "Rally365 Home" : "Tournament dashboard"}</span>
-      </Link>
-
-      <Link
         href="/"
-        aria-label="Rally365"
+        aria-label="Rally365 home"
         title="Rally365"
         style={{
-          justifySelf: "center",
           display: "inline-flex",
           alignItems: "center",
-          justifyContent: "center",
-          width: 42,
-          height: 42,
-          borderRadius: 14,
-          overflow: "hidden",
-          background: "#fff",
-          border: "1px solid #dfe8e3",
-          boxShadow: "0 4px 14px rgba(20,53,42,.07)",
+          gap: 9,
+          minWidth: 0,
           textDecoration: "none",
+          color: "#10231a",
         }}
       >
+        <span style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+          <span style={{ fontSize: 24, fontWeight: 900, letterSpacing: "-1.4px", whiteSpace: "nowrap" }}>
+            Rally<span style={{ color: "#19a463" }}>365</span>
+          </span>
+          <span style={{ marginTop: 5, fontSize: 11, color: "#789085", whiteSpace: "nowrap" }}>
+            Everyday badminton
+          </span>
+        </span>
         <img
-          src="/rally365-logo-recommended.png"
-          alt="Rally365"
-          style={{ width: 34, height: 34, objectFit: "contain", display: "block" }}
+          src="/rally365-circle-logo.png"
+          alt=""
+          style={{ width: 42, height: 42, objectFit: "contain", display: "block", flex: "0 0 auto" }}
         />
       </Link>
 
-      <div style={{ justifySelf: "end", minWidth: 38, display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
+        <Link
+          href={actionHref}
+          aria-label={actionLabel}
+          title={actionLabel}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 14,
+            background: "#fff",
+            border: "1px solid #dfe8e3",
+            color: "#17352a",
+            display: "grid",
+            placeItems: "center",
+            boxShadow: "0 4px 14px rgba(20,53,42,.07)",
+            textDecoration: "none",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <ArrowLeft size={17} strokeWidth={2.2} />
+        </Link>
+
         {isTournamentDashboard ? (
           <button
             type="button"
@@ -204,7 +203,7 @@ export default function TournamentHomeButton() {
               width: 38,
               height: 38,
               borderRadius: 14,
-              background: "rgba(255,255,255,.96)",
+              background: "#fff",
               border: "1px solid #dfe8e3",
               color: "#17352a",
               display: "grid",
@@ -217,6 +216,25 @@ export default function TournamentHomeButton() {
             <Share2 size={17} strokeWidth={2.1} />
           </button>
         ) : null}
+
+        <div
+          className="rallyTournamentVenuePill"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            border: "1px solid #dce7df",
+            borderRadius: 999,
+            padding: "9px 12px",
+            fontSize: 11,
+            color: "#476154",
+            background: "#f7faf8",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <MapPin size={15} color="#19a463" />
+          <span>Vega Badminton</span>
+        </div>
       </div>
     </header>
   );

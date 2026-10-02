@@ -21,6 +21,8 @@ type Match = {
 
 type Partner = { id: string; name: string; matches: number; wins: number; winRate: number };
 type TrendPoint = { label: string; winRate: number; avgPoints: number };
+type Frequency = "weekly" | "monthly";
+type PerformanceBar = { label: string; matches: number; wins: number; winRate: number; points: number };
 
 const isValid = (m: Match) => m.status !== "VOIDED";
 const avatarPath = (name: string) => `/avatars/${encodeURIComponent(name)}.png`;
@@ -40,6 +42,7 @@ export default function PlayerProfileClient() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [frequency, setFrequency] = useState<Frequency>("weekly");
 
   useEffect(() => {
     if (!playerKey) {
@@ -119,7 +122,7 @@ export default function PlayerProfileClient() {
   }, [playerMatches, playerId]);
 
   const trend = useMemo<TrendPoint[]>(() => {
-    const chronological = [...playerMatches].slice(0, 10).reverse();
+    const chronological = [...playerMatches].reverse();
     let wins = 0;
     let points = 0;
     return chronological.map((match, index) => {
@@ -133,11 +136,51 @@ export default function PlayerProfileClient() {
     });
   }, [playerMatches, playerId]);
 
-  const recent = useMemo(() => playerMatches.slice(0, 8).map(m => {
+  const recent = useMemo(() => playerMatches.slice(0, 12).map(m => {
     const side = m.match_players.find(x => x.player_id === playerId)?.team;
     if (!side) return "L";
     return (side === "A" ? m.team_a_score > m.team_b_score : m.team_b_score > m.team_a_score) ? "W" : "L";
   }), [playerMatches, playerId]);
+
+  const performanceBars = useMemo<PerformanceBar[]>(() => {
+    const chronological = [...playerMatches].reverse();
+    const buckets = new Map<string, { date: Date; matches: number; wins: number; points: number }>();
+    for (const match of chronological) {
+      const side = match.match_players.find(x => x.player_id === playerId)?.team;
+      if (!side) continue;
+      const date = new Date(match.played_at);
+      if (Number.isNaN(date.getTime())) continue;
+      let key: string;
+      let bucketDate: Date;
+      if (frequency === "weekly") {
+        const day = date.getDay();
+        const mondayOffset = day === 0 ? -6 : 1 - day;
+        bucketDate = new Date(date);
+        bucketDate.setDate(date.getDate() + mondayOffset);
+        bucketDate.setHours(0, 0, 0, 0);
+        key = bucketDate.toISOString().slice(0, 10);
+      } else {
+        bucketDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      }
+      const own = Number(side === "A" ? match.team_a_score : match.team_b_score);
+      const opp = Number(side === "A" ? match.team_b_score : match.team_a_score);
+      const bucket = buckets.get(key) || { date: bucketDate, matches: 0, wins: 0, points: 0 };
+      bucket.matches++;
+      bucket.points += own;
+      if (own > opp) bucket.wins++;
+      buckets.set(key, bucket);
+    }
+    return [...buckets.values()].slice(-12).map(bucket => ({
+      label: frequency === "weekly"
+        ? `W${String(bucket.date.getDate()).padStart(2, "0")}`
+        : bucket.date.toLocaleDateString("en-IN", { month: "short" }),
+      matches: bucket.matches,
+      wins: bucket.wins,
+      winRate: bucket.matches ? Math.round(bucket.wins / bucket.matches * 100) : 0,
+      points: bucket.points,
+    }));
+  }, [playerMatches, playerId, frequency]);
 
   const partnerRows = useMemo<Partner[]>(() => {
     const map = new Map<string, { matches: number; wins: number }>();
@@ -196,7 +239,7 @@ export default function PlayerProfileClient() {
           <div className="r365-hero-main">
             <img className="r365-avatar" src={avatarPath(player.name)} alt="" onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.parentElement?.querySelector(".r365-avatar-fallback")?.removeAttribute("hidden"); }} />
             <div className="r365-avatar r365-avatar-fallback" hidden>{player.name.slice(0, 1)}</div>
-            <div>
+            <div className="r365-player-summary">
               <div className="r365-eyebrow">PLAYER PROFILE</div>
               <h1>{player.name} <span style={{ color: "#29e58b", fontSize: ".65em" }}>●</span></h1>
               <p className="r365-sub">{groupName} · Hyderabad</p>
@@ -205,28 +248,48 @@ export default function PlayerProfileClient() {
             </div>
             <div className="r365-trend-panel">
               <div className="r365-trend-head">
-                <div><div className="r365-trend-title">Performance trend</div><div className="r365-trend-subtitle">Cumulative win rate · last {Math.min(10, stats.played)} matches</div></div>
-                <div className="r365-trend-current"><b>{trendCurrent}%</b><span>win rate</span></div>
+                <div><div className="r365-trend-title">Performance trend</div><div className="r365-trend-subtitle">Cumulative win rate · all {stats.played} recorded matches</div></div>
+                <div className="r365-trend-current"><b>{trendCurrent}%</b><span>current win rate</span></div>
               </div>
-              <div className="r365-trend-chart" aria-label="Player win rate trend">
+              <div className="r365-trend-chart" aria-label="Player win rate trend across all recorded matches">
                 <svg viewBox="0 0 360 112" role="img" aria-hidden="true">
                   <defs><linearGradient id="r365TrendFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#42eb91" stopOpacity=".24" /><stop offset="100%" stopColor="#42eb91" stopOpacity="0" /></linearGradient></defs>
                   {[25, 50, 75].map(value => <line key={value} className="r365-trend-grid" x1="8" x2="352" y1={102 - (value / 100) * 92} y2={102 - (value / 100) * 92} />)}
                   <polygon className="r365-trend-area" points={trendArea} />
                   <polyline className="r365-trend-line" points={trendLine} />
-                  {trendPoints.map((point, index) => <circle key={`${point.label}-${index}`} className="r365-trend-dot" cx={point.x} cy={point.y} r={index === trendPoints.length - 1 ? 4 : 2.5} />)}
+                  {trendPoints.map((point, index) => {
+                    const showDot = trendPoints.length <= 24 || index === trendPoints.length - 1 || index % Math.ceil(trendPoints.length / 20) === 0;
+                    return showDot ? <circle key={`${point.label}-${index}`} className="r365-trend-dot" cx={point.x} cy={point.y} r={index === trendPoints.length - 1 ? 4 : 2.5} /> : null;
+                  })}
                 </svg>
               </div>
-              <div className="r365-trend-axis"><span>Older</span><span>Recent</span></div>
+              <div className="r365-trend-axis"><span>Match 1</span><span>Match {Math.max(1, stats.played)}</span></div>
               <div className="r365-trend-kpis">
                 <div className="r365-trend-kpi"><b>{stats.winRate}%</b><span>Overall win rate</span></div>
-                <div className="r365-trend-kpi"><b>{trendAvgPoints.toFixed(1)}</b><span>Avg points</span></div>
+                <div className="r365-trend-kpi"><b>{stats.avgPoints}</b><span>Avg points/game</span></div>
                 <div className="r365-trend-kpi"><b>{stats.pointDiff > 0 ? "+" : ""}{stats.pointDiff}</b><span>Point diff</span></div>
               </div>
-              <div className="r365-trend-legend"><i /> Win-rate progression across recorded matches</div>
+
+              <div className="r365-frequency-head">
+                <div><strong>Performance by frequency</strong><span>Win rate and match volume</span></div>
+                <div className="r365-frequency-toggle" role="tablist" aria-label="Performance frequency">
+                  <button type="button" className={frequency === "weekly" ? "active" : ""} onClick={() => setFrequency("weekly")}>Weekly</button>
+                  <button type="button" className={frequency === "monthly" ? "active" : ""} onClick={() => setFrequency("monthly")}>Monthly</button>
+                </div>
+              </div>
+              <div className="r365-performance-bars">
+                {performanceBars.length === 0 ? <div className="r365-chart-empty">No recorded performance yet.</div> : performanceBars.map(bar => (
+                  <div className="r365-performance-bar" key={`${frequency}-${bar.label}`} title={`${bar.matches} matches · ${bar.wins} wins · ${bar.winRate}% win rate`}>
+                    <div className="r365-performance-bar-value">{bar.matches}</div>
+                    <div className="r365-performance-bar-fill" style={{ height: `${Math.max(8, bar.winRate)}%` }}><span>{bar.winRate}%</span></div>
+                    <small>{bar.label}</small>
+                  </div>
+                ))}
+              </div>
+              <div className="r365-trend-legend"><i /> Bars show win rate; number above each bar is matches played</div>
             </div>
           </div>
-          <div className="r365-form"><span className="r365-form-label">RECENT FORM</span>{recent.map((r, i) => <span key={`${r}-${i}`} className={`r365-result ${r === "L" ? "loss" : ""}`}>{r}</span>)}<div className="r365-rank"><small>Win rate</small><strong>{stats.winRate}%</strong><em>{stats.currentStreak > 0 ? `↑ ${stats.currentStreak} streak` : "Stable"}</em></div></div>
+          <div className="r365-form"><span className="r365-form-label">RECENT FORM</span><div className="r365-form-results">{recent.map((r, i) => <span key={`${r}-${i}`} className={`r365-result ${r === "L" ? "loss" : ""}`}>{r}</span>)}</div><div className="r365-rank"><small>Win rate</small><strong>{stats.winRate}%</strong><em>{stats.currentStreak > 0 ? `↑ ${stats.currentStreak} streak` : "Stable"}</em></div></div>
         </section>
 
         <section className="r365-kpis">

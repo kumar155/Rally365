@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Share2, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Share2, Users } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import "../player-profile.css";
 
@@ -26,6 +26,8 @@ const formatDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Date TBD" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
+
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 export default function PlayerProfileClient() {
   const searchParams = useSearchParams();
@@ -57,8 +59,15 @@ export default function PlayerProfileClient() {
         return;
       }
 
+      // The profile URL may contain either the player's UUID or their name.
+      // Never send a non-UUID value to the UUID `id` column: Postgres rejects
+      // values such as "Kartik" before the OR filter can evaluate the name.
+      const playerQuery = isUuid(playerKey)
+        ? supabase.from("players").select("id,name").eq("group_id", group.id).eq("id", playerKey).maybeSingle()
+        : supabase.from("players").select("id,name").eq("group_id", group.id).eq("name", playerKey).maybeSingle();
+
       const [playerResult, playerListResult, matchResult] = await Promise.all([
-        supabase.from("players").select("id,name").eq("group_id", group.id).or(`id.eq.${playerKey},name.eq.${playerKey}`).limit(1).maybeSingle(),
+        playerQuery,
         supabase.from("players").select("id,name").eq("group_id", group.id).order("name"),
         supabase.from("matches").select("id,team_a_score,team_b_score,played_at,status,match_players(player_id,team)").eq("group_id", group.id).order("played_at", { ascending: false }),
       ]);

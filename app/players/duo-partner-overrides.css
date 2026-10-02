@@ -1,6 +1,24 @@
 /* Best Duo Partners: alignment and explicit win/loss indicator styling. */
 .r365-partner-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 
+/* Rank labels: replace the old alphabet marker with an ordered rank. */
+.r365-partner-grid{counter-reset:duo-rank}
+.r365-partner-tile{counter-increment:duo-rank}
+.r365-partner-rank{
+  top:8px;
+  right:9px;
+  z-index:3;
+  color:#5a7c70;
+  font-size:0 !important;
+  line-height:1;
+  font-weight:800;
+}
+.r365-partner-rank::after{
+  content:"#" counter(duo-rank);
+  font-size:8px;
+  line-height:1;
+}
+
 .r365-partner-tile{
   position:relative;
   display:grid;
@@ -12,12 +30,6 @@
   min-height:128px;
   padding:12px 14px;
   box-sizing:border-box;
-}
-
-.r365-partner-rank{
-  top:8px;
-  right:9px;
-  z-index:2;
 }
 
 .r365-partner-info{
@@ -78,6 +90,23 @@
   display:grid;
   place-items:center;
   border-radius:50%;
+  box-sizing:border-box;
+}
+
+/* Keep the percentage and label mathematically centered inside the ring. */
+.r365-partner-ring > div{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-align:center !important;
+  line-height:1 !important;
+  transform:none !important;
   box-sizing:border-box;
 }
 

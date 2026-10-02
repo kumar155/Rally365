@@ -4,42 +4,52 @@
   grid-template-rows: auto auto !important;
   align-items: center !important;
   column-gap: 12px !important;
-  row-gap: 12px !important;
-  padding: 18px 16px !important;
+  row-gap: 10px !important;
+  padding: 16px !important;
 }
 
+/* Reference layout: match number + time share the first row. */
 .home-match-history .home-history-score-card > .match-number {
   grid-column: 1 / -1 !important;
   grid-row: 1 !important;
   width: auto !important;
   min-width: 0 !important;
+  min-height: 38px !important;
   display: flex !important;
-  flex-direction: column !important;
+  flex-direction: row !important;
   align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
   color: #526a5d !important;
 }
 
 .home-match-history .home-history-score-card > .match-number > b {
   display: inline-flex !important;
+  flex: 0 0 auto !important;
   align-items: center !important;
   justify-content: center !important;
-  min-width: 58px !important;
-  height: 42px !important;
-  padding: 0 14px !important;
-  border-radius: 13px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
   background: #f1f5f3 !important;
   color: #526a5d !important;
-  font-size: 15px !important;
-  font-weight: 900 !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
 }
 
 .home-match-history .home-history-score-card .match-timestamp {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
   color: #809297 !important;
   font-size: 14px !important;
   font-weight: 600 !important;
   line-height: 1.2 !important;
+  white-space: nowrap !important;
 }
 
 .home-match-history .home-history-score-card > .teams {
@@ -49,7 +59,7 @@
   width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 12px !important;
+  gap: 8px !important;
   align-self: center !important;
 }
 
@@ -59,11 +69,11 @@
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  gap: 10px !important;
+  gap: 8px !important;
   padding-right: 0 !important;
 }
 
-/* Team names stay neutral; only the WIN badge carries the result color. */
+/* Team names stay neutral. Result styling is carried only by the WIN badge. */
 .home-match-history .home-history-score-card .home-team-win,
 .home-match-history .home-history-score-card .home-team-loss {
   min-width: 0 !important;
@@ -99,6 +109,7 @@
   line-height: 1;
 }
 
+/* Score column stays vertically aligned with the two team rows. */
 .home-match-history .home-history-score-card > div:nth-child(3) {
   grid-column: 2 !important;
   grid-row: 2 !important;
@@ -146,7 +157,24 @@
   .home-match-history .home-history-score-card {
     grid-template-columns: minmax(0, 1fr) 54px 32px !important;
     column-gap: 9px !important;
-    padding: 16px 13px !important;
+    row-gap: 8px !important;
+    padding: 14px 13px !important;
+  }
+
+  .home-match-history .home-history-score-card > .match-number {
+    min-height: 36px !important;
+    gap: 8px !important;
+  }
+
+  .home-match-history .home-history-score-card > .match-number > b {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 32px !important;
+    font-size: 13px !important;
+  }
+
+  .home-match-history .home-history-score-card .match-timestamp {
+    font-size: 13px !important;
   }
 
   .home-match-history .home-history-score-card > div:nth-child(3) {

@@ -1,0 +1,179 @@
+/* Best Duo Partners: alignment and explicit win/loss indicator styling. */
+.r365-partner-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+
+.r365-partner-tile{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 82px;
+  grid-template-rows:auto 1fr;
+  column-gap:14px;
+  row-gap:10px;
+  align-items:center;
+  min-height:128px;
+  padding:12px 14px;
+  box-sizing:border-box;
+}
+
+.r365-partner-rank{
+  top:8px;
+  right:9px;
+  z-index:2;
+}
+
+.r365-partner-info{
+  grid-column:1;
+  grid-row:1;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  align-self:center;
+}
+
+.r365-partner-info>div:last-child{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:4px;
+  padding-right:12px;
+}
+
+.r365-partner-avatar{
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+}
+
+.r365-partner-name{
+  display:block;
+  width:100%;
+  min-width:0;
+  font-size:12px;
+  line-height:1.15;
+  color:#effbf6;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.r365-partner-info span{
+  display:block;
+  color:#7f9a91;
+  font-size:8px;
+  line-height:1.1;
+  white-space:nowrap;
+}
+
+.r365-partner-ring{
+  position:relative;
+  width:82px;
+  height:82px;
+  flex:0 0 82px;
+  grid-column:2;
+  grid-row:1 / span 2;
+  align-self:center;
+  justify-self:end;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  box-sizing:border-box;
+}
+
+.r365-partner-ring::before{
+  width:62px;
+  height:62px;
+}
+
+.r365-partner-ring strong,
+.r365-partner-ring small{
+  position:relative;
+  z-index:2;
+  display:block;
+  width:100%;
+  text-align:center;
+  pointer-events:none;
+}
+
+.r365-partner-ring strong{
+  font-size:16px;
+  line-height:1;
+}
+
+.r365-partner-ring small{
+  margin-top:4px;
+  font-size:6px;
+  line-height:1;
+  letter-spacing:.7px;
+  text-transform:uppercase;
+}
+
+.r365-partner-stats{
+  grid-column:1;
+  grid-row:2;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  min-width:0;
+  align-self:end;
+  padding-bottom:2px;
+}
+
+.r365-partner-stats>div{
+  display:grid;
+  grid-template-columns:8px auto auto;
+  align-items:center;
+  column-gap:5px;
+  min-width:0;
+  white-space:nowrap;
+}
+
+.r365-partner-stats i{
+  display:block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  grid-column:1;
+  box-shadow:0 0 7px rgba(255,255,255,.05);
+}
+
+.r365-partner-stats i.win{
+  background:#35e68b;
+}
+
+.r365-partner-stats i.loss{
+  background:#ef5b63;
+}
+
+.r365-partner-stats b{
+  grid-column:2;
+  font-size:11px;
+  line-height:1;
+  color:#eefbf6;
+  font-weight:800;
+}
+
+.r365-partner-stats span{
+  grid-column:3;
+  font-size:9px;
+  line-height:1;
+  color:#8da79e;
+}
+
+@media(max-width:760px){
+  .r365-partner-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .r365-partner-tile{grid-template-columns:minmax(0,1fr) 74px;column-gap:8px;min-height:122px;padding:10px}
+  .r365-partner-info{gap:8px}
+  .r365-partner-avatar{width:30px;height:30px;flex-basis:30px}
+  .r365-partner-name{font-size:10px}
+  .r365-partner-info span{font-size:7px}
+  .r365-partner-ring{width:74px;height:74px;flex-basis:74px}
+  .r365-partner-ring::before{width:56px;height:56px}
+  .r365-partner-ring strong{font-size:15px}
+  .r365-partner-stats{gap:10px}
+  .r365-partner-stats>div{grid-template-columns:7px auto auto;column-gap:4px}
+  .r365-partner-stats i{width:7px;height:7px}
+  .r365-partner-stats b{font-size:10px}
+  .r365-partner-stats span{font-size:8px}
+}

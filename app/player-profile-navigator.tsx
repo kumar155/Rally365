@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 /**
  * The existing Players list is rendered inside the main home client page.
  * Keep that page's existing state intact, but route player-card taps to the
- * full profile experience instead of opening the old compact modal.
+ * static profile shell. The player name is passed as a query value so the
+ * route does not require a build-time dynamic segment.
  */
 export default function PlayerProfileNavigator() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function PlayerProfileNavigator() {
 
       event.preventDefault();
       event.stopPropagation();
-      router.push(`/players/${encodeURIComponent(name)}`);
+      router.push(`/players/profile?id=${encodeURIComponent(name)}`);
     };
 
     document.addEventListener("click", onClick, true);

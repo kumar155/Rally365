@@ -63,10 +63,10 @@ jobs:
           text = text.replace(old, new, 1)
 
           path.write_text(text, encoding='utf-8')
-      
+
       - name: Verify build
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commit changes and remove one-time workflow

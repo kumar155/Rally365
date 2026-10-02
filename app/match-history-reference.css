@@ -243,3 +243,45 @@
     height: 30px !important;
   }
 }
+
+/* Final match-history alignment: keep the WIN tag outside the ellipsis-clipped team text. */
+.home-match-history .home-history-score-card .home-team-win {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after {
+  content: "WIN" !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: 2px !important;
+  padding: 4px 8px !important;
+  border-radius: 7px !important;
+  background: #d7f6e7 !important;
+  color: #08784b !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 850 !important;
+}
+
+.home-match-history .home-history-score-card .home-team-win::after {
+  content: none !important;
+}
+
+/* Scores use exactly the same visual hierarchy as the corresponding team: winner = bold green, loser = regular muted. */
+.home-match-history .home-history-score-card > div:nth-child(3) > b,
+.home-match-history .home-history-score-card > div:nth-child(3) > span {
+  font-family: inherit !important;
+  letter-spacing: -.15px !important;
+}
+
+@media (max-width: 420px) {
+  .home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after {
+    margin-left: 1px !important;
+    padding: 3px 7px !important;
+    font-size: 9px !important;
+  }
+}

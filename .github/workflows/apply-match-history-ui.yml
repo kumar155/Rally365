@@ -1,0 +1,99 @@
+name: Apply match history UI
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    if: ${{ !contains(github.event.head_commit.message, 'match history reference UI') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply reference match history UI
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('app/page.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          pattern = re.compile(r'\{homeMatches\.map\(\(m, i\) => <div className=\{`match-card home-history-score-card.*?</div>\)\}\}\n        </div>\}</>', re.S)
+
+          replacement = r'''<style>{`\
+          .home-history-reference-list{display:flex;flex-direction:column;gap:12px}\
+          .home-history-reference-card{background:#fff;border:1px solid #e3ebe6;border-radius:18px;padding:14px 16px;box-shadow:0 1px 2px rgba(16,35,26,.02)}\
+          .home-history-reference-meta{display:flex;align-items:center;gap:8px;margin-bottom:9px;color:#7b8c83;font-size:12px;line-height:1}\
+          .home-history-reference-id{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:25px;padding:0 9px;border-radius:9px;background:#f0f4f2;color:#50665b;font-weight:800;font-size:11px}\
+          .home-history-reference-dot{color:#9aa9a2;font-weight:800}\
+          .home-history-reference-body{display:grid;grid-template-columns:minmax(0,1fr) 72px 24px;gap:12px;align-items:center}\
+          .home-history-reference-teams{min-width:0;display:flex;flex-direction:column;gap:7px}\
+          .home-history-reference-team{display:flex;align-items:center;gap:8px;min-width:0;font-size:15px;line-height:1.25}\
+          .home-history-reference-team strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:750;color:#10231a}\
+          .home-history-reference-team.loss strong{font-weight:500;color:#60746a}\
+          .home-history-reference-win{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;padding:4px 8px;border-radius:7px;background:#d7f6e7;color:#08784b;font-size:10px;font-weight:850;letter-spacing:.1px}\
+          .home-history-reference-score{width:72px;min-height:62px;border:1px solid #dfe7e2;border-radius:13px;background:#f8fbf9;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;padding:7px 8px}\
+          .home-history-reference-score .top{font-size:18px;font-weight:800;color:#08784b}\
+          .home-history-reference-score .bottom{margin-top:5px;font-size:15px;color:#8a9a92}\
+          .home-history-reference-edit{width:24px;height:34px;border:0;background:transparent;color:#8da0b9;padding:0;display:grid;place-items:center;cursor:pointer}\
+          .home-history-reference-edit:hover{color:#617b9c}\
+          @media (max-width:420px){.home-history-reference-body{grid-template-columns:minmax(0,1fr) 64px 22px;gap:9px}.home-history-reference-score{width:64px}.home-history-reference-team{font-size:14px}}\
+        `}</style>
+        <div className="match-list home-match-history home-history-reference-list">{homeMatches.length === 0 && <div className="empty-rally-card">
+          <div className="rally-illustration-image">
+            <Image src="/badminton-court-clean.png" alt="Empty badminton court" width={1280} height={356} sizes="(max-width: 560px) 100vw, 560px" priority />
+          </div>
+          <div className="empty-rally-title">No matches yet</div>
+          <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
+          <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
+        </div>}
+          {homeMatches.map((m, i) => {
+            const teamAWon = m.team_a_score > m.team_b_score;
+            const teamBWon = m.team_b_score > m.team_a_score;
+            return <div className={`home-history-reference-card ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
+              <div className="home-history-reference-meta">
+                <span className="home-history-reference-id">M{homeMatches.length - i}</span>
+                <span>Today, {matchHistoryTime(m.played_at)}</span>
+                <span className="home-history-reference-dot">•</span>
+              </div>
+              <div className="home-history-reference-body">
+                <div className="home-history-reference-teams">
+                  <div className="home-history-reference-team">
+                    <strong>{team(m, "A")}</strong>
+                    {teamAWon && <span className="home-history-reference-win">✓ WIN</span>}
+                  </div>
+                  <div className={`home-history-reference-team ${teamAWon ? "loss" : ""}`}>
+                    <strong>{team(m, "B")}</strong>
+                    {teamBWon && <span className="home-history-reference-win">✓ WIN</span>}
+                  </div>
+                </div>
+                <div className="home-history-reference-score" aria-label={`Score ${m.team_a_score} to ${m.team_b_score}`}>
+                  <span className="top">{m.team_a_score}</span>
+                  <span className="bottom">{m.team_b_score}</span>
+                </div>
+                {m.status !== "VOIDED" && <button className="home-history-reference-edit" title="Edit match" aria-label="Edit match" onClick={() => openEdit(m)}><Pencil size={18} /></button>}
+              </div>
+            </div>;
+          })}
+        </div></>'''
+
+          if not pattern.search(text):
+              raise SystemExit('Target match history block was not found; no changes made.')
+
+          text = pattern.sub(replacement, text, count=1)
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit UI change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx
+          git commit -m "ui: match history reference UI"
+          git push

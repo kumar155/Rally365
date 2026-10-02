@@ -9,7 +9,6 @@
   min-height: 92px !important;
 }
 
-/* Match number and time stay together on the first row. */
 .home-match-history .home-history-score-card > .match-number {
   grid-column: 1 / -1 !important;
   grid-row: 1 !important;
@@ -75,7 +74,6 @@
   padding-right: 0 !important;
 }
 
-/* Team names remain neutral. Winner is distinguished only by weight. */
 .home-match-history .home-history-score-card .home-team-win,
 .home-match-history .home-history-score-card .home-team-loss {
   min-width: 0 !important;
@@ -93,13 +91,23 @@
   font-weight: 500 !important;
 }
 
-/* No WIN tick/badge — the heavier team name communicates the result. */
+/* Green WIN tag without a tick icon. */
 .home-match-history .home-history-score-card .home-team-win::after {
-  content: none !important;
-  display: none !important;
+  content: "WIN" !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: 8px !important;
+  padding: 4px 8px !important;
+  border-radius: 7px !important;
+  background: #d7f6e7 !important;
+  color: #08784b !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 850 !important;
+  vertical-align: middle !important;
 }
 
-/* Compact horizontal score box. */
 .home-match-history .home-history-score-card > div:nth-child(3) {
   grid-column: 2 !important;
   grid-row: 2 !important;
@@ -186,6 +194,12 @@
   .home-match-history .home-history-score-card .home-team-win,
   .home-match-history .home-history-score-card .home-team-loss {
     font-size: 14px !important;
+  }
+
+  .home-match-history .home-history-score-card .home-team-win::after {
+    margin-left: 6px !important;
+    padding: 3px 7px !important;
+    font-size: 9px !important;
   }
 
   .home-match-history .home-history-score-card > div:nth-child(3) {

@@ -93,49 +93,33 @@
   box-sizing:border-box;
 }
 
-/* Keep the percentage and label mathematically centered inside the ring. */
-.r365-partner-ring > div{
-  position:absolute !important;
-  inset:0 !important;
-  width:100% !important;
-  height:100% !important;
-  margin:0 !important;
-  display:flex !important;
-  flex-direction:column !important;
-  align-items:center !important;
-  justify-content:center !important;
-  text-align:center !important;
-  line-height:1 !important;
-  transform:none !important;
-  box-sizing:border-box;
-}
-
+/* Keep the percentage mathematically centered inside the ring. */
 .r365-partner-ring::before{
   width:62px;
   height:62px;
 }
 
-.r365-partner-ring strong,
-.r365-partner-ring small{
-  position:relative;
+.r365-partner-ring > strong{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  display:grid !important;
+  place-items:center !important;
+  text-align:center !important;
+  line-height:1 !important;
+  font-size:16px !important;
+  transform:none !important;
   z-index:2;
-  display:block;
-  width:100%;
-  text-align:center;
   pointer-events:none;
+  box-sizing:border-box;
 }
 
-.r365-partner-ring strong{
-  font-size:16px;
-  line-height:1;
-}
-
-.r365-partner-ring small{
-  margin-top:4px;
-  font-size:6px;
-  line-height:1;
-  letter-spacing:.7px;
-  text-transform:uppercase;
+/* The percentage is sufficient; don't show the extra "Win rate" label. */
+.r365-partner-ring > small{
+  display:none !important;
 }
 
 .r365-partner-stats{
@@ -205,4 +189,57 @@
   .r365-partner-stats i{width:7px;height:7px}
   .r365-partner-stats b{font-size:10px}
   .r365-partner-stats span{font-size:8px}
+}
+
+/* Final duo-card refinements: names visible, no initial/avatar, W/L labels only. */
+.r365-partner-avatar{
+  display:none !important;
+}
+
+.r365-partner-info{
+  gap:0 !important;
+}
+
+.r365-partner-info > div:last-child{
+  padding-right:0;
+  width:100%;
+}
+
+.r365-partner-name{
+  color:#effbf6 !important;
+  font-size:12px !important;
+  font-weight:800;
+  line-height:1.15 !important;
+}
+
+.r365-partner-stats span{
+  font-size:0 !important;
+  line-height:1 !important;
+  font-weight:800;
+}
+
+.r365-partner-stats > div:first-child span::after{
+  content:"W";
+  font-size:9px;
+  color:#8da79e;
+}
+
+.r365-partner-stats > div:last-child span::after{
+  content:"L";
+  font-size:9px;
+  color:#8da79e;
+}
+
+.r365-partner-ring > strong{
+  top:0 !important;
+  left:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  transform:none !important;
+}
+
+@media(max-width:760px){
+  .r365-partner-name{font-size:10px !important}
+  .r365-partner-stats > div:first-child span::after,
+  .r365-partner-stats > div:last-child span::after{font-size:8px}
 }

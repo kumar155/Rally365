@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 1
 
       - name: Apply reference match history UI
-        shell: python
+        shell: python {0}
         run: |
           from pathlib import Path
           import re

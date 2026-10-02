@@ -81,9 +81,22 @@ export default function TournamentNavBridge() {
     observer.observe(document.body, { childList: true, subtree: true });
     const timer = window.setInterval(apply, 500);
 
+    // The draw page is a client-state page. When the browser restores it from
+    // the back/forward cache after a score was entered, its previous React
+    // state can otherwise still contain the old 0-0 score. Force a fresh
+    // server/client load for that navigation so the saved tournament_matches
+    // values are rendered immediately.
+    const handlePageShow = () => {
+      if (window.location.pathname !== "/tournaments/draw") return;
+      const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      if (navigation?.type === "back_forward") window.location.reload();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+
     return () => {
       observer.disconnect();
       window.clearInterval(timer);
+      window.removeEventListener("pageshow", handlePageShow);
       document.getElementById(style.id)?.remove();
     };
   }, []);

@@ -33,15 +33,16 @@ jobs:
               'const na = winnerTeam === "A" ? 1 : 0;\n    const nb = winnerTeam === "B" ? 1 : 0;',
               '''const na = Number(scoreA);\n    const nb = Number(scoreB);\n    if (!Number.isInteger(na) || !Number.isInteger(nb) || na < 0 || nb < 0) { setError("Enter valid scores for both teams."); return; }\n    if (na === nb) { setError("A badminton match cannot be saved as a tie."); return; }\n    const scoreWinner = na > nb ? "A" : "B";\n    if (winnerTeam !== scoreWinner) { setError("Winner selection must match the entered score."); return; }''', 1)
 
-          score_ui = '''<div style={{ display: "flex", gap: 10, alignItems: "center", margin: "16px 0" }}>\n        <input inputMode="numeric" type="number" min="0" max="99" value={scoreA} placeholder="21" aria-label="Team A score" onChange={e => setScoreA(e.target.value)} />\n        <span style={{ color: "#91a39b", fontWeight: 700 }}>–</span>\n        <input inputMode="numeric" type="number" min="0" max="99" value={scoreB} placeholder="15" aria-label="Team B score" onChange={e => setScoreB(e.target.value)} />\n      </div>\n      <div className="helper">Enter Team A and Team B scores</div>\n      <div className="winner-select">'''
+          score_ui = '''<div style={{ display: "flex", gap: 10, alignItems: "center", margin: "16px 0" }}>\n        <input inputMode="numeric" type="number" min="0" max="99" value={scoreA} placeholder="21" aria-label="Team A score" onChange={e => setScoreA(e.target.value)} />\n        <span style={{ color: "#91a39b", fontWeight: 700 }}>–</span>\n        <input inputMode="numeric" type="number" min="0" max="99" value={scoreB} placeholder="15" aria-label="Team B score" onChange={e => setScoreB(e.target.value)} />\n      </div>'''
 
-          anchor = '<div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">'
-          assert anchor in s, 'new match anchor not found'
-          s = s.replace(anchor, anchor.replace('<div className="winner-select">', score_ui), 1)
+          new_anchor = '</div>{selected.length === 4 && <div className="winner-select">'
+          new_repl = '</div>' + score_ui + '{selected.length === 4 && <div className="winner-select">'
+          assert new_anchor in s, 'new match score insertion point not found'
+          s = s.replace(new_anchor, new_repl, 1)
 
           edit_anchor = '<div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div>\n      <div className="winner-select">'
-          edit_repl = '''<div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div>\n      ''' + score_ui
-          assert edit_anchor in s, 'edit match anchor not found'
+          edit_repl = '<div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div>\n      ' + score_ui + '\n      <div className="winner-select">'
+          assert edit_anchor in s, 'edit match score insertion point not found'
           s = s.replace(edit_anchor, edit_repl, 1)
 
           s = s.replace(

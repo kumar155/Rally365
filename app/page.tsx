@@ -1728,8 +1728,12 @@ const totalFines = fines.reduce(
 
     // The database still uses its existing score columns for compatibility,
     // but the UI treats them only as internal W/L placeholders.
-    const teamAScore = winnerTeam === "A" ? 1 : 0;
-    const teamBScore = winnerTeam === "B" ? 1 : 0;
+    const teamAScore = Number(scoreA);
+    const teamBScore = Number(scoreB);
+    if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore) || teamAScore < 0 || teamBScore < 0) { setError("Enter valid scores for both teams."); return; }
+    if (teamAScore === teamBScore) { setError("A badminton match cannot be saved as a tie."); return; }
+    const scoreWinner = teamAScore > teamBScore ? "A" : "B";
+    if (winnerTeam !== scoreWinner) { setError("Winner selection must match the entered score."); return; }
 
     const { data: m, error: me } = await supabase
       .from("matches")
@@ -2036,8 +2040,12 @@ const totalFines = fines.reduce(
       return;
     }
 
-    const na = winnerTeam === "A" ? 1 : 0;
-    const nb = winnerTeam === "B" ? 1 : 0;
+    const na = Number(scoreA);
+    const nb = Number(scoreB);
+    if (!Number.isInteger(na) || !Number.isInteger(nb) || na < 0 || nb < 0) { setError("Enter valid scores for both teams."); return; }
+    if (na === nb) { setError("A badminton match cannot be saved as a tie."); return; }
+    const scoreWinner = na > nb ? "A" : "B";
+    if (winnerTeam !== scoreWinner) { setError("Winner selection must match the entered score."); return; }
 
     const { error } = await supabase.rpc("edit_match_with_pin", {
       p_group_id: groupId,
@@ -2104,8 +2112,8 @@ const totalFines = fines.reduce(
     setError("");
     verifiedEditPinRef.current = "";
     setTargetMatch(match);
-    setScoreA("");
-    setScoreB("");
+    setScoreA(String(match.team_a_score));
+    setScoreB(String(match.team_b_score));
     setWinnerTeam(match.team_a_score > match.team_b_score ? "A" : "B");
     setPinAction("edit");
     setPin("");
@@ -2224,11 +2232,7 @@ const totalFines = fines.reduce(
           <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
           <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
         </div>}
-          {homeMatches.map((m, i) => <div className={`match-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">{matchHistoryTime(m.played_at)}</small></div><div className="teams">
-                <div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{team(m, "A")}</strong></div>
-                <div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div>
-                {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
-              </div>{m.status !== "VOIDED" && <button
+          {homeMatches.map((m, i) => <div className={`match-card home-history-score-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 14, alignItems: "center" }}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">Today, {matchHistoryTime(m.played_at)}</small></div><div className="teams"><div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{team(m, "A")}</strong></div><div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div>{m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}</div><div style={{ minWidth: 58, border: "1px solid #dfe7e2", borderRadius: 12, padding: "8px 10px", background: "#f8fbf9", display: "grid", justifyItems: "center", lineHeight: 1.05 }}><b style={{ color: "#08784b", fontSize: 18 }}>{m.team_a_score}</b><span style={{ color: "#8a9a92", fontSize: 15 }}>{m.team_b_score}</span></div>{m.status !== "VOIDED" && <button
                   className="edit-link"
                   title="Edit match"
                   aria-label="Edit match"
@@ -2695,7 +2699,11 @@ const totalFines = fines.reduce(
         return <button key={p.id} className={`player-chip ${selectionIndex >= 0 ? "selected" : ""} ${teamClass}`} onClick={() => setSelected(x => x.includes(p.id) ? x.filter(y => y !== p.id) : x.length < 4 ? [...x, p.id] : x)}>
           {p.name}{selectionIndex >= 0 && <small>{selectionIndex + 1}</small>}
         </button>;
-      })}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div>{selected.length === 4 && <div className="winner-select">
+      })}</div><div className="match-preview"><b>{selected.slice(0, 2).map(name).join(" + ") || "—"}</b><span>vs</span><b>{selected.slice(2, 4).map(name).join(" + ") || "—"}</b></div><div style={{ display: "flex", gap: 10, alignItems: "center", margin: "16px 0" }}>
+        <input inputMode="numeric" type="number" min="0" max="99" value={scoreA} placeholder="21" aria-label="Team A score" onChange={e => setScoreA(e.target.value)} />
+        <span style={{ color: "#91a39b", fontWeight: 700 }}>–</span>
+        <input inputMode="numeric" type="number" min="0" max="99" value={scoreB} placeholder="15" aria-label="Team B score" onChange={e => setScoreB(e.target.value)} />
+      </div>{selected.length === 4 && <div className="winner-select">
         <div className="helper">Who won?</div>
         <div className="winner-options">
           <button
@@ -2721,7 +2729,7 @@ const totalFines = fines.reduce(
           </button>
         </div>
       </div>}
-      <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam} onClick={saveMatch}>Save match</button></Modal>}
+      <button className="primary-button" disabled={selected.length !== 4 || !winnerTeam || scoreA === "" || scoreB === ""} onClick={saveMatch}>Save match</button></Modal>}
 
     {modal === "pin" && <Modal title="Admin verification" close={() => setModal(null)}><div className="pin-box"><LockKeyhole size={28} /><p>{pinAction === "unfreeze" ? "Enter the 6-digit admin PIN to unlock today." : "Enter the 6-digit admin PIN."}</p><input autoFocus maxLength={6} inputMode="numeric" pattern="[0-9]{6}" type="password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
       <button className="primary-button" disabled={pin.length !== 6} onClick={verify}>Verify</button></div></Modal>}
@@ -2735,6 +2743,11 @@ const totalFines = fines.reduce(
     }}>
       <p className="helper">Admin verified. The match ID remains unchanged.</p>
       <div className="match-preview"><b>{team(targetMatch, "A")}</b><span>vs</span><b>{team(targetMatch, "B")}</b></div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "16px 0" }}>
+        <input inputMode="numeric" type="number" min="0" max="99" value={scoreA} placeholder="21" aria-label="Team A score" onChange={e => setScoreA(e.target.value)} />
+        <span style={{ color: "#91a39b", fontWeight: 700 }}>–</span>
+        <input inputMode="numeric" type="number" min="0" max="99" value={scoreB} placeholder="15" aria-label="Team B score" onChange={e => setScoreB(e.target.value)} />
+      </div>
       <div className="winner-select">
         <div className="helper">Who won?</div>
         <div className="winner-options">
@@ -2763,7 +2776,7 @@ const totalFines = fines.reduce(
       </div>
 
       <div className="edit-modal-actions">
-        <button className="primary-button edit-save-button" onClick={saveEditedMatch}>
+        <button className="primary-button edit-save-button" disabled={scoreA === "" || scoreB === "" || !winnerTeam} onClick={saveEditedMatch}>
           Save corrected score
         </button>
         <button className="danger-button delete-match-button" onClick={removeMatch}>

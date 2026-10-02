@@ -134,12 +134,31 @@
   line-height: 1 !important;
 }
 
-.home-match-history .home-history-score-card > div:nth-child(3) > b {
+/* Score A follows Team A's result. */
+.home-match-history .home-history-score-card > .teams:has(> div:first-child .home-team-win) ~ div:nth-child(3) > b {
   color: #08784b !important;
   font-weight: 800 !important;
 }
 
-.home-match-history .home-history-score-card > div:nth-child(3) > span {
+.home-match-history .home-history-score-card > .teams:has(> div:first-child .home-team-loss) ~ div:nth-child(3) > b {
+  color: #8a9a92 !important;
+  font-weight: 500 !important;
+}
+
+/* Score B follows Team B's result. */
+.home-match-history .home-history-score-card > .teams:has(> div:nth-child(2) .home-team-win) ~ div:nth-child(3) > span {
+  color: #08784b !important;
+  font-weight: 800 !important;
+}
+
+.home-match-history .home-history-score-card > .teams:has(> div:nth-child(2) .home-team-loss) ~ div:nth-child(3) > span {
+  color: #8a9a92 !important;
+  font-weight: 500 !important;
+}
+
+/* Keep the score neutral for a tie/undefined result rather than incorrectly highlighting Team A. */
+.home-match-history .home-history-score-card > .teams:not(:has(.home-team-win)):not(:has(.home-team-loss)) ~ div:nth-child(3) > b,
+.home-match-history .home-history-score-card > .teams:not(:has(.home-team-win)):not(:has(.home-team-loss)) ~ div:nth-child(3) > span {
   color: #8a9a92 !important;
   font-weight: 500 !important;
 }

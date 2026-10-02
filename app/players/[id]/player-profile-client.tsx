@@ -305,20 +305,22 @@ export default function PlayerProfileClient() {
                   const losses = p.matches - p.wins;
                   return (
                     <article className="r365-partner-tile" key={p.id}>
-                      <div className="r365-partner-info">
+                      <div className="r365-partner-info" style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                         <div className="r365-partner-avatar" aria-hidden="true">{p.name.slice(0, 1).toUpperCase()}</div>
-                        <div>
-                          <strong className="r365-partner-name">{p.name}</strong>
-                          <span>{p.matches} {p.matches === 1 ? "match" : "matches"}</span>
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3, paddingRight: 4 }}>
+                          <strong className="r365-partner-name" style={{ display: "block", color: "#effbf6", fontSize: 13, lineHeight: 1.1, fontWeight: 700, opacity: 1, visibility: "visible", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</strong>
+                          <span style={{ display: "block", color: "#8ca69d", fontSize: 8, lineHeight: 1.1 }}>{p.matches} {p.matches === 1 ? "match" : "matches"}</span>
                         </div>
                       </div>
                       <div className="r365-partner-ring" style={{ "--partner-win-rate": `${p.winRate}%` } as React.CSSProperties} aria-label={`${p.name}: ${p.winRate}% win rate`}>
-                        <strong>{p.winRate}%</strong>
-                        <small>win rate</small>
+                        <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", lineHeight: 1, pointerEvents: "none" }}>
+                          <strong style={{ position: "relative", zIndex: 3, display: "block", color: "#effff7", fontSize: 16, lineHeight: 1, fontWeight: 800, letterSpacing: "-.4px" }}>{p.winRate}%</strong>
+                          <small style={{ position: "relative", zIndex: 3, display: "block", marginTop: 4, color: "#76948a", fontSize: 6, lineHeight: 1, textTransform: "uppercase", letterSpacing: ".45px" }}>win rate</small>
+                        </div>
                       </div>
-                      <div className="r365-partner-record">
-                        <span><i className="r365-partner-win-dot" /> <b>{p.wins}</b> Wins</span>
-                        <span><i className="r365-partner-loss-dot" /> <b>{losses}</b> {losses === 1 ? "Loss" : "Losses"}</span>
+                      <div className="r365-partner-record" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, whiteSpace: "nowrap" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#8ca69d", fontSize: 8, lineHeight: 1 }}><i className="r365-partner-win-dot" style={{ display: "inline-block", width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: "#35e68b" }} /><b style={{ color: "#eaf8f2", fontSize: 10 }}>{p.wins}</b> Wins</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#8ca69d", fontSize: 8, lineHeight: 1 }}><i className="r365-partner-loss-dot" style={{ display: "inline-block", width: 8, height: 8, flex: "0 0 8px", borderRadius: "50%", background: "#ed5b62" }} /><b style={{ color: "#eaf8f2", fontSize: 10 }}>{losses}</b> {losses === 1 ? "Loss" : "Losses"}</span>
                       </div>
                     </article>
                   );

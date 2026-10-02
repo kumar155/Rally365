@@ -30,11 +30,10 @@ type TrendPoint = {
   winRate: number;
   avgPoints: number;
 };
-type Frequency = "weekly" | "monthly";
-type PerformanceBar = { label: string; matches: number; wins: number; winRate: number; points: number };
+type Frequency = "all" | "weekly" | "monthly";
+type PerformanceBar = { key: string; label: string; period: string; matches: number; wins: number; winRate: number; points: number };
 
 const isValid = (m: Match) => m.status !== "VOIDED";
-const avatarPath = (name: string) => `/avatars/${encodeURIComponent(name)}.png`;
 const formatDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Date TBD" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -59,6 +58,7 @@ export default function PlayerProfileClient() {
   const [loading, setLoading] = useState(true);
   const [frequency, setFrequency] = useState<Frequency>("weekly");
   const [selectedTrendIndex, setSelectedTrendIndex] = useState<number | null>(null);
+  const [selectedBarKey, setSelectedBarKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!playerKey) {
@@ -168,17 +168,7 @@ export default function PlayerProfileClient() {
       const side = match.match_players.find(x => x.player_id === playerId)?.team;
       const date = new Date(match.played_at);
       if (!side || Number.isNaN(date.getTime())) {
-        return {
-          label: `${index + 1}`,
-          date: formatDate(match.played_at),
-          week: "Week TBD",
-          month: "Month TBD",
-          result: "L",
-          own: 0,
-          opp: 0,
-          winRate: 0,
-          avgPoints: 0,
-        };
+        return { label: `${index + 1}`, date: formatDate(match.played_at), week: "Week TBD", month: "Month TBD", result: "L", own: 0, opp: 0, winRate: 0, avgPoints: 0 };
       }
       const own = Number(side === "A" ? match.team_a_score : match.team_b_score);
       const opp = Number(side === "A" ? match.team_b_score : match.team_a_score);
@@ -201,6 +191,7 @@ export default function PlayerProfileClient() {
 
   useEffect(() => {
     setSelectedTrendIndex(null);
+    setSelectedBarKey(null);
   }, [playerId]);
 
   const recent = useMemo(
@@ -214,6 +205,7 @@ export default function PlayerProfileClient() {
 
   const performanceBars = useMemo<PerformanceBar[]>(() => {
     const chronological = [...playerMatches].reverse();
+    const bucketMode: "weekly" | "monthly" = frequency === "weekly" ? "weekly" : "monthly";
     const buckets = new Map<string, { date: Date; matches: number; wins: number; points: number }>();
     for (const match of chronological) {
       const side = match.match_players.find(x => x.player_id === playerId)?.team;
@@ -222,7 +214,7 @@ export default function PlayerProfileClient() {
       if (Number.isNaN(date.getTime())) continue;
       let key: string;
       let bucketDate: Date;
-      if (frequency === "weekly") {
+      if (bucketMode === "weekly") {
         const day = date.getDay();
         const mondayOffset = day === 0 ? -6 : 1 - day;
         bucketDate = new Date(date);
@@ -241,15 +233,25 @@ export default function PlayerProfileClient() {
       if (own > opp) bucket.wins++;
       buckets.set(key, bucket);
     }
-    return [...buckets.values()].slice(-12).map(bucket => ({
-      label: frequency === "weekly"
+    const values = [...buckets.values()];
+    const visible = frequency === "all" ? values : values.slice(-12);
+    return visible.map(bucket => {
+      const label = bucketMode === "weekly"
         ? `W${isoWeek(bucket.date)}`
-        : bucket.date.toLocaleDateString("en-IN", { month: "short" }),
-      matches: bucket.matches,
-      wins: bucket.wins,
-      winRate: bucket.matches ? Math.round((bucket.wins / bucket.matches) * 100) : 0,
-      points: bucket.points,
-    }));
+        : bucket.date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+      const period = bucketMode === "weekly"
+        ? `Week ${isoWeek(bucket.date)} · ${bucket.date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+        : bucket.date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+      return {
+        key: `${frequency}-${bucket.date.toISOString()}`,
+        label,
+        period,
+        matches: bucket.matches,
+        wins: bucket.wins,
+        winRate: bucket.matches ? Math.round((bucket.wins / bucket.matches) * 100) : 0,
+        points: bucket.points,
+      };
+    });
   }, [playerMatches, playerId, frequency]);
 
   const partnerRows = useMemo<Partner[]>(() => {
@@ -267,12 +269,7 @@ export default function PlayerProfileClient() {
       }
     }
     return [...map.entries()]
-      .map(([id, value]) => ({
-        id,
-        name: nameMap.get(id) || "Unknown",
-        ...value,
-        winRate: value.matches ? Math.round((value.wins / value.matches) * 100) : 0,
-      }))
+      .map(([id, value]) => ({ id, name: nameMap.get(id) || "Unknown", ...value, winRate: value.matches ? Math.round((value.wins / value.matches) * 100) : 0 }))
       .sort((a, b) => b.winRate - a.winRate || b.matches - a.matches)
       .slice(0, 5);
   }, [playerMatches, playerId, nameMap]);
@@ -284,11 +281,7 @@ export default function PlayerProfileClient() {
     const padY = 10;
     const source = trend.length ? trend : [{ label: "1", date: "Date TBD", week: "Week TBD", month: "Month TBD", result: "L" as const, own: 0, opp: 0, winRate: 0, avgPoints: 0 }];
     const step = source.length > 1 ? (width - padX * 2) / (source.length - 1) : 0;
-    return source.map((point, index) => ({
-      ...point,
-      x: padX + step * index,
-      y: height - padY - (point.winRate / 100) * (height - padY * 2),
-    }));
+    return source.map((point, index) => ({ ...point, x: padX + step * index, y: height - padY - (point.winRate / 100) * (height - padY * 2) }));
   }, [trend]);
 
   const trendLine = trendPoints.map(point => `${point.x},${point.y}`).join(" ");
@@ -296,7 +289,10 @@ export default function PlayerProfileClient() {
   const trendCurrent = trend.at(-1)?.winRate ?? stats.winRate;
   const selectedPoint = selectedTrendIndex === null ? null : trendPoints[selectedTrendIndex] || null;
   const tooltipLeft = selectedPoint ? Math.min(84, Math.max(16, (selectedPoint.x / 360) * 100)) : 50;
-  const tooltipTop = selectedPoint ? Math.max(3, (selectedPoint.y / 112) * 100 - 42) : 3;
+  const tooltipBelow = selectedPoint ? selectedPoint.y < 48 : false;
+  const tooltipTop = selectedPoint ? (tooltipBelow ? selectedPoint.y + 10 : selectedPoint.y - 8) : 0;
+  const selectedBar = selectedBarKey ? performanceBars.find(bar => bar.key === selectedBarKey) || null : null;
+  const partnerInitial = (name: string) => name.trim().slice(0, 1).toUpperCase();
 
   if (loading) return <main className="r365-profile-page"><div className="r365-profile-loading r365-loading">Loading player profile…</div></main>;
   if (!player) return <main className="r365-profile-page"><div className="r365-profile-shell"><Link className="r365-back" href="/">← Back to players</Link><div className="r365-error" style={{ marginTop: 16 }}>{error || "Player not found."}</div></div></main>;
@@ -317,13 +313,7 @@ export default function PlayerProfileClient() {
         <section className="r365-hero">
           <div className="r365-hero-glow" />
           <div className="r365-hero-main">
-            <div className="r365-player-photo-wrap">
-              <img className="r365-avatar" src={avatarPath(player.name)} alt={player.name} onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.parentElement?.querySelector(".r365-avatar-fallback")?.removeAttribute("hidden"); }} />
-              <div className="r365-avatar r365-avatar-fallback" hidden>{player.name.slice(0, 1)}</div>
-            </div>
-            <div className="r365-player-summary r365-player-identity">
-              <h1>{player.name}</h1>
-            </div>
+            <div className="r365-player-identity"><h1>{player.name}</h1></div>
 
             <div className="r365-trend-panel">
               <div className="r365-trend-head">
@@ -338,18 +328,7 @@ export default function PlayerProfileClient() {
                   <polygon className="r365-trend-area" points={trendArea} />
                   <polyline className="r365-trend-line" points={trendLine} />
                   {trendPoints.map((point, index) => (
-                    <circle
-                      key={`hit-${point.label}-${index}`}
-                      className="r365-trend-hit"
-                      cx={point.x}
-                      cy={point.y}
-                      r={9}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Match ${point.label}, ${point.date}, ${point.week}, ${point.month}, ${point.result}`}
-                      onPointerDown={() => setSelectedTrendIndex(index)}
-                      onFocus={() => setSelectedTrendIndex(index)}
-                    />
+                    <circle key={`hit-${point.label}-${index}`} className="r365-trend-hit" cx={point.x} cy={point.y} r={9} tabIndex={0} role="button" aria-label={`Match ${point.label}, ${point.date}, ${point.week}, ${point.month}, ${point.result}`} onPointerDown={() => setSelectedTrendIndex(index)} onFocus={() => setSelectedTrendIndex(index)} />
                   ))}
                   {trendPoints.map((point, index) => {
                     const showDot = trendPoints.length <= 24 || index === trendPoints.length - 1 || index % Math.ceil(trendPoints.length / 20) === 0;
@@ -357,7 +336,7 @@ export default function PlayerProfileClient() {
                   })}
                 </svg>
                 {selectedPoint && (
-                  <div className="r365-trend-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status">
+                  <div className={`r365-trend-tooltip ${tooltipBelow ? "below" : "above"}`} style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}px` }} role="status">
                     <b>Match {selectedPoint.label} · {selectedPoint.result}</b>
                     <span>{selectedPoint.date}</span>
                     <span>{selectedPoint.week} · {selectedPoint.month}</span>
@@ -375,35 +354,35 @@ export default function PlayerProfileClient() {
               </div>
 
               <div className="r365-frequency-head">
-                <div><strong>Performance by frequency</strong><span>Win rate and match volume</span></div>
+                <div><strong>Performance by frequency</strong><span>{frequency === "all" ? "Full history · monthly buckets" : "Win rate and match volume"}</span></div>
                 <div className="r365-frequency-toggle" role="tablist" aria-label="Performance frequency">
+                  <button type="button" className={frequency === "all" ? "active" : ""} onClick={() => setFrequency("all")}>All</button>
                   <button type="button" className={frequency === "weekly" ? "active" : ""} onClick={() => setFrequency("weekly")}>Weekly</button>
                   <button type="button" className={frequency === "monthly" ? "active" : ""} onClick={() => setFrequency("monthly")}>Monthly</button>
                 </div>
               </div>
               <div className="r365-performance-bars">
                 {performanceBars.length === 0 ? <div className="r365-chart-empty">No recorded performance yet.</div> : performanceBars.map(bar => (
-                  <div className="r365-performance-bar" key={`${frequency}-${bar.label}`} title={`${bar.matches} matches · ${bar.wins} wins · ${bar.winRate}% win rate`}>
+                  <div className={`r365-performance-bar ${selectedBarKey === bar.key ? "selected" : ""}`} key={bar.key} tabIndex={0} role="button" aria-label={`${bar.period}: ${bar.matches} matches, ${bar.wins} wins, ${bar.winRate}% win rate`} onPointerEnter={() => setSelectedBarKey(bar.key)} onFocus={() => setSelectedBarKey(bar.key)} onPointerDown={() => setSelectedBarKey(bar.key)}>
+                    <div className="r365-performance-bar-detail" aria-hidden="true"><b>{bar.period}</b><span>{bar.matches} matches · {bar.wins} wins</span><strong>{bar.winRate}% win rate</strong></div>
                     <div className="r365-performance-bar-value">{bar.matches}</div>
                     <div className="r365-performance-bar-fill" style={{ height: `${Math.max(8, bar.winRate)}%` }}><span>{bar.winRate}%</span></div>
                     <small>{bar.label}</small>
                   </div>
                 ))}
               </div>
-              <div className="r365-trend-legend"><i /> Touch a trend point for date · week · month</div>
+              <div className="r365-trend-legend"><i /> Touch or hover a point/bar for period details</div>
             </div>
           </div>
         </section>
 
         <section className="r365-kpis">
           <div className="r365-kpi"><div className="r365-kpi-icon">🏸</div><b>{stats.played}</b><span>Matches</span></div>
+          <div className="r365-kpi"><div className="r365-kpi-icon">◔</div><b>{stats.winRate}%</b><span>Win rate</span></div>
           <div className="r365-kpi"><div className="r365-kpi-icon">🏆</div><b>{stats.wins}</b><span>Wins</span></div>
           <div className="r365-kpi"><div className="r365-kpi-icon">✕</div><b>{stats.losses}</b><span>Losses</span></div>
-          <div className="r365-kpi"><div className="r365-kpi-icon">◔</div><b>{stats.winRate}%</b><span>Win rate</span></div>
-          <div className="r365-kpi"><div className="r365-kpi-icon">▱</div><b>{stats.gamesWon}</b><span>Points won</span></div>
-          <div className="r365-kpi"><div className="r365-kpi-icon">▱</div><b>{stats.gamesLost}</b><span>Points lost</span></div>
           <div className="r365-kpi"><div className="r365-kpi-icon">▥</div><b>{stats.avgPoints}</b><span>Avg points/game</span></div>
-          <div className="r365-kpi"><div className="r365-kpi-icon">🔥</div><b>{stats.currentStreak}</b><span>Current streak</span></div>
+          <div className="r365-kpi"><div className="r365-kpi-icon">±</div><b>{stats.pointDiff > 0 ? "+" : ""}{stats.pointDiff}</b><span>Point differential</span></div>
         </section>
 
         <section className="r365-recent-form-card">
@@ -420,9 +399,16 @@ export default function PlayerProfileClient() {
             </div>
           </section>
 
-          <section className="r365-card">
-            <div className="r365-card-head"><h2>Best Duo Partners</h2><span className="r365-muted">Recorded matches</span></div>
-            {partnerRows.length === 0 ? <div className="r365-empty">No doubles partner data available yet.</div> : <div className="r365-list">{partnerRows.map(partner => <div className="r365-list-row" key={partner.id}><div className="r365-list-avatar">{partner.name.slice(0, 1)}</div><div className="r365-list-copy"><b>{partner.name}</b><span>{partner.matches} matches · {partner.wins} wins</span></div><strong>{partner.winRate}%</strong></div>)}</div>}
+          <section className="r365-card r365-partners-card">
+            <div className="r365-card-head"><div><h2>Best Duo Partners</h2><span className="r365-muted">Partnership performance</span></div></div>
+            {partnerRows.length === 0 ? <div className="r365-empty">No doubles partner data available yet.</div> : <div className="r365-partner-grid">{partnerRows.map((partner, index) => <div className="r365-partner-tile" key={partner.id}>
+              <div className="r365-partner-rank">{String.fromCharCode(65 + index)}</div>
+              <div className="r365-partner-avatar">{partnerInitial(partner.name)}</div>
+              <b className="r365-partner-name">{partner.name}</b>
+              <strong>{partner.winRate}%</strong>
+              <span>{partner.matches} matches · {partner.wins} wins</span>
+              <i><em style={{ width: `${partner.winRate}%` }} /></i>
+            </div>)}</div>}
           </section>
 
           <section className="r365-card r365-card-wide">

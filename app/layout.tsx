@@ -3,7 +3,9 @@ import "./globals.css";
 import "./loading-splash.css";
 import "./tournaments/manage/manage-fixes.css";
 import "./tournaments/tournament-list.css";
+import "./players/player-profile.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
+import PlayerProfileNavigator from "./player-profile-navigator";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -20,6 +22,7 @@ export default function RootLayout({
       <body>
         {children}
         <TournamentNavBridge />
+        <PlayerProfileNavigator />
         <style>{`
           /* Temporarily hide Fines by player without removing its implementation. */
           .section-title:has(+ .stats-table .fine-player-header),

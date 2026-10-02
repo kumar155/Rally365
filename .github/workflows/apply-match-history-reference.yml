@@ -1,0 +1,191 @@
+name: Apply match history reference styling
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'match history reference styling') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply reference styling
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/globals.css')
+          text = path.read_text(encoding='utf-8')
+          marker = '/* Match history reference layout — Today tab */'
+          if marker in text:
+              print('Reference styling already present.')
+              raise SystemExit(0)
+
+          css = r'''/* Match history reference layout — Today tab */
+          .home-history-score-card{
+            position:relative;
+            display:grid !important;
+            grid-template-columns:minmax(0,1fr) 72px 24px !important;
+            grid-template-rows:auto auto !important;
+            column-gap:12px !important;
+            row-gap:8px !important;
+            align-items:center !important;
+            padding:14px 16px !important;
+            min-height:126px;
+          }
+          .home-history-score-card .match-number{
+            grid-column:1 / -1 !important;
+            grid-row:1 !important;
+            width:auto !important;
+            display:flex !important;
+            align-items:center !important;
+            gap:9px !important;
+            min-height:25px;
+            font-size:12px !important;
+            color:#7f90a0 !important;
+          }
+          .home-history-score-card .match-number b{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:38px;
+            height:25px;
+            padding:0 8px;
+            border-radius:8px;
+            background:#f0f4f7;
+            color:#516476;
+            font-size:11px;
+            font-weight:800;
+          }
+          .home-history-score-card .match-number .match-timestamp{
+            margin:0 !important;
+            color:#8292a1 !important;
+            font-size:12px !important;
+            font-weight:500;
+            line-height:1;
+          }
+          .home-history-score-card .match-number .match-timestamp::after{
+            content:"  •";
+            color:#a1adb7;
+            font-weight:800;
+          }
+          .home-history-score-card .teams{
+            grid-column:1 !important;
+            grid-row:2 !important;
+            min-width:0;
+            display:flex !important;
+            flex-direction:column;
+            gap:7px;
+            font-size:15px !important;
+            line-height:1.25 !important;
+          }
+          .home-history-score-card .teams div{
+            display:flex !important;
+            align-items:center;
+            justify-content:flex-start !important;
+            padding:0 !important;
+            min-height:22px;
+          }
+          .home-history-score-card .teams strong{
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+            font-size:15px;
+            font-weight:700;
+            color:#10231a;
+          }
+          .home-history-score-card .teams strong.home-team-loss{
+            color:#60746a;
+            font-weight:500;
+          }
+          .home-history-score-card .teams strong.home-team-win{
+            color:#10231a;
+            font-weight:750;
+          }
+          .home-history-score-card .teams strong.home-team-win::after{
+            content:"✓ WIN";
+            display:inline-flex;
+            align-items:center;
+            margin-left:8px;
+            padding:4px 8px;
+            border-radius:7px;
+            background:#d7f6e7;
+            color:#08784b;
+            font-size:10px;
+            line-height:1;
+            font-weight:850;
+            vertical-align:middle;
+          }
+          .home-history-score-card .teams small{
+            display:none;
+          }
+          .home-history-score-card > div:nth-of-type(3){
+            grid-column:2 !important;
+            grid-row:2 !important;
+            width:72px !important;
+            min-width:72px !important;
+            min-height:62px;
+            border:1px solid #dfe7e2 !important;
+            border-radius:13px !important;
+            padding:7px 8px !important;
+            background:#f8fbf9 !important;
+            display:flex !important;
+            flex-direction:column;
+            align-items:center !important;
+            justify-content:center !important;
+            gap:4px;
+            line-height:1 !important;
+          }
+          .home-history-score-card > div:nth-of-type(3) b{
+            color:#08784b !important;
+            font-size:18px !important;
+            font-weight:800;
+          }
+          .home-history-score-card > div:nth-of-type(3) span{
+            color:#8a9a92 !important;
+            font-size:15px !important;
+            font-weight:500;
+          }
+          .home-history-score-card .edit-link{
+            grid-column:3 !important;
+            grid-row:2 !important;
+            width:24px !important;
+            height:34px;
+            padding:0 !important;
+            border:0 !important;
+            background:transparent !important;
+            color:#8da0b9 !important;
+            display:grid !important;
+            place-items:center;
+          }
+          @media (max-width:420px){
+            .home-history-score-card{
+              grid-template-columns:minmax(0,1fr) 64px 22px !important;
+              column-gap:9px !important;
+              padding:13px 14px !important;
+            }
+            .home-history-score-card > div:nth-of-type(3){
+              width:64px !important;
+              min-width:64px !important;
+            }
+          }
+          '''
+          path.write_text(text.rstrip() + '\n' + css + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit and remove patch workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/globals.css
+          git rm .github/workflows/apply-match-history-reference.yml
+          git commit -m "ui: match history reference styling"
+          git push

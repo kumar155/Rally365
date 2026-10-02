@@ -297,9 +297,34 @@ export default function PlayerProfileClient() {
             <div className="r365-key-grid"><div className="r365-key"><b>{stats.played}</b><span>Total matches</span></div><div className="r365-key"><b>{stats.wins}</b><span>Total wins</span></div><div className="r365-key"><b>{stats.gamesWon}</b><span>Total games won</span></div><div className="r365-key"><b>{stats.gamesLost}</b><span>Games lost</span></div><div className="r365-key"><b>{stats.avgPoints}</b><span>Avg points/game</span></div><div className="r365-key"><b>{stats.bestStreak}</b><span>Best win streak</span></div></div>
           </section>
 
-          <section className="r365-card">
-            <div className="r365-card-head"><div><h2>Best Duo Partners</h2><span className="r365-muted">Based on recorded team history</span></div><Users size={16} color="#42eb91" /></div>
-            {partnerRows.length ? <table className="r365-table"><thead><tr><th>Player</th><th>Matches</th><th>Wins</th><th>Win rate</th></tr></thead><tbody>{partnerRows.map(p => <tr key={p.id}><td>{p.name}</td><td>{p.matches}</td><td>{p.wins}</td><td className="good">{p.winRate}%</td></tr>)}</tbody></table> : <div className="r365-muted">No duo history yet.</div>}
+          <section className="r365-card r365-partners-card">
+            <div className="r365-card-head"><div><h2>Best Duo Partners</h2><span className="r365-muted">Partnership performance</span></div><Users size={16} color="#42eb91" /></div>
+            {partnerRows.length ? (
+              <div className="r365-partner-grid">
+                {partnerRows.map((p, index) => {
+                  const losses = p.matches - p.wins;
+                  return (
+                    <article className="r365-partner-tile" key={p.id}>
+                      <div className="r365-partner-info">
+                        <div className="r365-partner-avatar" aria-hidden="true">{p.name.slice(0, 1).toUpperCase()}</div>
+                        <div>
+                          <strong className="r365-partner-name">{p.name}</strong>
+                          <span>{p.matches} {p.matches === 1 ? "match" : "matches"}</span>
+                        </div>
+                      </div>
+                      <div className="r365-partner-ring" style={{ "--partner-win-rate": `${p.winRate}%` } as React.CSSProperties} aria-label={`${p.name}: ${p.winRate}% win rate`}>
+                        <strong>{p.winRate}%</strong>
+                        <small>win rate</small>
+                      </div>
+                      <div className="r365-partner-record">
+                        <span><i className="r365-partner-win-dot" /> <b>{p.wins}</b> Wins</span>
+                        <span><i className="r365-partner-loss-dot" /> <b>{losses}</b> {losses === 1 ? "Loss" : "Losses"}</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : <div className="r365-muted">No duo history yet.</div>}
           </section>
         </div>
 

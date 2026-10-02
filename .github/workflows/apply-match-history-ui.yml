@@ -1,6 +1,6 @@
 name: Apply match history UI
 
-on:
+'on':
   push:
     branches:
       - main
@@ -16,20 +16,14 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Skip generated commit
-        shell: bash
-        run: |
-          if [[ "$GITHUB_SHA" != "" ]]; then
-            MSG="$(git log -1 --pretty=%B)"
-            if [[ "$MSG" == *"match history reference UI"* ]]; then
-              echo "Already applied."
-              exit 0
-            fi
-          fi
-
       - name: Apply reference match history UI
-        shell: python {0}
         run: |
+          MSG="$(git log -1 --pretty=%B)"
+          if [[ "$MSG" == *"match history reference UI"* ]]; then
+            echo "Already applied."
+            exit 0
+          fi
+          python - <<'PY'
           from pathlib import Path
           import re
 
@@ -98,11 +92,10 @@ jobs:
           if not pattern.search(text):
               raise SystemExit('Target match history block was not found; no changes made.')
 
-          text = pattern.sub(replacement, text, count=1)
-          path.write_text(text, encoding='utf-8')
+          path.write_text(pattern.sub(replacement, text, count=1), encoding='utf-8')
+          PY
 
       - name: Commit UI change
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

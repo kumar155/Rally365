@@ -3,6 +3,7 @@ import "./globals.css";
 import "./loading-splash.css";
 import "./tournaments/manage/manage-fixes.css";
 import "./tournaments/tournament-list.css";
+import "./match-history-reference.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 import PlayerProfileNavigator from "./player-profile-navigator";
 

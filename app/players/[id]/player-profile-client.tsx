@@ -23,6 +23,7 @@ type PeriodRow = { label: string; matches: number; wins: number; winRate: number
 
 const isValid = (m: Match) => m.status !== "VOIDED";
 const avatarPath = (name: string) => `/avatars/${encodeURIComponent(name)}.png`;
+const isGuestPlayerName = (name: string) => /^guest\d*$/i.test(name.trim());
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -145,12 +146,14 @@ export default function PlayerProfileClient() {
       if (!me) continue;
       const own = me.team === "A" ? match.team_a_score : match.team_b_score;
       const opp = me.team === "A" ? match.team_b_score : match.team_a_score;
-      match.match_players.filter(x => x.team === me.team && x.player_id !== playerId).forEach(partner => {
-        const current = map.get(partner.player_id) || { matches: 0, wins: 0 };
-        current.matches++;
-        if (own > opp) current.wins++;
-        map.set(partner.player_id, current);
-      });
+      match.match_players
+        .filter(x => x.team === me.team && x.player_id !== playerId && !isGuestPlayerName(nameMap.get(x.player_id) || ""))
+        .forEach(partner => {
+          const current = map.get(partner.player_id) || { matches: 0, wins: 0 };
+          current.matches++;
+          if (own > opp) current.wins++;
+          map.set(partner.player_id, current);
+        });
     }
     return [...map.entries()].map(([id, value]) => ({
       id,

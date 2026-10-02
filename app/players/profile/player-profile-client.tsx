@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Share2, Users } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import "../player-profile.css";
+import "./player-profile-trend.css";
 
 type Player = { id: string; name: string };
 type MatchPlayer = { player_id: string; team: "A" | "B" };
@@ -19,6 +20,7 @@ type Match = {
 };
 
 type Partner = { id: string; name: string; matches: number; wins: number; winRate: number };
+type TrendPoint = { label: string; winRate: number; avgPoints: number };
 
 const isValid = (m: Match) => m.status !== "VOIDED";
 const avatarPath = (name: string) => `/avatars/${encodeURIComponent(name)}.png`;
@@ -59,9 +61,6 @@ export default function PlayerProfileClient() {
         return;
       }
 
-      // The profile URL may contain either the player's UUID or their name.
-      // Never send a non-UUID value to the UUID `id` column: Postgres rejects
-      // values such as "Kartik" before the OR filter can evaluate the name.
       const playerQuery = isUuid(playerKey)
         ? supabase.from("players").select("id,name").eq("group_id", group.id).eq("id", playerKey).maybeSingle()
         : supabase.from("players").select("id,name").eq("group_id", group.id).eq("name", playerKey).maybeSingle();
@@ -119,6 +118,21 @@ export default function PlayerProfileClient() {
     return { played, wins, losses: played - wins, winRate: played ? Math.round(wins / played * 100) : 0, gamesWon, gamesLost, avgPoints: played ? (gamesWon / played).toFixed(1) : "0.0", currentStreak, bestStreak, pointDiff: gamesWon - gamesLost };
   }, [playerMatches, playerId]);
 
+  const trend = useMemo<TrendPoint[]>(() => {
+    const chronological = [...playerMatches].slice(0, 10).reverse();
+    let wins = 0;
+    let points = 0;
+    return chronological.map((match, index) => {
+      const side = match.match_players.find(x => x.player_id === playerId)?.team;
+      if (!side) return { label: `${index + 1}`, winRate: 0, avgPoints: 0 };
+      const own = Number(side === "A" ? match.team_a_score : match.team_b_score);
+      const opp = Number(side === "A" ? match.team_b_score : match.team_a_score);
+      if (own > opp) wins++;
+      points += own;
+      return { label: `${index + 1}`, winRate: Math.round((wins / (index + 1)) * 100), avgPoints: Number((points / (index + 1)).toFixed(1)) };
+    });
+  }, [playerMatches, playerId]);
+
   const recent = useMemo(() => playerMatches.slice(0, 8).map(m => {
     const side = m.match_players.find(x => x.player_id === playerId)?.team;
     if (!side) return "L";
@@ -141,6 +155,25 @@ export default function PlayerProfileClient() {
     }
     return [...map.entries()].map(([id, value]) => ({ id, name: nameMap.get(id) || "Unknown", ...value, winRate: value.matches ? Math.round(value.wins / value.matches * 100) : 0 })).sort((a, b) => b.winRate - a.winRate || b.matches - a.matches).slice(0, 5);
   }, [playerMatches, playerId, nameMap]);
+
+  const trendPoints = useMemo(() => {
+    const width = 360;
+    const height = 112;
+    const padX = 8;
+    const padY = 10;
+    const source = trend.length ? trend : [{ label: "1", winRate: 0, avgPoints: 0 }];
+    const step = source.length > 1 ? (width - padX * 2) / (source.length - 1) : 0;
+    return source.map((point, index) => ({
+      ...point,
+      x: padX + step * index,
+      y: height - padY - (point.winRate / 100) * (height - padY * 2),
+    }));
+  }, [trend]);
+
+  const trendLine = trendPoints.map(point => `${point.x},${point.y}`).join(" ");
+  const trendArea = trendPoints.length ? `${trendPoints[0].x},102 ${trendLine} ${trendPoints[trendPoints.length - 1].x},102` : "";
+  const trendCurrent = trend.at(-1)?.winRate ?? stats.winRate;
+  const trendAvgPoints = trend.at(-1)?.avgPoints ?? Number(stats.avgPoints);
 
   if (loading) return <main className="r365-profile-page"><div className="r365-profile-loading r365-loading">Loading player profile…</div></main>;
   if (!player) return <main className="r365-profile-page"><div className="r365-profile-shell"><Link className="r365-back" href="/">← Back to players</Link><div className="r365-error" style={{ marginTop: 16 }}>{error || "Player not found."}</div></div></main>;
@@ -169,6 +202,28 @@ export default function PlayerProfileClient() {
               <p className="r365-sub">{groupName} · Hyderabad</p>
               <div className="r365-meta"><span><Users size={13} /> Badminton</span><span>🏸 Player</span></div>
               <div className="r365-tags"><span className="r365-tag">Competitive</span><span className="r365-tag blue">Performance</span></div>
+            </div>
+            <div className="r365-trend-panel">
+              <div className="r365-trend-head">
+                <div><div className="r365-trend-title">Performance trend</div><div className="r365-trend-subtitle">Cumulative win rate · last {Math.min(10, stats.played)} matches</div></div>
+                <div className="r365-trend-current"><b>{trendCurrent}%</b><span>win rate</span></div>
+              </div>
+              <div className="r365-trend-chart" aria-label="Player win rate trend">
+                <svg viewBox="0 0 360 112" role="img" aria-hidden="true">
+                  <defs><linearGradient id="r365TrendFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#42eb91" stopOpacity=".24" /><stop offset="100%" stopColor="#42eb91" stopOpacity="0" /></linearGradient></defs>
+                  {[25, 50, 75].map(value => <line key={value} className="r365-trend-grid" x1="8" x2="352" y1={102 - (value / 100) * 92} y2={102 - (value / 100) * 92} />)}
+                  <polygon className="r365-trend-area" points={trendArea} />
+                  <polyline className="r365-trend-line" points={trendLine} />
+                  {trendPoints.map((point, index) => <circle key={`${point.label}-${index}`} className="r365-trend-dot" cx={point.x} cy={point.y} r={index === trendPoints.length - 1 ? 4 : 2.5} />)}
+                </svg>
+              </div>
+              <div className="r365-trend-axis"><span>Older</span><span>Recent</span></div>
+              <div className="r365-trend-kpis">
+                <div className="r365-trend-kpi"><b>{stats.winRate}%</b><span>Overall win rate</span></div>
+                <div className="r365-trend-kpi"><b>{trendAvgPoints.toFixed(1)}</b><span>Avg points</span></div>
+                <div className="r365-trend-kpi"><b>{stats.pointDiff > 0 ? "+" : ""}{stats.pointDiff}</b><span>Point diff</span></div>
+              </div>
+              <div className="r365-trend-legend"><i /> Win-rate progression across recorded matches</div>
             </div>
           </div>
           <div className="r365-form"><span className="r365-form-label">RECENT FORM</span>{recent.map((r, i) => <span key={`${r}-${i}`} className={`r365-result ${r === "L" ? "loss" : ""}`}>{r}</span>)}<div className="r365-rank"><small>Win rate</small><strong>{stats.winRate}%</strong><em>{stats.currentStreak > 0 ? `↑ ${stats.currentStreak} streak` : "Stable"}</em></div></div>

@@ -1,0 +1,83 @@
+name: Apply match history alignment patch
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch match history UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path('app/page.tsx')
+          text = page.read_text()
+          old = '''{homeMatches.map((m, i) => <div className={`match-card home-history-score-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 14, alignItems: "center" }}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">Today, {matchHistoryTime(m.played_at)}</small></div><div className="teams"><div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{team(m, "A")}</strong></div><div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{team(m, "B")}</strong></div>{m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}</div><div style={{ minWidth: 58, border: "1px solid #dfe7e2", borderRadius: 12, padding: "8px 10px", background: "#f8fbf9", display: "grid", justifyItems: "center", lineHeight: 1.05 }}><b style={{ color: "#08784b", fontSize: 18 }}>{m.team_a_score}</b><span style={{ color: "#8a9a92", fontSize: 15 }}>{m.team_b_score}</span></div>{m.status !== "VOIDED" && <button
+                  className="edit-link"
+                  title="Edit match"
+                  aria-label="Edit match"
+                  onClick={() => openEdit(m)}
+                >
+                  <Pencil size={16} />
+                </button>}</div>)}'''
+          new = '''{homeMatches.map((m, i) => {
+            const aWon = m.team_a_score > m.team_b_score;
+            const bWon = m.team_b_score > m.team_a_score;
+            return <div className={`match-card home-history-score-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id}>
+              <div className="home-history-meta">
+                <span className="home-history-match-number">M{homeMatches.length - i}</span>
+                <span className="home-history-time">Today, {matchHistoryTime(m.played_at)} <b>•</b></span>
+              </div>
+              <div className="home-history-body">
+                <div className="home-history-teams">
+                  <div className="home-history-team-row">
+                    <strong className={`home-history-team-name ${aWon ? "winner" : bWon ? "loser" : ""}`}>{team(m, "A")}</strong>
+                    {aWon && <span className="home-history-win-pill">✓ WIN</span>}
+                  </div>
+                  <div className="home-history-team-row">
+                    <strong className={`home-history-team-name ${bWon ? "winner" : aWon ? "loser" : ""}`}>{team(m, "B")}</strong>
+                    {bWon && <span className="home-history-win-pill">✓ WIN</span>}
+                  </div>
+                  {m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}
+                </div>
+                <div className="home-history-score" aria-label={`Score ${m.team_a_score} to ${m.team_b_score}`}>
+                  <b className={aWon ? "score-winner" : "score-loser"}>{m.team_a_score}</b>
+                  <span className={bWon ? "score-winner" : "score-loser"}>{m.team_b_score}</span>
+                </div>
+                {m.status !== "VOIDED" && <button
+                  className="edit-link home-history-edit"
+                  title="Edit match"
+                  aria-label="Edit match"
+                  onClick={() => openEdit(m)}
+                >
+                  <Pencil size={16} />
+                </button>}
+              </div>
+            </div>;
+          })}'''
+          if old not in text:
+              raise SystemExit('Expected match history block was not found')
+          page.write_text(text.replace(old, new, 1))
+
+          css = Path('app/globals.css')
+          css_text = css.read_text()
+          marker = '/* Match history reference alignment */'
+          if marker not in css_text:
+              css_text += '''\n\n/* Match history reference alignment */\n.home-history-score-card {\n  display: flex !important;\n  flex-direction: column !important;\n  align-items: stretch !important;\n  gap: 12px !important;\n  padding: 18px 16px !important;\n}\n.home-history-meta {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 8px;\n  width: 100%;\n}\n.home-history-match-number {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  min-width: 58px;\n  height: 42px;\n  padding: 0 14px;\n  border-radius: 13px;\n  background: #f1f5f3;\n  color: #526a5d;\n  font-size: 15px;\n  font-weight: 900;\n}\n.home-history-time {\n  color: #809297;\n  font-size: 14px;\n  font-weight: 600;\n  line-height: 1.2;\n}\n.home-history-time b {\n  font-weight: 900;\n}\n.home-history-body {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) 58px 34px;\n  gap: 12px;\n  align-items: center;\n  width: 100%;\n}\n.home-history-teams {\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n.home-history-team-row {\n  min-width: 0;\n  min-height: 32px;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n.home-history-team-name {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: #10231a !important;\n  font-size: 15px;\n  line-height: 1.25;\n  font-weight: 650;\n}\n.home-history-team-name.winner {\n  font-weight: 800;\n}\n.home-history-team-name.loser {\n  font-weight: 500;\n  color: #10231a !important;\n}\n.home-history-win-pill {\n  flex: 0 0 auto;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: 5px 9px;\n  border-radius: 8px;\n  background: #d8f5e7;\n  color: #08784b;\n  font-size: 11px;\n  font-weight: 900;\n  line-height: 1;\n}\n.home-history-score {\n  width: 58px;\n  min-height: 76px;\n  border: 1px solid #dce7e1;\n  border-radius: 14px;\n  background: #f8fbf9;\n  display: grid;\n  grid-template-rows: 1fr 1fr;\n  justify-items: center;\n  align-items: center;\n  padding: 7px 10px;\n  line-height: 1;\n}\n.home-history-score b,\n.home-history-score span {\n  font-size: 18px;\n  font-weight: 800;\n}\n.home-history-score .score-winner {\n  color: #08784b;\n}\n.home-history-score .score-loser {\n  color: #8a9a92;\n}\n.home-history-edit {\n  width: 34px;\n  height: 34px;\n  padding: 0;\n  align-self: center;\n  background: transparent;\n  color: #8aa0bd;\n}\n@media (max-width: 420px) {\n  .home-history-score-card { padding: 16px 13px !important; }\n  .home-history-body { grid-template-columns: minmax(0, 1fr) 54px 32px; gap: 9px; }\n  .home-history-team-name { font-size: 14px; }\n  .home-history-win-pill { padding: 5px 7px; font-size: 10px; }\n  .home-history-score { width: 54px; min-height: 72px; }\n}\n'''
+              css.write_text(css_text)
+          PY
+
+      - name: Commit patch and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx app/globals.css .github/workflows/patch-match-history-alignment.yml
+          git commit -m "fix: align today match history and neutralize team colors"
+          git push
+          git rm .github/workflows/patch-match-history-alignment.yml
+          git commit -m "chore: remove temporary match history patch workflow"
+          git push

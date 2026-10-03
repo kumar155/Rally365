@@ -775,9 +775,16 @@ export default function Home() {
       winRate: ms.length ? Math.round((w / ms.length) * 100) : 0,
       diff: pf - pa,
     };
-  }).sort(
-    (a, b) => b.w - a.w || b.winRate - a.winRate || b.played - a.played
-  ), [players, validMatches]);
+  }).sort((a, b) => {
+    const isGuest = (name: string) => {
+      const n = name.trim().toLowerCase();
+      return n === "guest" || /^guest\d+$/.test(n) || n.startsWith("guest ");
+    };
+    const aGuest = isGuest(a.name);
+    const bGuest = isGuest(b.name);
+    if (aGuest !== bGuest) return aGuest ? 1 : -1;
+    return b.winRate - a.winRate || b.w - a.w || b.played - a.played || a.name.localeCompare(b.name);
+  }), [players, validMatches]);
 
   const achievementData = useMemo(() => {
     const result: Record<string, any> = {};

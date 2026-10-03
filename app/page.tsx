@@ -296,9 +296,9 @@ export default function Home() {
   const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
   const matchTeamLabel = (m: Match, t: "A" | "B") => {
-  const raw = team(m, t).replace(/^(?:vs\s+)+/i, "").trim();
-  return `vs ${raw.replace(/\s*(?:\/|&)\s*/g, " - ")}`;
-};
+    const raw = team(m, t).replace(/^(?:vs\s+)+/i, "").trim();
+    return `${t === "B" ? "vs " : ""}${raw.replace(/\s*(?:\/|&)\s*/g, " - ")}`;
+  };
 
   const localDateKey = (date: Date) => {
     const y = date.getFullYear();
@@ -2310,11 +2310,11 @@ const totalFines = fines.reduce(
                 <div className="teams">
                   <div>
                     <strong className={aWon ? "winning-team" : "losing-team"}>{matchTeamLabel(m, "A")}</strong>
-                    <span className={aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{aWon ? "W" : "L"}</span>
+                    <span className={aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{m.team_a_score}</span>
                   </div>
                   <div>
                     <strong className={!aWon ? "winning-team" : "losing-team"}>{matchTeamLabel(m, "B")}</strong>
-                    <span className={!aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{!aWon ? "W" : "L"}</span>
+                    <span className={!aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{m.team_b_score}</span>
                   </div>
                   {m.edit_count > 0 && <small>Edited · {m.edit_count}x</small>}
                 </div>

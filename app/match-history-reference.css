@@ -84,7 +84,7 @@
 
 .home-match-history .home-history-score-card .home-team-win {
   color: #08784b !important;
-  font-weight: 800 !important;
+  font-weight: 600 !important;
 }
 
 .home-match-history .home-history-score-card .home-team-loss {
@@ -137,7 +137,7 @@
 
 /* Score A follows Team A's result. */
 .home-match-history .home-history-score-card > .teams:has(> div:first-child .home-team-win) ~ div:nth-child(3) > b {
-  color: #08784b !important;
+  color: #0c6943a6 !important;
   font-weight: 800 !important;
 }
 
@@ -148,7 +148,7 @@
 
 /* Score B follows Team B's result. */
 .home-match-history .home-history-score-card > .teams:has(> div:nth-child(2) .home-team-win) ~ div:nth-child(3) > span {
-  color: #08784b !important;
+  color: #0c6943a6 !important;
   font-weight: 800 !important;
 }
 

@@ -37,8 +37,8 @@ function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
     justifyContent: "center",
     gap: 7,
     minWidth: 0,
-    height: 160,
-    minHeight: 160,
+    height: 78,
+    minHeight: 78,
     boxSizing: "border-box",
   };
 
@@ -47,7 +47,7 @@ function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
       aria-label="Money summary"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
         gap: 9,
         width: "100%",
         margin: "24px 0 18px",
@@ -55,16 +55,16 @@ function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
       }}
     >
       <div className="money-summary-card" style={cardStyle}>
-        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#33254f", fontWeight: 800 }}>
+        <strong style={{ fontSize: 25, lineHeight: 1.1, color: "#33254f", fontWeight: 600 }}>
           ₹{Math.round(summary.fines).toLocaleString("en-IN")}
         </strong>
-        <small style={{ fontSize: 16, color: "#82938b" }}>Fines</small>
+        <small style={{ fontSize: 12, color: "#82938b" }}>Fines</small>
       </div>
       <div className="money-summary-card" style={cardStyle}>
-        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#33254f", fontWeight: 800 }}>
+        <strong style={{ fontSize: 25, lineHeight: 1.1, color: "#33254f", fontWeight: 600 }}>
           ₹{Math.round(summary.expenses).toLocaleString("en-IN")}
         </strong>
-        <small style={{ fontSize: 16, color: "#82938b" }}>Expenses</small>
+        <small style={{ fontSize: 12, color: "#82938b" }}>Expenses</small>
       </div>
     </div>
   );

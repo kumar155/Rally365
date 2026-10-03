@@ -29,6 +29,13 @@ export default function RootLayout({
           .stats-table:has(.fine-player-header) {
             display: none !important;
           }
+
+          /* Shared expense details are informational only. The split is the
+             useful information for players, so keep edit/delete actions out
+             of the expanded expense view. */
+          .money-expense-actions {
+            display: none !important;
+          }
         `}</style>
       </body>
     </html>

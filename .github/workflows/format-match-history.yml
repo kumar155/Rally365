@@ -1,0 +1,52 @@
+name: Apply match history format fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'Fix match history opponent format'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply format change
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/page.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          old_a = '{team(m, "A")}'
+          old_b = '{team(m, "B")}'
+          new_a = '{`vs ${team(m, "A").replace(/^vs\\s+/, "").replace(/\\s*\\/\\s*/g, " - ")}`}'
+          new_b = '{`vs ${team(m, "B").replace(/^vs\\s+/, "").replace(/\\s*\\/\\s*/g, " - ")}`}'
+
+          count_a = text.count(old_a)
+          count_b = text.count(old_b)
+          if count_a != 1 or count_b != 1:
+              raise SystemExit(f'Expected exactly one match-history occurrence of each team expression; found A={count_a}, B={count_b}')
+
+          text = text.replace(old_a, new_a, 1).replace(old_b, new_b, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validate build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/format-match-history.yml
+          git add app/page.tsx .github/workflows/format-match-history.yml
+          git commit -m "Fix match history opponent format"
+          git push origin main

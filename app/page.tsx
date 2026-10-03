@@ -29,18 +29,30 @@ function readMoneySummary(): MoneySummary {
 function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
   const cardStyle: React.CSSProperties = {
     border: "1px solid #dfe8e2",
-    borderRadius: 20,
-    padding: "18px 18px 16px",
+    borderRadius: 14,
+    padding: "13px 8px",
     background: "#fff",
     display: "flex",
     flexDirection: "column",
-    gap: 6,
+    justifyContent: "center",
+    gap: 7,
     minWidth: 0,
+    minHeight: 160,
     boxSizing: "border-box",
   };
 
   return (
-    <div aria-label="Money summary" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, width: "100%", margin: "24px 0 18px", boxSizing: "border-box" }}>
+    <div
+      aria-label="Money summary"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 9,
+        width: "100%",
+        margin: "24px 0 18px",
+        boxSizing: "border-box",
+      }}
+    >
       <div style={cardStyle}>
         <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#10251d", fontWeight: 800 }}>
           ₹{Math.round(summary.fines).toLocaleString("en-IN")}

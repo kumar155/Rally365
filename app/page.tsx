@@ -296,7 +296,7 @@ export default function Home() {
   const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
   const matchTeamLabel = (m: Match, t: "A" | "B") => {
-  const raw = team(m, t).replace(/^vs\s+/i, "").trim();
+  const raw = team(m, t).replace(/^(?:vs\s+)+/i, "").trim();
   return `vs ${raw.replace(/\s*(?:\/|&)\s*/g, " - ")}`;
 };
 

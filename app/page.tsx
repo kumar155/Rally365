@@ -6,12 +6,17 @@ import { supabase } from "../lib/supabase";
 import Home from "./page-legacy";
 
 type MoneySummary = { fines: number; expenses: number };
-type ExpensePayerSummary = { name: string; amount: number; entries: number };
+type ExpenseSplitSummary = { name: string; amount: number; entries: number };
 
 const parseAmount = (value: string) => {
   const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
   return match ? Number(match[0]) : 0;
 };
+
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 function getMoneyPage() {
   const moneyHeading = Array.from(document.querySelectorAll<HTMLElement>(".page-heading h1, h1")).find(
@@ -30,6 +35,27 @@ function readMoneySummary(): MoneySummary {
     .reduce((sum, element) => sum + parseAmount(element.textContent || ""), 0);
 
   return { fines, expenses };
+}
+
+function readSelectedReportMonth() {
+  const page = getMoneyPage();
+  const label = page?.querySelector<HTMLElement>(".month-picker b")?.textContent?.trim() || "";
+  const match = label.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  const monthIndex = match ? monthNames.indexOf(match[1]) : -1;
+  if (monthIndex >= 0 && match) return `${match[2]}-${String(monthIndex + 1).padStart(2, "0")}`;
+  return new Date().toISOString().slice(0, 7);
+}
+
+function formatReportMonth(reportMonth: string) {
+  const [year, month] = reportMonth.split("-").map(Number);
+  if (!year || !month) return reportMonth;
+  return new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
+function getNextMonthStart(reportMonth: string) {
+  const [year, month] = reportMonth.split("-").map(Number);
+  const next = new Date(year, month, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 function MoneySummaryCards({
@@ -75,7 +101,7 @@ function MoneySummaryCards({
       <button
         type="button"
         className="money-summary-card"
-        aria-label="View expense payer summary"
+        aria-label="View selected month expense split summary"
         onClick={onExpensesClick}
         style={{
           ...cardStyle,
@@ -93,20 +119,23 @@ function MoneySummaryCards({
   );
 }
 
-function ExpensePayerModal({
+function ExpenseSplitModal({
   rows,
   total,
+  reportMonth,
   loading,
   error,
   onClose,
 }: {
-  rows: ExpensePayerSummary[];
+  rows: ExpenseSplitSummary[];
   total: number;
+  reportMonth: string;
   loading: boolean;
   error: string;
   onClose: () => void;
 }) {
   if (typeof document === "undefined") return null;
+  const monthLabel = formatReportMonth(reportMonth);
 
   return createPortal(
     <div
@@ -127,7 +156,7 @@ function ExpensePayerModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="expense-summary-title"
+        aria-labelledby="expense-split-summary-title"
         onClick={(event) => event.stopPropagation()}
         style={{
           width: "min(100%, 520px)",
@@ -143,19 +172,19 @@ function ExpensePayerModal({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2, color: "#16885d", textTransform: "uppercase" }}>
-              Expense summary
+              Expense split summary
             </div>
-            <h2 id="expense-summary-title" style={{ margin: "5px 0 3px", fontSize: 26, lineHeight: 1.15, color: "#102a21" }}>
-              Who paid what
+            <h2 id="expense-split-summary-title" style={{ margin: "5px 0 3px", fontSize: 26, lineHeight: 1.15, color: "#102a21" }}>
+              {monthLabel}
             </h2>
             <p style={{ margin: 0, color: "#7b8e86", fontSize: 14 }}>
-              Total paid across all recorded expenses.
+              Each player’s share across all expenses in this month.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close expense summary"
+            aria-label="Close expense split summary"
             style={{
               width: 36,
               height: 36,
@@ -176,15 +205,17 @@ function ExpensePayerModal({
         <div style={{ marginTop: 18, border: "1px solid #e1ebe6", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "13px 15px", background: "#f5f8f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ color: "#71857d", fontSize: 12, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase" }}>Player</span>
-            <span style={{ color: "#71857d", fontSize: 12, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase" }}>Paid</span>
+            <span style={{ color: "#71857d", fontSize: 12, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase" }}>Split</span>
           </div>
 
           {loading ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#7b8e86" }}>Loading expense summary…</div>
+            <div style={{ padding: 24, textAlign: "center", color: "#7b8e86" }}>Loading expense splits…</div>
           ) : error ? (
             <div style={{ padding: 20, color: "#b64242", fontSize: 14 }}>{error}</div>
           ) : rows.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#7b8e86" }}>No recorded expense payers yet.</div>
+            <div style={{ padding: 24, textAlign: "center", color: "#7b8e86" }}>
+              No expense splits recorded for {monthLabel}.
+            </div>
           ) : (
             rows.map((row, index) => (
               <div
@@ -201,7 +232,7 @@ function ExpensePayerModal({
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: "#132c23", fontSize: 16, fontWeight: 700 }}>{row.name}</div>
                   <div style={{ color: "#8a9b94", fontSize: 12, marginTop: 3 }}>
-                    {row.entries} {row.entries === 1 ? "expense" : "expenses"}
+                    {row.entries} {row.entries === 1 ? "expense split" : "expense splits"}
                   </div>
                 </div>
                 <strong style={{ color: "#14845a", fontSize: 18, whiteSpace: "nowrap" }}>
@@ -213,7 +244,7 @@ function ExpensePayerModal({
 
           {!loading && !error && rows.length > 0 && (
             <div style={{ padding: "14px 15px", borderTop: "1px solid #dfe9e4", background: "#f8fbf9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#526960", fontSize: 14 }}>Total</strong>
+              <strong style={{ color: "#526960", fontSize: 14 }}>Total split</strong>
               <strong style={{ color: "#102a21", fontSize: 18 }}>₹{Math.round(total).toLocaleString("en-IN")}</strong>
             </div>
           )}
@@ -244,14 +275,17 @@ export default function HomeWithExpenseInfoView() {
   const [moneyTarget, setMoneyTarget] = useState<HTMLElement | null>(null);
   const [summary, setSummary] = useState<MoneySummary>({ fines: 0, expenses: 0 });
   const [expenseSummaryOpen, setExpenseSummaryOpen] = useState(false);
-  const [payerSummary, setPayerSummary] = useState<ExpensePayerSummary[]>([]);
-  const [payerSummaryLoading, setPayerSummaryLoading] = useState(false);
-  const [payerSummaryError, setPayerSummaryError] = useState("");
+  const [expenseSplitSummary, setExpenseSplitSummary] = useState<ExpenseSplitSummary[]>([]);
+  const [expenseSplitSummaryLoading, setExpenseSplitSummaryLoading] = useState(false);
+  const [expenseSplitSummaryError, setExpenseSplitSummaryError] = useState("");
+  const [expenseSummaryMonth, setExpenseSummaryMonth] = useState("");
 
   const openExpenseSummary = async () => {
+    const reportMonth = readSelectedReportMonth();
+    setExpenseSummaryMonth(reportMonth);
     setExpenseSummaryOpen(true);
-    setPayerSummaryLoading(true);
-    setPayerSummaryError("");
+    setExpenseSplitSummaryLoading(true);
+    setExpenseSplitSummaryError("");
 
     try {
       const { data: group, error: groupError } = await supabase
@@ -262,53 +296,64 @@ export default function HomeWithExpenseInfoView() {
 
       if (groupError || !group) throw new Error(groupError?.message || "Group not found");
 
+      const nextMonthStart = getNextMonthStart(reportMonth);
+      const monthStart = `${reportMonth}-01`;
       const { data: expenseRows, error: expenseError } = await supabase
         .from("expenses")
-        .select("amount,paid_by_player_id")
-        .eq("group_id", group.id);
+        .select("id,expense_date")
+        .eq("group_id", group.id)
+        .gte("expense_date", monthStart)
+        .lt("expense_date", nextMonthStart);
 
       if (expenseError) throw new Error(expenseError.message);
 
-      const payerIds = Array.from(
-        new Set((expenseRows || []).map((expense) => expense.paid_by_player_id).filter((id): id is string => Boolean(id)))
-      );
+      const expenseIds = (expenseRows || []).map((expense) => expense.id);
+      if (expenseIds.length === 0) {
+        setExpenseSplitSummary([]);
+        return;
+      }
 
-      if (payerIds.length === 0) {
-        setPayerSummary([]);
+      const { data: splitRows, error: splitError } = await supabase
+        .from("expense_splits")
+        .select("expense_id,player_id,share_amount")
+        .in("expense_id", expenseIds);
+
+      if (splitError) throw new Error(splitError.message);
+
+      const playerIds = Array.from(new Set((splitRows || []).map((split) => split.player_id)));
+      if (playerIds.length === 0) {
+        setExpenseSplitSummary([]);
         return;
       }
 
       const { data: playerRows, error: playerError } = await supabase
         .from("players")
         .select("id,name")
-        .in("id", payerIds);
+        .in("id", playerIds);
 
       if (playerError) throw new Error(playerError.message);
 
       const names = new Map((playerRows || []).map((player) => [player.id, player.name]));
-      const totals = new Map<string, { amount: number; entries: number }>();
+      const totals = new Map<string, { name: string; amount: number; entries: number }>();
 
-      (expenseRows || []).forEach((expense) => {
-        if (!expense.paid_by_player_id) return;
-        const playerName = names.get(expense.paid_by_player_id);
+      (splitRows || []).forEach((split) => {
+        const playerName = names.get(split.player_id);
         if (!playerName) return;
 
-        const current = totals.get(playerName) || { amount: 0, entries: 0 };
-        current.amount += Number(expense.amount || 0);
+        const current = totals.get(split.player_id) || { name: playerName, amount: 0, entries: 0 };
+        current.amount += Number(split.share_amount || 0);
         current.entries += 1;
-        totals.set(playerName, current);
+        totals.set(split.player_id, current);
       });
 
-      setPayerSummary(
-        Array.from(totals.entries())
-          .map(([name, value]) => ({ name, ...value }))
-          .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
+      setExpenseSplitSummary(
+        Array.from(totals.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
       );
     } catch (error) {
-      setPayerSummary([]);
-      setPayerSummaryError(error instanceof Error ? error.message : "Could not load expense summary");
+      setExpenseSplitSummary([]);
+      setExpenseSplitSummaryError(error instanceof Error ? error.message : "Could not load expense split summary");
     } finally {
-      setPayerSummaryLoading(false);
+      setExpenseSplitSummaryLoading(false);
     }
   };
 
@@ -353,11 +398,12 @@ export default function HomeWithExpenseInfoView() {
             moneyTarget
           )}
           {expenseSummaryOpen && (
-            <ExpensePayerModal
-              rows={payerSummary}
-              total={payerSummary.reduce((sum, row) => sum + row.amount, 0)}
-              loading={payerSummaryLoading}
-              error={payerSummaryError}
+            <ExpenseSplitModal
+              rows={expenseSplitSummary}
+              total={expenseSplitSummary.reduce((sum, row) => sum + row.amount, 0)}
+              reportMonth={expenseSummaryMonth || readSelectedReportMonth()}
+              loading={expenseSplitSummaryLoading}
+              error={expenseSplitSummaryError}
               onClose={() => setExpenseSummaryOpen(false)}
             />
           )}

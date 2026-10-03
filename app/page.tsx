@@ -28,15 +28,16 @@ function readMoneySummary(): MoneySummary {
 
 function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
   const cardStyle: React.CSSProperties = {
-    border: "1px solid #dfe8e2",
-    borderRadius: 14,
-    padding: "13px 8px",
-    background: "#fff",
+    border: "1px solid #ddd3f4",
+    borderRadius: 16,
+    padding: "13px 14px",
+    background: "#f5f1fb",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     gap: 7,
     minWidth: 0,
+    height: 160,
     minHeight: 160,
     boxSizing: "border-box",
   };
@@ -46,21 +47,21 @@ function MoneySummaryCards({ summary }: { summary: MoneySummary }) {
       aria-label="Money summary"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
         gap: 9,
         width: "100%",
         margin: "24px 0 18px",
         boxSizing: "border-box",
       }}
     >
-      <div style={cardStyle}>
-        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#10251d", fontWeight: 800 }}>
+      <div className="money-summary-card" style={cardStyle}>
+        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#33254f", fontWeight: 800 }}>
           ₹{Math.round(summary.fines).toLocaleString("en-IN")}
         </strong>
         <small style={{ fontSize: 16, color: "#82938b" }}>Fines</small>
       </div>
-      <div style={cardStyle}>
-        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#10251d", fontWeight: 800 }}>
+      <div className="money-summary-card" style={cardStyle}>
+        <strong style={{ fontSize: 28, lineHeight: 1.1, color: "#33254f", fontWeight: 800 }}>
           ₹{Math.round(summary.expenses).toLocaleString("en-IN")}
         </strong>
         <small style={{ fontSize: 16, color: "#82938b" }}>Expenses</small>

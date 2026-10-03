@@ -24,7 +24,7 @@ function applyMoneyExpenseInfoView() {
   });
 
   // Keep the existing Money functionality and React tree intact. Only hide
-  // the extra summary/report UI; do not remove React-owned DOM nodes.
+  // the extra expense-settlement summary UI; fine reports remain available.
   const moneyHeading = Array.from(document.querySelectorAll<HTMLElement>("h1")).find(
     (heading) => heading.textContent?.trim() === "Money"
   );
@@ -41,20 +41,9 @@ function applyMoneyExpenseInfoView() {
   hide(".money-ledger-warning");
   hide(".money-settlement-panel");
   hide(".money-balance-list");
-  hide(".month-picker");
-  hide(".money-grid.four");
-  hide(".stats-table.monthly-fines");
 
-  page.querySelectorAll<HTMLElement>(".section-title").forEach((section) => {
-    const label = section.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
-    if (
-      label.startsWith("monthly fine report") ||
-      label.startsWith("settlements") ||
-      label.startsWith("player balances")
-    ) {
-      section.style.display = "none";
-    }
-  });
+  // Keep Monthly Fine Report, its summary metrics, month selector,
+  // and Fines by Player visible.
 }
 
 export default function HomeWithExpenseInfoView() {

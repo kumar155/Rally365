@@ -30,10 +30,10 @@ jobs:
 
           count_a = text.count(old_a)
           count_b = text.count(old_b)
-          if count_a != 1 or count_b != 1:
-              raise SystemExit(f'Expected exactly one match-history occurrence of each team expression; found A={count_a}, B={count_b}')
+          if count_a != 2 or count_b != 2:
+              raise SystemExit(f'Expected exactly two match-history occurrences of each team expression; found A={count_a}, B={count_b}')
 
-          text = text.replace(old_a, new_a, 1).replace(old_b, new_b, 1)
+          text = text.replace(old_a, new_a).replace(old_b, new_b)
           path.write_text(text, encoding='utf-8')
           PY
 

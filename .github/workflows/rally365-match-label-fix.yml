@@ -16,8 +16,8 @@ jobs:
           from pathlib import Path
           p = Path('app/page.tsx')
           s = p.read_text()
-          old = r'const raw = team(m, t).replace(/^vs\\s+/i, "").trim();'
-          new = r'const raw = team(m, t).replace(/^(?:vs\\s+)+/i, "").trim();'
+          old = r'const raw = team(m, t).replace(/^vs\s+/i, "").trim();'
+          new = r'const raw = team(m, t).replace(/^(?:vs\s+)+/i, "").trim();'
           if old not in s:
               raise SystemExit('Expected matchTeamLabel line not found')
           p.write_text(s.replace(old, new, 1))

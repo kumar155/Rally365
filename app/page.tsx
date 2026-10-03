@@ -295,6 +295,10 @@ export default function Home() {
 
   const name = (id: string) => players.find(p => p.id === id)?.name || "?";
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
+  const matchTeamLabel = (m: Match, t: "A" | "B") => {
+  const raw = team(m, t).replace(/^vs\s+/i, "").trim();
+  return `vs ${raw.replace(/\s*(?:\/|&)\s*/g, " - ")}`;
+};
 
   const localDateKey = (date: Date) => {
     const y = date.getFullYear();
@@ -2244,7 +2248,7 @@ const totalFines = fines.reduce(
           <div className="empty-rally-text">Start today&apos;s rally by recording the first game.</div>
           <div className="empty-rally-date">{new Date(`${homeDate}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</div>
         </div>}
-          {homeMatches.map((m, i) => <div className={`match-card home-history-score-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 14, alignItems: "center" }}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">Today, {matchHistoryTime(m.played_at)}</small></div><div className="teams"><div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{`vs ${team(m, "A").replace(/^vs\s+/, "").replace(/\s*\/\s*/g, " - ")}`}</strong></div><div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{`vs ${team(m, "B").replace(/^vs\s+/, "").replace(/\s*\/\s*/g, " - ")}`}</strong></div>{m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}</div><div style={{ minWidth: 58, border: "1px solid #dfe7e2", borderRadius: 12, padding: "8px 10px", background: "#f8fbf9", display: "grid", justifyItems: "center", lineHeight: 1.05 }}><b style={{ color: "#08784b", fontSize: 18 }}>{m.team_a_score}</b><span style={{ color: "#8a9a92", fontSize: 15 }}>{m.team_b_score}</span></div>{m.status !== "VOIDED" && <button
+          {homeMatches.map((m, i) => <div className={`match-card home-history-score-card ${i % 2 === 1 ? "match-card-alt" : ""} ${m.status === "VOIDED" ? "voided" : ""}`} key={m.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 14, alignItems: "center" }}><div className="match-number"><b>M{homeMatches.length - i}</b><small className="match-timestamp">Today, {matchHistoryTime(m.played_at)}</small></div><div className="teams"><div><strong className={m.team_a_score > m.team_b_score ? "home-team-win" : m.team_a_score < m.team_b_score ? "home-team-loss" : ""}>{matchTeamLabel(m, "A")}</strong></div><div><strong className={m.team_b_score > m.team_a_score ? "home-team-win" : m.team_b_score < m.team_a_score ? "home-team-loss" : ""}>{matchTeamLabel(m, "B")}</strong></div>{m.status === "VOIDED" ? <small>VOIDED</small> : m.edit_count > 0 ? <small>Edited · {m.edit_count}x</small> : null}</div><div style={{ minWidth: 58, border: "1px solid #dfe7e2", borderRadius: 12, padding: "8px 10px", background: "#f8fbf9", display: "grid", justifyItems: "center", lineHeight: 1.05 }}><b style={{ color: "#08784b", fontSize: 18 }}>{m.team_a_score}</b><span style={{ color: "#8a9a92", fontSize: 15 }}>{m.team_b_score}</span></div>{m.status !== "VOIDED" && <button
                   className="edit-link"
                   title="Edit match"
                   aria-label="Edit match"
@@ -2305,11 +2309,11 @@ const totalFines = fines.reduce(
                 <div className="match-number">M{matchNumber}</div>
                 <div className="teams">
                   <div>
-                    <strong className={aWon ? "winning-team" : "losing-team"}>{`vs ${team(m, "A").replace(/^vs\s+/, "").replace(/\s*\/\s*/g, " - ")}`}</strong>
+                    <strong className={aWon ? "winning-team" : "losing-team"}>{matchTeamLabel(m, "A")}</strong>
                     <span className={aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{aWon ? "W" : "L"}</span>
                   </div>
                   <div>
-                    <strong className={!aWon ? "winning-team" : "losing-team"}>{`vs ${team(m, "B").replace(/^vs\s+/, "").replace(/\s*\/\s*/g, " - ")}`}</strong>
+                    <strong className={!aWon ? "winning-team" : "losing-team"}>{matchTeamLabel(m, "B")}</strong>
                     <span className={!aWon ? "match-result-circle match-result-win" : "match-result-circle match-result-loss"}>{!aWon ? "W" : "L"}</span>
                   </div>
                   {m.edit_count > 0 && <small>Edited · {m.edit_count}x</small>}

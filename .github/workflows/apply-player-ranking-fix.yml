@@ -1,0 +1,36 @@
+name: Apply player ranking fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply ranking rule
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/page.tsx')
+          text = path.read_text()
+          old = '''  }).sort(\n    (a, b) => b.w - a.w || b.winRate - a.winRate || b.played - a.played\n  ), [players, validMatches]);'''
+          new = '''  }).sort((a, b) => {\n    const isGuest = (name: string) => {\n      const n = name.trim().toLowerCase();\n      return n === "guest" || /^guest\\d+$/.test(n) || n.startsWith("guest ");\n    };\n    const aGuest = isGuest(a.name);\n    const bGuest = isGuest(b.name);\n    if (aGuest !== bGuest) return aGuest ? 1 : -1;\n    return b.winRate - a.winRate || b.w - a.w || b.played - a.played || a.name.localeCompare(b.name);\n  }), [players, validMatches]);'''
+          if old not in text:
+              raise SystemExit('Expected comparator not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-player-ranking-fix.yml
+          git add app/page.tsx
+          git commit -m "Fix player ranking by win percentage"
+          git push origin HEAD:main

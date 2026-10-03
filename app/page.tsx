@@ -11,7 +11,8 @@ import { supabase } from "../lib/supabase";
 
 type Player = { id: string; name: string };
 type Match = { id: string; group_id: string; team_a_score: number; team_b_score: number; played_at: string; status: string; edit_count: number; last_edited_at: string | null; match_players: { player_id: string; team: "A" | "B" }[] };
-type Expense = { id: string; expense_date: string; category: string; amount: number; description: string | null };
+type Expense = { id: string; expense_date: string; category: string; amount: number; description: string | null; paid_by_player_id: string | null };
+type ExpenseSplit = { expense_id: string; player_id: string; share_amount: number };
 // type Attendance = { id: string; player_id: string; attendance_date: string; status: string; late_minutes: number; fine_amount: number };
 type Attendance = {
   id: string;
@@ -63,6 +64,7 @@ export default function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseSplits, setExpenseSplits] = useState<ExpenseSplit[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -117,6 +119,10 @@ export default function Home() {
   const [finePlayer, setFinePlayer] = useState(""); const [fineType, setFineType] = useState<"late" | "missed">("late"); const [minutes, setMinutes] = useState("");
   const [fineDate, setFineDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
   const [expenseCategory, setExpenseCategory] = useState("SHUTTLES"); const [expenseAmount, setExpenseAmount] = useState(""); const [expenseDesc, setExpenseDesc] = useState(""); const [split, setSplit] = useState<string[]>([]);
+  const [expensePayer, setExpensePayer] = useState("");
+  const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseDeleteId, setExpenseDeleteId] = useState<string | null>(null);
   const [lateRate, setLateRate] = useState("1"); const [missedRate, setMissedRate] = useState("10");
 
   const load = useCallback(async () => {
@@ -131,7 +137,7 @@ export default function Home() {
     //   supabase.from("attendance").select("id,player_id,attendance_date,status,late_minutes,fine_amount").eq("group_id", g.id).order("attendance_date", { ascending: false }),
     //   supabase.from("group_rates").select("late_per_minute,missed_day_fine").eq("group_id", g.id).single()
     // ]);
-    const [p, m, e, a, f, r] = await Promise.all([
+    const [p, m, e, s, a, f, r] = await Promise.all([
     supabase
       .from("players")
       .select("id,name")
@@ -146,9 +152,13 @@ export default function Home() {
 
     supabase
       .from("expenses")
-      .select("id,expense_date,category,amount,description")
+      .select("id,expense_date,category,amount,description,paid_by_player_id")
       .eq("group_id", g.id)
       .order("expense_date", { ascending: false }),
+
+    supabase
+      .from("expense_splits")
+      .select("expense_id,player_id,share_amount"),
 
     supabase
       .from("attendance")
@@ -172,6 +182,7 @@ export default function Home() {
     if (p.error) setError(p.error.message); else setPlayers(p.data || []);
     if (m.error) setError(m.error.message); else setMatches((m.data || []) as Match[]);
     if (e.error) setError(e.error.message); else setExpenses((e.data || []) as Expense[]);
+    if (s.error) setError(s.error.message); else setExpenseSplits((s.data || []) as ExpenseSplit[]);
     if (a.error) setError(a.error.message); else setAttendance((a.data || []) as Attendance[]);
     if (f.error) setError(f.error.message); else setFines((f.data || []) as Fine[]);
     if (!r.error && r.data) { setLateRate(String(r.data.late_per_minute)); setMissedRate(String(r.data.missed_day_fine)) }
@@ -285,6 +296,7 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${groupId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "expense_splits" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedules", filter: `group_id=eq.${groupId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "duo_schedule_matches" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "match_day_freezes", filter: `group_id=eq.${groupId}` }, load)
@@ -1186,6 +1198,51 @@ const totalFines = fines.reduce(
 );
   const duoName = (ids: string[]) => ids.map(name).join(" & ");
 
+  const expenseLedger = useMemo(() => {
+    const expenseIds = new Set(expenses.map(e => e.id));
+    const balance = new Map<string, number>();
+    players.forEach(p => balance.set(p.id, 0));
+
+    for (const expense of expenses) {
+      if (expense.paid_by_player_id && balance.has(expense.paid_by_player_id)) {
+        balance.set(expense.paid_by_player_id, (balance.get(expense.paid_by_player_id) || 0) + Number(expense.amount || 0));
+      }
+    }
+    for (const splitRow of expenseSplits) {
+      if (!expenseIds.has(splitRow.expense_id)) continue;
+      if (balance.has(splitRow.player_id)) {
+        balance.set(splitRow.player_id, (balance.get(splitRow.player_id) || 0) - Number(splitRow.share_amount || 0));
+      }
+    }
+
+    const rows = players.map(player => ({
+      ...player,
+      balance: Math.round((balance.get(player.id) || 0) * 100) / 100,
+    })).sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
+
+    const debtors = rows.filter(r => r.balance < -0.005).map(r => ({ id: r.id, amount: Math.round(-r.balance * 100) / 100 }));
+    const creditors = rows.filter(r => r.balance > 0.005).map(r => ({ id: r.id, amount: Math.round(r.balance * 100) / 100 }));
+    const settlements: { from: string; to: string; amount: number }[] = [];
+    let di = 0;
+    let ci = 0;
+    while (di < debtors.length && ci < creditors.length) {
+      const amount = Math.min(debtors[di].amount, creditors[ci].amount);
+      if (amount > 0.005) settlements.push({ from: debtors[di].id, to: creditors[ci].id, amount: Math.round(amount * 100) / 100 });
+      debtors[di].amount = Math.round((debtors[di].amount - amount) * 100) / 100;
+      creditors[ci].amount = Math.round((creditors[ci].amount - amount) * 100) / 100;
+      if (debtors[di].amount <= 0.005) di++;
+      if (creditors[ci].amount <= 0.005) ci++;
+    }
+
+    return {
+      rows,
+      settlements,
+      totalToPay: Math.round(rows.filter(r => r.balance < 0).reduce((s, r) => s - r.balance, 0) * 100) / 100,
+      totalToReceive: Math.round(rows.filter(r => r.balance > 0).reduce((s, r) => s + r.balance, 0) * 100) / 100,
+      unassignedExpenses: expenses.filter(e => !e.paid_by_player_id).length,
+    };
+  }, [players, expenses, expenseSplits]);
+
   const generateDuoSchedule = (ids: string[]) => {
     const unique = [...new Set(ids)];
     if (unique.length < 4) return [];
@@ -1943,6 +2000,18 @@ const totalFines = fines.reduce(
       return;
     }
 
+    if (expenseDeleteId) {
+      const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", { p_group_id: groupId, p_pin: pin });
+      if (pinError) { setError(pinError.message); return; }
+      if (!pinValid) { setError("Invalid admin PIN"); return; }
+      const { error: deleteSplitError } = await supabase.from("expense_splits").delete().eq("expense_id", expenseDeleteId);
+      if (deleteSplitError) { setError(deleteSplitError.message); return; }
+      const { error: deleteExpenseError } = await supabase.from("expenses").delete().eq("id", expenseDeleteId);
+      if (deleteExpenseError) { setError(deleteExpenseError.message); return; }
+      setExpenseDeleteId(null); setPin(""); setError(""); setModal(null); await load();
+      return;
+    }
+
     if (pinAction === "edit" && targetMatch) {
       const enteredPin = pin;
       const { data: pinValid, error: pinError } = await supabase.rpc("verify_admin_pin", {
@@ -2035,13 +2104,41 @@ const totalFines = fines.reduce(
   };
 
   const addExpense = async () => {
-    if (!groupId || !adminOK || !expenseAmount || !split.length) return;
-    const amount = Number(expenseAmount), { data: e, error: ee } = await supabase.from("expenses").insert({ group_id: groupId, expense_date: new Date().toISOString().slice(0, 10), category: expenseCategory, amount, description: expenseDesc || null }).select("id").single();
-    if (ee || !e) { setError(ee?.message || "Could not save expense"); return }
-    const share = Math.round(amount / split.length * 100) / 100;
-    const { error: se } = await supabase.from("expense_splits").insert(split.map(player_id => ({ expense_id: e.id, player_id, share_amount: share })));
-    if (se) { setError(se.message); return }
-    setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); load();
+    if (!groupId || !adminOK || !expenseAmount || !split.length || !expensePayer) {
+      setError("Select who paid, enter an amount, and select at least one participant.");
+      return;
+    }
+    const amount = Number(expenseAmount);
+    if (!Number.isFinite(amount) || amount <= 0) { setError("Expense amount must be greater than ₹0."); return; }
+    const payload = {
+      group_id: groupId,
+      expense_date: new Date().toISOString().slice(0, 10),
+      category: expenseCategory,
+      amount,
+      description: expenseDesc || null,
+      paid_by_player_id: expensePayer,
+    };
+
+    let expenseId = editingExpenseId;
+    if (editingExpenseId) {
+      const { error: updateError } = await supabase.from("expenses").update(payload).eq("id", editingExpenseId);
+      if (updateError) { setError(updateError.message); return; }
+      const { error: deleteSplitsError } = await supabase.from("expense_splits").delete().eq("expense_id", editingExpenseId);
+      if (deleteSplitsError) { setError(deleteSplitsError.message); return; }
+    } else {
+      const { data: e, error: ee } = await supabase.from("expenses").insert(payload).select("id").single();
+      if (ee || !e) { setError(ee?.message || "Could not save expense"); return; }
+      expenseId = e.id;
+    }
+
+    const cents = Math.round(amount * 100);
+    const base = Math.floor(cents / split.length);
+    const remainder = cents % split.length;
+    const splitRows = split.map((player_id, index) => ({ expense_id: expenseId!, player_id, share_amount: (base + (index < remainder ? 1 : 0)) / 100 }));
+    const { error: se } = await supabase.from("expense_splits").insert(splitRows);
+    if (se) { setError(se.message); return; }
+
+    setAdminOK(false); setModal(null); setExpenseAmount(""); setExpenseDesc(""); setExpensePayer(""); setSplit([]); setEditingExpenseId(null); await load();
   };
   const saveEditedMatch = async () => {
     const sessionPin = verifiedEditPinRef.current || verifiedEditPin;
@@ -2325,95 +2422,39 @@ const totalFines = fines.reduce(
       </>}
 
       {tab === "money" && <>
-        <div className="page-heading">
-          <div className="eyebrow">GROUP LEDGER</div>
-          <h1>Money</h1>
-          <p>Fines and shared group expenses.</p>
+        <div className="page-heading"><div className="eyebrow">GROUP LEDGER</div><h1>Money</h1><p>Shared expenses, balances and settlements.</p></div>
+        <div className="money-balance-grid">
+          <div className="money-balance-card owe"><span>TO PAY</span><strong>{money(expenseLedger.totalToPay)}</strong><small>What the group owes on shared expenses</small></div>
+          <div className="money-balance-card receive"><span>TO RECEIVE</span><strong>{money(expenseLedger.totalToReceive)}</strong><small>What the group should receive back</small></div>
         </div>
-
-        <div className="money-grid">
-          <div><b>{money(totalFines)}</b><small>Fines</small></div>
-          <div><b>{money(totalExpenses)}</b><small>Expenses</small></div>
-        </div>
+        {expenseLedger.unassignedExpenses > 0 && <div className="money-ledger-warning"><b>{expenseLedger.unassignedExpenses} older expense{expenseLedger.unassignedExpenses === 1 ? "" : "s"} need a payer.</b><span>Edit them below to include them in settlement calculations.</span></div>}
 
         <div className="section-title"><span>Admin actions</span><LockKeyhole size={14} /></div>
         <div className="admin-actions">
           <button className="money-action-purple money-stat-action" onClick={() => { setMoneyAction("fine"); openAdmin("money") }}><Clock3 /> Add fine</button>
-          <button className="money-action-purple money-stat-action" onClick={() => { setMoneyAction("expense"); openAdmin("money") }}><ReceiptText /> Add expense</button>
+          <button className="money-action-purple money-stat-action" onClick={() => { setMoneyAction("expense"); setEditingExpenseId(null); setExpensePayer(""); setSplit([]); openAdmin("money") }}><ReceiptText /> Add expense</button>
+        </div>
+
+        <div className="money-settlement-panel"><div className="section-title"><span>Settlements</span><span>{expenseLedger.settlements.length}</span></div>
+          {expenseLedger.settlements.length === 0 ? <div className="empty-card">All shared expenses are settled.</div> : <div className="money-settlement-list">{expenseLedger.settlements.map((s, i) => <div className="money-settlement-row" key={`${s.from}-${s.to}-${i}`}><div><b>{name(s.from)}</b><span>pays</span><b>{name(s.to)}</b></div><strong>{money(s.amount)}</strong></div>)}</div>}
+        </div>
+
+        <div className="money-balance-list"><div className="section-title"><span>Player balances</span><span>Expenses only</span></div>
+          {expenseLedger.rows.map(row => <div className="money-balance-row" key={row.id}><div><b>{row.name}</b><small>{row.balance > 0.005 ? "should receive" : row.balance < -0.005 ? "owes" : "settled"}</small></div><strong className={row.balance > 0.005 ? "positive" : row.balance < -0.005 ? "negative" : "neutral"}>{row.balance > 0.005 ? "+" : row.balance < -0.005 ? "-" : ""}{money(Math.abs(row.balance))}</strong></div>)}
         </div>
 
         <div className="section-title"><span>Monthly fine report</span><span>Fines only</span></div>
-        <div className="month-picker">
-          <button onClick={() => {
-            const d = new Date(`${reportMonth}-01T12:00:00`);
-            d.setMonth(d.getMonth() - 1);
-            setReportMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-          }}>‹</button>
-          <b>{new Date(`${reportMonth}-01T12:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</b>
-          <button onClick={() => {
-            const d = new Date(`${reportMonth}-01T12:00:00`);
-            d.setMonth(d.getMonth() + 1);
-            setReportMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-          }}>›</button>
-        </div>
+        <div className="month-picker"><button onClick={() => { const d = new Date(`${reportMonth}-01T12:00:00`); d.setMonth(d.getMonth() - 1); setReportMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}>‹</button><b>{new Date(`${reportMonth}-01T12:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</b><button onClick={() => { const d = new Date(`${reportMonth}-01T12:00:00`); d.setMonth(d.getMonth() + 1); setReportMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}>›</button></div>
+        <div className="money-grid four"><div><b>{money(monthTotal)}</b><small>Total fines</small></div><div><b>{money(monthLate)}</b><small>Late fines</small></div><div><b>{money(monthMissed)}</b><small>Missed fines</small></div><div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div></div>
+        <div className="stats-table monthly-fines"><div className="table-head"><span>#</span><span>PLAYER</span><span>LATE</span><span>MISSED</span><span>TOTAL</span><span></span></div>{monthlyFineStats.map((s, i) => <button className="monthly-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}><span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b><small>{s.lateCount} late · {s.missedCount} missed</small></span><span>{money(s.late)}</span><span>{money(s.missed)}</span><strong>{money(s.total)}</strong><ChevronRight size={16} /></button>)}</div>
 
-        <div className="money-grid four">
-          <div><b>{money(monthTotal)}</b><small>Total fines</small></div>
-          <div><b>{money(monthLate)}</b><small>Late fines</small></div>
-          <div><b>{money(monthMissed)}</b><small>Missed fines</small></div>
-          <div><b>{monthLateCount + monthMissedCount}</b><small>Entries</small></div>
-        </div>
+        <div className="section-title"><span>Shared expenses</span><span>{monthlyExpenses.length}</span></div>
+        <div className="match-list">{monthlyExpenses.length === 0 && <div className="empty-card">No expenses recorded for this month.</div>}{monthlyExpenses.map(e => { const rows = expenseSplits.filter(s => s.expense_id === e.id); const expanded = expandedExpenseId === e.id; return <div className={`money-expense-card ${expanded ? "expanded" : ""}`} key={e.id}>
+          <button type="button" className="money-expense-summary" onClick={() => setExpandedExpenseId(expanded ? null : e.id)}><div className="expense-icon">₹</div><div className="money-expense-copy"><b>{e.category}</b><small>{money(Number(e.amount))} · {e.paid_by_player_id ? `Paid by ${name(e.paid_by_player_id)}` : "Payer not recorded"}</small><small>{new Date(e.expense_date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{e.description ? ` · ${e.description}` : ""}</small></div><ChevronDown size={18} className={expanded ? "money-chevron-open" : ""} /></button>
+          {expanded && <div className="money-expense-detail"><div className="money-expense-detail-head"><b>Split</b><span>{rows.length} people</span></div>{rows.map(r => <div className="money-expense-split-row" key={`${e.id}-${r.player_id}`}><span>{name(r.player_id)}</span><strong>{money(Number(r.share_amount))}</strong></div>)}{rows.length === 0 && <div className="empty-card">No split recorded.</div>}<div className="money-expense-actions"><button type="button" onClick={() => { setEditingExpenseId(e.id); setExpenseCategory(e.category); setExpenseAmount(String(e.amount)); setExpenseDesc(e.description || ""); setExpensePayer(e.paid_by_player_id || ""); setSplit(rows.map(r => r.player_id)); setMoneyAction("expense"); openAdmin("money"); }}>Edit expense</button><button type="button" className="danger-button" onClick={() => { setExpenseDeleteId(e.id); setMoneyAction("expense"); openAdmin("money"); }}>Delete</button></div></div>}
+        </div>; })}</div>
 
-        <div className="stats-table monthly-fines">
-          <div className="table-head"><span>#</span><span>PLAYER</span><span>LATE</span><span>MISSED</span><span>TOTAL</span><span></span></div>
-          {monthlyFineStats.map((s, i) => <button className="monthly-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}>
-            <span className="rank">{i + 1}</span>
-            <span className="player-name"><b>{s.name}</b><small>{s.lateCount} late · {s.missedCount} missed</small></span>
-            <span>{money(s.late)}</span>
-            <span>{money(s.missed)}</span>
-            <strong>{money(s.total)}</strong>
-            <ChevronRight size={16} />
-          </button>)}
-        </div>
-
-        <div className="section-title"><span>Expenses for selected month</span><span>{monthlyExpenses.length}</span></div>
-        <div className="match-list">
-          {monthlyExpenses.length === 0 && <div className="empty-card">No expenses recorded for this month.</div>}
-          {monthlyExpenses.map(e => <div className="match-card" key={e.id}>
-            <div className="expense-icon">₹</div>
-            <div className="teams">
-              <div><strong>{e.category}</strong><span>{money(Number(e.amount))}</span></div>
-              {e.description && <small>{e.description}</small>}
-              <small className="expense-date">{new Date(e.expense_date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small>
-            </div>
-          </div>)}
-        </div>
-
-        <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div>
-        <div className="stats-table">
-          <div className="fine-player-header">
-            <span>#</span>
-            <span>PLAYER</span>
-            <span>L</span>
-            <span>M</span>
-            <span>TOTAL</span>
-            <span></span>
-          </div>
-          {finePlayerStats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}>
-            <span className="rank">{i + 1}</span>
-            <span className="player-name">
-              <b>{s.name}</b>
-              <small>
-                {s.entries} {s.entries === 1 ? "entry" : "entries"}
-                {s.latest ? ` · Last ${new Date(`${s.latest}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : " · No fines"}
-              </small>
-            </span>
-            <span className="fine-value">{money(s.late)}</span>
-            <span className="fine-value">{money(s.missed)}</span>
-            <span className="fine-total">{money(s.total)}</span>
-            <ChevronRight size={17} />
-          </button>)}
-        </div>
+        <div className="section-title"><span>Fines by player</span><span>Tap for history</span></div><div className="stats-table"><div className="fine-player-header"><span>#</span><span>PLAYER</span><span>L</span><span>M</span><span>TOTAL</span><span></span></div>{finePlayerStats.map((s, i) => <button className="fine-player-row" key={s.id} onClick={() => setFineDetailsPlayer(s.id)}><span className="rank">{i + 1}</span><span className="player-name"><b>{s.name}</b><small>{s.entries} {s.entries === 1 ? "entry" : "entries"}{s.latest ? ` · Last ${new Date(`${s.latest}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : " · No fines"}</small></span><span className="fine-value">{money(s.late)}</span><span className="fine-value">{money(s.missed)}</span><span className="fine-total">{money(s.total)}</span><ChevronRight size={17} /></button>)}</div>
       </>}
 
       {tab === "duos" && <>
@@ -2825,7 +2866,7 @@ const totalFines = fines.reduce(
       <button className="primary-button" onClick={addFine}>Save fine</button>
     </Modal>}
 
-    {modal === "expense" && <Modal title="Add expense" close={() => setModal(null)}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" onClick={addExpense}>Save expense</button></Modal>}
+    {modal === "expense" && <Modal title={editingExpenseId ? "Edit expense" : "Add expense"} close={() => { setEditingExpenseId(null); setModal(null); }}><select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)}><option value="SHUTTLES">🏸 Shuttles</option><option value="BREAKFAST">🍳 Breakfast</option><option value="COFFEE">☕ Coffee</option><option value="OTHER">Other</option></select><input inputMode="decimal" placeholder="Amount ₹" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} /><select value={expensePayer} onChange={e => setExpensePayer(e.target.value)}><option value="">Paid by…</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><input placeholder="Description (optional)" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} /><p className="helper">Split among</p><div className="selection-grid">{players.map(p => <button key={p.id} className={`player-chip ${split.includes(p.id) ? "selected" : ""}`} onClick={() => setSplit(x => x.includes(p.id) ? x.filter(y => y !== p.id) : [...x, p.id])}>{p.name}</button>)}</div>{split.length > 0 && <div className="split-preview">{money(Number(expenseAmount || 0) / split.length)} each · {split.length} people</div>}<button className="primary-button" disabled={!expensePayer || !expenseAmount || !split.length} onClick={addExpense}>{editingExpenseId ? "Save changes" : "Save expense"}</button></Modal>}
 
 
     {playerDetailsId && selectedPlayerDetails && <Modal

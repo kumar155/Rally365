@@ -517,17 +517,22 @@ export default function Home() {
       insights.push({ icon: "🏆", title: "Next milestone", tone: "blue", text: `${closest.p.name} is ${remaining} win${remaining === 1 ? "" : "s"} away from ${closest.milestone} wins.` });
     }
 
-    // MVP of the selected Home date. Guests are excluded. We use wins first,
-    // then win rate, then matches as deterministic tie-breakers.
+    // MVP of the selected Home date. Guests are excluded. Wins are the
+    // primary criterion; total points are used only when wins are tied.
+    // Win rate and matches are deterministic fallbacks for a complete tie.
     const mvpCandidates = eligiblePlayers.map(p => {
       const pm = todayMatches.filter(m => m.match_players.some(x => x.player_id === p.id));
       const wins = pm.filter(m => {
         const side = m.match_players.find(x => x.player_id === p.id)?.team;
         return side === "A" ? m.team_a_score > m.team_b_score : side === "B" ? m.team_b_score > m.team_a_score : false;
       }).length;
+      const points = pm.reduce((total, m) => {
+        const side = m.match_players.find(x => x.player_id === p.id)?.team;
+        return total + (side === "A" ? Number(m.team_a_score || 0) : side === "B" ? Number(m.team_b_score || 0) : 0);
+      }, 0);
       const winRate = pm.length ? Math.round((wins / pm.length) * 100) : 0;
-      return { p, matches: pm.length, wins, winRate };
-    }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.matches - a.matches || a.p.name.localeCompare(b.p.name));
+      return { p, matches: pm.length, wins, points, winRate };
+    }).filter(x => x.matches > 0).sort((a, b) => b.wins - a.wins || b.points - a.points || b.winRate - a.winRate || b.matches - a.matches || a.p.name.localeCompare(b.p.name));
 
     return {
       insights: insights.slice(0, 4),

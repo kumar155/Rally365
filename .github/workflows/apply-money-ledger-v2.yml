@@ -1,0 +1,31 @@
+name: Apply Money Ledger v2
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply implementation once
+        run: python scripts/apply-money-ledger-once.py
+      - name: Commit and clean up
+        shell: bash
+        run: |
+          git config user.name "Rally365 Bot"
+          git config user.email "rally365-bot@users.noreply.github.com"
+          git add app/page.tsx app/globals.css supabase/migrations/202610030001_shared_expense_payers.sql
+          git rm -f .github/workflows/patch-money-ledger.yml .github/workflows/apply-money-ledger.yml scripts/patch-money-ledger.py scripts/apply-money-ledger-once.py || true
+          git add .github/workflows/apply-money-ledger-v2.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: apply money ledger implementation"
+            git push origin main
+          fi

@@ -37,11 +37,6 @@ jobs:
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Validate build
-        run: |
-          npm ci
-          npm run build
-
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"

@@ -1,0 +1,114 @@
+name: Fix Match History UX
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply match history fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          page = Path("app/page-legacy.tsx")
+          text = page.read_text()
+          old = 'return `${t === "B" ? "vs " : ""}${raw.replace(/\\s*(?:\\/|&)\\s*/g, " - ")}`;'
+          new = 'return raw.replace(/\\s*(?:\\/|&)\\s*/g, " - ");'
+          if old not in text:
+              raise SystemExit("Expected matchTeamLabel implementation was not found")
+          page.write_text(text.replace(old, new, 1))
+
+          css = Path("app/match-history-reference.css")
+          styles = css.read_text()
+
+          # Remove the generated WIN badge entirely; the winning team color remains.
+          start = styles.find('/* Keep the WIN badge beside the winning team. */')
+          end = styles.find('/* Edited matches remain fully readable and show only an EDITED tag. */')
+          if start != -1 and end != -1 and start < end:
+              styles = styles[:start] + styles[end:]
+
+          styles += r'''
+
+/* Final Rally365 match-history presentation overrides. */
+.home-match-history .home-history-score-card {
+  grid-template-columns: minmax(0, 1fr) 82px 36px !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 14px !important;
+  row-gap: 8px !important;
+  min-height: 116px !important;
+  padding: 16px 20px !important;
+  border: 1.5px solid #efdcb6 !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  opacity: 1 !important;
+}
+.home-match-history .home-history-score-card > .match-number {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 !important;
+  justify-content: flex-start !important;
+}
+.home-match-history .home-history-score-card > .teams {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  gap: 7px !important;
+}
+.home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after,
+.home-match-history .home-history-score-card .home-team-win::after {
+  content: none !important;
+  display: none !important;
+}
+.home-match-history .home-history-score-card > .edit-link {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: #f1f3f7 !important;
+  color: #7086a6 !important;
+}
+.home-match-history .home-history-score-card > .edit-link svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+.home-match-history .home-history-score-card:not(.voided) {
+  opacity: 1 !important;
+  filter: none !important;
+}
+.home-match-history .home-history-score-card:has(.teams > small[style]) {
+  opacity: 1 !important;
+  filter: none !important;
+  color: inherit !important;
+}
+.home-match-history .home-history-score-card.voided {
+  opacity: .58 !important;
+}
+@media (max-width: 420px) {
+  .home-match-history .home-history-score-card {
+    grid-template-columns: minmax(0, 1fr) 82px 36px !important;
+    min-height: 112px !important;
+    padding: 14px 16px !important;
+    border-radius: 20px !important;
+  }
+  .home-match-history .home-history-score-card > .edit-link {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .home-match-history .home-history-score-card > .edit-link svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+}
+'''
+          css.write_text(styles)
+      - name: Commit changes and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "Rally365 Bot"
+          git config user.email "rally365-bot@users.noreply.github.com"
+          git add app/page-legacy.tsx app/match-history-reference.css
+          git rm -f .github/workflows/fix-match-history-ux.yml
+          git commit -m "Fix match history styling and remove win tag"
+          git push origin main

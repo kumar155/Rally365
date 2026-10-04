@@ -11,8 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Apply match history fixes
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           page = Path("app/page-legacy.tsx")
@@ -25,8 +26,6 @@ jobs:
 
           css = Path("app/match-history-reference.css")
           styles = css.read_text()
-
-          # Remove the generated WIN badge entirely; the winning team color remains.
           start = styles.find('/* Keep the WIN badge beside the winning team. */')
           end = styles.find('/* Edited matches remain fully readable and show only an EDITED tag. */')
           if start != -1 and end != -1 and start < end:
@@ -103,6 +102,7 @@ jobs:
 }
 '''
           css.write_text(styles)
+          PY
       - name: Commit changes and remove temporary workflow
         shell: bash
         run: |

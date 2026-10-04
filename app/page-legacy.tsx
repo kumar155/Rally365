@@ -309,7 +309,7 @@ export default function Home() {
   const team = (m: Match, t: "A" | "B") => m.match_players.filter(x => x.team === t).map(x => name(x.player_id)).join(" & ");
   const matchTeamLabel = (m: Match, t: "A" | "B") => {
     const raw = team(m, t).replace(/^(?:vs\s+)+/i, "").trim();
-    return `${t === "B" ? "vs " : ""}${raw.replace(/\s*(?:\/|&)\s*/g, " - ")}`;
+    return raw.replace(/\s*(?:\/|&)\s*/g, " - ");
   };
 
   const localDateKey = (date: Date) => {

@@ -1,0 +1,66 @@
+name: Rally365 Match History Fix
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Patch match history
+        shell: python
+        run: |
+          from pathlib import Path
+
+          page = Path('app/page-legacy.tsx')
+          s = page.read_text()
+
+          old = '''const matchTeamLabel = (m: Match, t: "A" | "B") => {
+    const raw = team(m, t).replace(/^(?:vs\\s+)+/i, "").trim();
+    return raw.replace(/\\s*(?:\\/|&)\\s*/g, " - ");
+  };'''
+          new = '''const matchTeamLabel = (m: Match, t: "A" | "B") => {
+    const raw = team(m, t)
+      .replace(/^(?:vs\\s*)+/i, "")
+      .replace(/^vs\\b\\s*/i, "")
+      .trim();
+    return raw.replace(/\\s*(?:\\/|&)\\s*/g, " - ");
+  };'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          s = s.replace('${m.status === "VOIDED" ? "voided" : ""}', '${m.status === "VOIDED" && !(m.last_edited_at || m.edit_count > 0) ? "voided" : ""}')
+          s = s.replace('m.status === "VOIDED" ? <small>VOIDED</small> : (m.last_edited_at || m.edit_count > 0) ? <small style=', '(m.status === "VOIDED" && !(m.last_edited_at || m.edit_count > 0)) ? <small>VOIDED</small> : (m.last_edited_at || m.edit_count > 0) ? <small style=')
+          s = s.replace('{m.status !== "VOIDED" && <button', '{!(m.status === "VOIDED" && !(m.last_edited_at || m.edit_count > 0)) && <button')
+          page.write_text(s)
+
+          css = Path('app/match-history-final-fixes.css')
+          c = css.read_text()
+          c += '''\n\n/* Match history typography: lighter, compact player/score weights. */
+.home-match-history .home-history-score-card .home-team-win { font-weight: 600 !important; }
+.home-match-history .home-history-score-card .home-team-loss,
+.home-match-history .home-history-score-card > .teams > div > strong:not(.home-team-win):not(.home-team-loss) { font-weight: 450 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > b { font-weight: 650 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > span { font-weight: 450 !important; }\n'''
+          css.write_text(c)
+      - name: Verify build
+        run: npm ci && npm run build
+      - name: Commit and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/page-legacy.tsx app/match-history-final-fixes.css .github/workflows/rally365-match-history-fix.yml
+          git commit -m 'Fix edited match display and compact match typography'
+          git rm .github/workflows/rally365-match-history-fix.yml
+          git commit -m 'Remove temporary match history fix workflow'
+          git push origin main

@@ -65,6 +65,67 @@ export default function RootLayout({
           .home-match-history .home-history-score-card.voided .teams > div:has(.home-team-win)::after {
             content: none !important;
           }
+
+          /* Match history: stable two-row layout for every entry. */
+          .home-match-history .home-history-score-card {
+            grid-template-columns: minmax(0, 1fr) 82px 36px !important;
+            grid-template-rows: auto auto !important;
+            column-gap: 14px !important;
+            row-gap: 8px !important;
+            align-items: center !important;
+          }
+
+          /* M7 + timestamp stay together at the top-left instead of being centered. */
+          .home-match-history .home-history-score-card > .match-number {
+            grid-column: 1 / -1 !important;
+            grid-row: 1 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            gap: 10px !important;
+          }
+
+          .home-match-history .home-history-score-card > .match-number > b,
+          .home-match-history .home-history-score-card > .match-number > .match-timestamp {
+            margin: 0 !important;
+            flex: 0 0 auto !important;
+          }
+
+          /* Teams, score and pencil occupy the same second row on every match. */
+          .home-match-history .home-history-score-card > .teams {
+            grid-column: 1 !important;
+            grid-row: 2 !important;
+            align-self: center !important;
+            min-width: 0 !important;
+          }
+
+          .home-match-history .home-history-score-card > div:nth-child(3) {
+            grid-column: 2 !important;
+            grid-row: 2 !important;
+            align-self: center !important;
+          }
+
+          .home-match-history .home-history-score-card > .edit-link {
+            grid-column: 3 !important;
+            grid-row: 2 !important;
+            align-self: center !important;
+          }
+
+          @media (max-width: 420px) {
+            .home-match-history .home-history-score-card {
+              grid-template-columns: minmax(0, 1fr) 82px 36px !important;
+              column-gap: 12px !important;
+              row-gap: 7px !important;
+            }
+
+            .home-match-history .home-history-score-card > .match-number {
+              gap: 8px !important;
+            }
+          }
         `}</style>
       </body>
     </html>

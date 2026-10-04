@@ -7,11 +7,10 @@ permissions:
   contents: write
 jobs:
   fix:
-    if: github.event.head_commit.message != 'Fix match history row alignment and clean up'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply alignment overrides
+      - name: Apply alignment overrides and clean up
         run: |
           cat >> app/match-history-reference.css <<'EOF'
 
@@ -23,7 +22,6 @@ jobs:
   row-gap: 8px !important;
   align-items: center !important;
 }
-
 .home-match-history .home-history-score-card > .match-number {
   grid-column: 1 / -1 !important;
   grid-row: 1 !important;
@@ -36,36 +34,30 @@ jobs:
   text-align: left !important;
   gap: 10px !important;
 }
-
 .home-match-history .home-history-score-card > .match-number > b {
   margin: 0 !important;
   flex: 0 0 auto !important;
 }
-
 .home-match-history .home-history-score-card > .match-number > .match-timestamp {
   margin: 0 !important;
   flex: 0 0 auto !important;
 }
-
 .home-match-history .home-history-score-card > .teams {
   grid-column: 1 !important;
   grid-row: 2 !important;
   align-self: center !important;
   min-width: 0 !important;
 }
-
 .home-match-history .home-history-score-card > div:nth-child(3) {
   grid-column: 2 !important;
   grid-row: 2 !important;
   align-self: center !important;
 }
-
 .home-match-history .home-history-score-card > .edit-link {
   grid-column: 3 !important;
   grid-row: 2 !important;
   align-self: center !important;
 }
-
 @media (max-width: 420px) {
   .home-match-history .home-history-score-card {
     grid-template-columns: minmax(0, 1fr) 82px 36px !important;

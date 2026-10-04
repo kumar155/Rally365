@@ -4,6 +4,7 @@ import "./loading-splash.css";
 import "./tournaments/manage/manage-fixes.css";
 import "./tournaments/tournament-list.css";
 import "./match-history-reference.css";
+import "./match-history-final-fixes.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 import PlayerProfileNavigator from "./player-profile-navigator";
 

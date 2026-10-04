@@ -7,4 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Rally365 match history fix workflow is running"
+      - name: Remove VS prefix and WIN badge
+        run: |
+          python -c 'from pathlib import Path; p=Path("app/page-legacy.tsx"); t=p.read_text(); old="return `${t === \\\"B\\\" ? \\\"vs \\\" : \\\"\\\"}${raw.replace(/\\\\s*(?:\\\\/|&)\\\\s*/g, \\\" - \\\")}`;"; new="return raw.replace(/\\\\s*(?:\\\\/|&)\\\\s*/g, \\\" - \\\");"; assert old in t; p.write_text(t.replace(old,new,1))'
+          echo "Match team labels updated"

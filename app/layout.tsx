@@ -36,6 +36,35 @@ export default function RootLayout({
           .money-expense-actions {
             display: none !important;
           }
+
+          /* A voided match remains in Match History, but its status must be
+             unmistakable even when the legacy small status element is clipped
+             by the compact match-history layout. */
+          .home-match-history .home-history-score-card.voided .teams::after {
+            content: "VOIDED";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            align-self: flex-start;
+            margin-top: 3px;
+            padding: 3px 7px;
+            border-radius: 6px;
+            background: #fff0f0;
+            border: 1px solid #efcaca;
+            color: #b64242;
+            font-size: 9px;
+            line-height: 1;
+            font-weight: 850;
+            letter-spacing: .3px;
+          }
+
+          .home-match-history .home-history-score-card.voided .teams > small {
+            display: none !important;
+          }
+
+          .home-match-history .home-history-score-card.voided .teams > div:has(.home-team-win)::after {
+            content: none !important;
+          }
         `}</style>
       </body>
     </html>

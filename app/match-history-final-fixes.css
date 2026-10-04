@@ -266,3 +266,11 @@
     height: 15px !important;
   }
 }
+
+
+/* Match history typography: lighter, compact player/score weights. */
+.home-match-history .home-history-score-card .home-team-win { font-weight: 600 !important; }
+.home-match-history .home-history-score-card .home-team-loss,
+.home-match-history .home-history-score-card > .teams > div > strong:not(.home-team-win):not(.home-team-loss) { font-weight: 450 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > b { font-weight: 650 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > span { font-weight: 450 !important; }

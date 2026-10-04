@@ -1639,3 +1639,241 @@
 
 /* Shared expense ledger */
 .money-balance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 18px}.money-balance-card{border:1px solid #dfe8e2;border-radius:20px;padding:18px;background:#fff;display:flex;flex-direction:column;gap:5px}.money-balance-card span{font-size:12px;font-weight:800;letter-spacing:.12em;color:#73867d}.money-balance-card strong{font-size:28px;line-height:1.1;color:#10251d}.money-balance-card small{font-size:13px;color:#82938b}.money-balance-card.owe{background:#fff7f7;border-color:#f0d9d9}.money-balance-card.owe strong{color:#b13d3d}.money-balance-card.receive{background:#f1fbf6;border-color:#ccebdd}.money-balance-card.receive strong{color:#08784b}.money-ledger-warning{display:flex;flex-direction:column;gap:3px;border:1px solid #ecd9ad;background:#fff9e9;border-radius:16px;padding:13px 15px;margin:0 0 18px;color:#76581b}.money-ledger-warning span{font-size:13px;color:#8b7550}.money-settlement-panel,.money-balance-list{margin:0 0 20px}.money-settlement-list{display:flex;flex-direction:column;gap:8px}.money-settlement-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dfe8e2;background:#fff;border-radius:16px;padding:13px 15px}.money-settlement-row div{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.money-settlement-row div span{color:#82938b;font-size:13px}.money-settlement-row strong{color:#08784b;white-space:nowrap}.money-balance-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e8eeea;padding:12px 4px}.money-balance-row div{display:flex;flex-direction:column;gap:2px}.money-balance-row small{color:#87968f;font-size:12px}.money-balance-row strong{white-space:nowrap}.money-balance-row strong.positive{color:#08784b}.money-balance-row strong.negative{color:#b13d3d}.money-balance-row strong.neutral{color:#7f8e87}.money-expense-card{border:1px solid #dfe8e2;border-radius:18px;background:#fff;overflow:hidden;margin-bottom:9px}.money-expense-card.expanded{border-color:#c8ddd2}.money-expense-summary{width:100%;border:0;background:transparent;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;padding:14px;cursor:pointer}.money-expense-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.money-expense-copy b{font-size:16px;color:#10251d}.money-expense-copy small{color:#81918a;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.money-expense-summary>svg{color:#73867d;transition:transform .18s ease}.money-chevron-open{transform:rotate(180deg)}.money-expense-detail{border-top:1px solid #e7eeea;padding:12px 14px 14px;background:#f9fcfa}.money-expense-detail-head{display:flex;justify-content:space-between;color:#60756b;font-size:12px;margin-bottom:7px}.money-expense-split-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5ece8;font-size:14px}.money-expense-split-row strong{color:#08784b}.money-expense-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.money-expense-actions button{border:1px solid #d5e0da;border-radius:10px;background:#fff;padding:8px 11px;font-weight:700;color:#1c5f47}.money-expense-actions .danger-button{color:#a63e3e}@media(max-width:560px){.money-balance-grid{grid-template-columns:1fr}.money-settlement-row{align-items:flex-start}.money-settlement-row div{max-width:70%}}
+
+/* Match history reference UI — compact, editorial rows matching the Rally365 reference design. */
+.home-match-history .home-history-score-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 88px 42px !important;
+  grid-template-rows: auto 1fr !important;
+  column-gap: 18px !important;
+  row-gap: 8px !important;
+  align-items: center !important;
+  min-height: 116px !important;
+  padding: 16px 22px !important;
+  border: 1.5px solid #d9e6df !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.home-match-history .home-history-score-card:nth-child(4n + 1) { border-color: #c9e4d7 !important; }
+.home-match-history .home-history-score-card:nth-child(4n + 2) { border-color: #c9dcf0 !important; }
+.home-match-history .home-history-score-card:nth-child(4n + 3) { border-color: #efdcb6 !important; }
+.home-match-history .home-history-score-card:nth-child(4n + 4) { border-color: #dcc7ed !important; }
+
+.home-match-history .home-history-score-card > .match-number {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  color: #526a5d !important;
+}
+
+.home-match-history .home-history-score-card > .match-number > b {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  background: #f1f5f3 !important;
+  color: #233b31 !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+}
+
+.home-match-history .home-history-score-card .match-timestamp {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  color: #72818e !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+.home-match-history .home-history-score-card .match-timestamp::before {
+  content: "|" !important;
+  margin-right: 10px !important;
+  color: #d4ddd8 !important;
+  font-weight: 400 !important;
+}
+
+.home-match-history .home-history-score-card > .teams {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-rows: auto auto auto !important;
+  gap: 0 !important;
+  align-self: center !important;
+  line-height: 1.1 !important;
+}
+
+.home-match-history .home-history-score-card > .teams::before {
+  content: "VS" !important;
+  grid-row: 2 !important;
+  width: fit-content !important;
+  color: #66767f !important;
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+  font-weight: 500 !important;
+  margin: 3px 0 !important;
+}
+
+.home-match-history .home-history-score-card > .teams > div {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 5px !important;
+  padding: 0 !important;
+}
+
+.home-match-history .home-history-score-card > .teams > div:first-child { grid-row: 1 !important; }
+.home-match-history .home-history-score-card > .teams > div:nth-child(2) { grid-row: 3 !important; }
+
+.home-match-history .home-history-score-card .home-team-win,
+.home-match-history .home-history-score-card .home-team-loss,
+.home-match-history .home-history-score-card .teams > div > strong:not(.home-team-win):not(.home-team-loss) {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+  letter-spacing: -.25px !important;
+}
+
+.home-match-history .home-history-score-card .home-team-win {
+  color: #2f805f !important;
+  font-weight: 750 !important;
+}
+
+.home-match-history .home-history-score-card .home-team-loss,
+.home-match-history .home-history-score-card .teams > div > strong:not(.home-team-win):not(.home-team-loss) {
+  color: #39434a !important;
+  font-weight: 500 !important;
+}
+
+.home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after {
+  content: "WIN" !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: 6px !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #d8f4e6 !important;
+  color: #138458 !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 850 !important;
+  letter-spacing: .2px !important;
+}
+
+.home-match-history .home-history-score-card .home-team-win::after { content: none !important; }
+
+.home-match-history .home-history-score-card > div:nth-child(3) {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  box-sizing: border-box !important;
+  border: 1px solid #d8e5de !important;
+  border-radius: 15px !important;
+  background: #f8fbf9 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 8px 10px !important;
+  line-height: 1 !important;
+}
+
+.home-match-history .home-history-score-card > div:nth-child(3) > b,
+.home-match-history .home-history-score-card > div:nth-child(3) > span {
+  font-family: inherit !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  letter-spacing: -.3px !important;
+}
+
+.home-match-history .home-history-score-card > div:nth-child(3) > b { color: #2f805f !important; font-weight: 800 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > span { color: #657179 !important; font-weight: 500 !important; }
+.home-match-history .home-history-score-card > div:nth-child(3) > b::after {
+  content: "–" !important;
+  color: #6e777b !important;
+  margin-left: 11px !important;
+  font-weight: 500 !important;
+}
+
+.home-match-history .home-history-score-card > .edit-link {
+  grid-column: 3 !important;
+  grid-row: 2 !important;
+  width: 46px !important;
+  height: 46px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  align-self: center !important;
+  background: #f1f3f7 !important;
+  color: #7086a6 !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.home-match-history .home-history-score-card > .edit-link svg { width: 25px !important; height: 25px !important; }
+
+.home-match-history .home-history-score-card .teams > small {
+  grid-column: 1 !important;
+  color: #c56b6b !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: .6px !important;
+  margin-top: 4px !important;
+}
+
+.home-match-history .home-history-score-card:has(.teams > small) { opacity: .58 !important; }
+
+@media (max-width: 420px) {
+  .home-match-history .home-history-score-card {
+    grid-template-columns: minmax(0, 1fr) 82px 40px !important;
+    column-gap: 12px !important;
+    row-gap: 7px !important;
+    min-height: 112px !important;
+    padding: 14px 16px !important;
+    border-radius: 20px !important;
+  }
+  .home-match-history .home-history-score-card > .match-number { gap: 8px !important; }
+  .home-match-history .home-history-score-card > .match-number > b { width: 48px !important; min-width: 48px !important; height: 32px !important; font-size: 13px !important; }
+  .home-match-history .home-history-score-card .match-timestamp { font-size: 14px !important; }
+  .home-match-history .home-history-score-card .match-timestamp::before { margin-right: 8px !important; }
+  .home-match-history .home-history-score-card .home-team-win,
+  .home-match-history .home-history-score-card .home-team-loss,
+  .home-match-history .home-history-score-card .teams > div > strong:not(.home-team-win):not(.home-team-loss) { font-size: 17px !important; }
+  .home-match-history .home-history-score-card > .teams::before { font-size: 12px !important; margin: 2px 0 !important; }
+  .home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after { margin-left: 4px !important; padding: 4px 8px !important; font-size: 9px !important; }
+  .home-match-history .home-history-score-card > div:nth-child(3) { width: 82px !important; min-width: 82px !important; height: 54px !important; min-height: 54px !important; }
+  .home-match-history .home-history-score-card > div:nth-child(3) > b,
+  .home-match-history .home-history-score-card > div:nth-child(3) > span { font-size: 19px !important; }
+  .home-match-history .home-history-score-card > .edit-link { width: 42px !important; height: 42px !important; }
+  .home-match-history .home-history-score-card > .edit-link svg { width: 23px !important; height: 23px !important; }
+}

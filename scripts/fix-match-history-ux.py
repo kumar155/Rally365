@@ -1,0 +1,48 @@
+from pathlib import Path
+
+page = Path("app/page-legacy.tsx")
+lines = page.read_text().splitlines()
+changed = False
+for i, line in enumerate(lines):
+    if 'return `${t === "B" ? "vs " : ""}' in line:
+        indent = line[:len(line) - len(line.lstrip())]
+        lines[i] = indent + 'return raw.replace(/\\s*(?:\\/|&)\\s*/g, " - ");'
+        changed = True
+        break
+if not changed:
+    raise SystemExit("matchTeamLabel line not found")
+page.write_text("\n".join(lines) + "\n")
+
+css = Path("app/match-history-reference.css")
+styles = css.read_text()
+styles += """
+
+/* Final match-history presentation: no WIN badges, valid edited rows, consistent gold borders. */
+.home-match-history .home-history-score-card {
+  grid-template-columns: minmax(0, 1fr) 82px 36px !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 14px !important;
+  row-gap: 8px !important;
+  min-height: 116px !important;
+  padding: 16px 20px !important;
+  border: 1.5px solid #efdcb6 !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  opacity: 1 !important;
+}
+.home-match-history .home-history-score-card > .match-number { grid-column: 1 / -1 !important; grid-row: 1 !important; justify-content: flex-start !important; }
+.home-match-history .home-history-score-card > .teams { grid-column: 1 !important; grid-row: 2 !important; gap: 7px !important; }
+.home-match-history .home-history-score-card .teams > div:has(.home-team-win)::after,
+.home-match-history .home-history-score-card .home-team-win::after { content: none !important; display: none !important; }
+.home-match-history .home-history-score-card > .edit-link { width: 36px !important; height: 36px !important; border-radius: 50% !important; background: #f1f3f7 !important; color: #7086a6 !important; }
+.home-match-history .home-history-score-card > .edit-link svg { width: 17px !important; height: 17px !important; }
+.home-match-history .home-history-score-card:not(.voided) { opacity: 1 !important; filter: none !important; }
+.home-match-history .home-history-score-card:has(.teams > small[style]) { opacity: 1 !important; filter: none !important; color: inherit !important; }
+.home-match-history .home-history-score-card.voided { opacity: .58 !important; }
+@media (max-width: 420px) {
+  .home-match-history .home-history-score-card { grid-template-columns: minmax(0, 1fr) 82px 36px !important; min-height: 112px !important; padding: 14px 16px !important; border-radius: 20px !important; }
+  .home-match-history .home-history-score-card > .edit-link { width: 36px !important; height: 36px !important; }
+  .home-match-history .home-history-score-card > .edit-link svg { width: 17px !important; height: 17px !important; }
+}
+"""
+css.write_text(styles)

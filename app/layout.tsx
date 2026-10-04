@@ -116,6 +116,21 @@ export default function RootLayout({
             align-self: center !important;
           }
 
+          /* Compact typography: reduce visual weight without changing hierarchy. */
+          .home-match-history .home-history-score-card .home-team-win {
+            font-weight: 600 !important;
+          }
+          .home-match-history .home-history-score-card .home-team-loss,
+          .home-match-history .home-history-score-card > .teams > div > strong:not(.home-team-win):not(.home-team-loss) {
+            font-weight: 450 !important;
+          }
+          .home-match-history .home-history-score-card > div:nth-child(3) > b {
+            font-weight: 650 !important;
+          }
+          .home-match-history .home-history-score-card > div:nth-child(3) > span {
+            font-weight: 450 !important;
+          }
+
           @media (max-width: 420px) {
             .home-match-history .home-history-score-card {
               grid-template-columns: minmax(0, 1fr) 82px 36px !important;

@@ -7,6 +7,7 @@ import "./match-history-reference.css";
 import "./match-history-final-fixes.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 import PlayerProfileNavigator from "./player-profile-navigator";
+import MatchHistoryStatusBridge from "./match-history-status-bridge";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -24,6 +25,7 @@ export default function RootLayout({
         {children}
         <TournamentNavBridge />
         <PlayerProfileNavigator />
+        <MatchHistoryStatusBridge />
         <style>{`
           /* Temporarily hide Fines by player without removing its implementation. */
           .section-title:has(+ .stats-table .fine-player-header),
@@ -129,6 +131,28 @@ export default function RootLayout({
           }
           .home-match-history .home-history-score-card > div:nth-child(3) > span {
             font-weight: 450 !important;
+          }
+
+          .home-match-history .match-history-status-bridge-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            width: fit-content !important;
+            margin-top: 6px !important;
+            padding: 3px 8px !important;
+            border-radius: 999px !important;
+            border: 1px solid #d7e8df !important;
+            background: #eef8f3 !important;
+            color: #16885d !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            letter-spacing: .5px !important;
+            line-height: 1.2 !important;
+          }
+
+          .home-match-history .home-history-score-card.voided .match-history-status-bridge-badge {
+            border-color: #efcaca !important;
+            background: #fff0f0 !important;
+            color: #b64242 !important;
           }
 
           @media (max-width: 420px) {

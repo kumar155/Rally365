@@ -161,7 +161,7 @@ function SmartInsightsLive() {
     if (!valid.length) return [] as Insight[];
 
     const candidates: Insight[] = [];
-    const add = (candidate: Omit<Insight, "score">) => candidates.push({ ...candidate, score: candidate.score });
+    const add = (candidate: Omit<Insight, "score"> & { score: number }) => candidates.push(candidate);
 
     // 1. Form change: compare the last three results with the previous three.
     for (const p of realPlayers) {

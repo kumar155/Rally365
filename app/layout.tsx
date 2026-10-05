@@ -8,7 +8,7 @@ import "./match-history-final-fixes.css";
 import TournamentNavBridge from "./tournament-nav-bridge";
 import PlayerProfileNavigator from "./player-profile-navigator";
 import MatchHistoryStatusBridge from "./match-history-status-bridge";
-import SmartInsightsLive from "./smart-insights-live";
+import SmartInsightsHome from "./smart-insights-home";
 
 export const metadata: Metadata = {
   title: "Rally365",
@@ -27,7 +27,7 @@ export default function RootLayout({
         <TournamentNavBridge />
         <PlayerProfileNavigator />
         <MatchHistoryStatusBridge />
-        <SmartInsightsLive />
+        <SmartInsightsHome />
         <style>{`
           /* Temporarily hide Fines by player without removing its implementation. */
           .section-title:has(+ .stats-table .fine-player-header),

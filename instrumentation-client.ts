@@ -300,9 +300,29 @@ function addMatchRefreshButton() {
 }
 
 function watchForMatchList() {
+  let lastKnownDate = "";
+  let dateSyncScheduled = false;
+
+  const syncSelectedDate = () => {
+    dateSyncScheduled = false;
+    const selectedDate = getSelectedDate();
+    if (!selectedDate || selectedDate === lastKnownDate) return;
+    lastKnownDate = selectedDate;
+    void refreshMatchRows();
+  };
+
+  const scheduleDateSync = () => {
+    if (dateSyncScheduled) return;
+    dateSyncScheduled = true;
+    requestAnimationFrame(syncSelectedDate);
+  };
+
   addMatchRefreshButton();
 
-  const bodyObserver = new MutationObserver(() => addMatchRefreshButton());
+  const bodyObserver = new MutationObserver(() => {
+    addMatchRefreshButton();
+    scheduleDateSync();
+  });
   bodyObserver.observe(document.body, { childList: true, subtree: true });
 
   let observedMatchList: HTMLElement | null = null;
@@ -323,6 +343,7 @@ function watchForMatchList() {
   const listObserver = new MutationObserver(attachMatchObserver);
   listObserver.observe(document.body, { childList: true, subtree: true });
   attachMatchObserver();
+  scheduleDateSync();
 }
 
 if (document.readyState === "loading") {

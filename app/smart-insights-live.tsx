@@ -25,8 +25,8 @@ type Insight = {
 };
 
 const isGuest = (name: string) => {
-  const n = name.trim().toLowerCase();
-  return n === "guest" || /^guest\d+$/.test(n) || n.startsWith("guest ");
+  const value = name.trim().toLowerCase();
+  return value === "guest" || /^guest\d+$/.test(value) || value.startsWith("guest ");
 };
 
 const localDateKey = (value: Date) => {
@@ -37,7 +37,7 @@ const localDateKey = (value: Date) => {
 };
 
 const sideWon = (match: Match, playerId: string) => {
-  const row = match.match_players.find(x => x.player_id === playerId);
+  const row = match.match_players.find(item => item.player_id === playerId);
   if (!row) return false;
   return row.team === "A"
     ? Number(match.team_a_score) > Number(match.team_b_score)
@@ -45,10 +45,10 @@ const sideWon = (match: Match, playerId: string) => {
 };
 
 const teamPlayers = (match: Match, team: "A" | "B") =>
-  match.match_players.filter(x => x.team === team).map(x => x.player_id);
+  match.match_players.filter(item => item.team === team).map(item => item.player_id);
 
 const marginForPlayer = (match: Match, playerId: string) => {
-  const row = match.match_players.find(x => x.player_id === playerId);
+  const row = match.match_players.find(item => item.player_id === playerId);
   if (!row) return 0;
   return row.team === "A"
     ? Number(match.team_a_score) - Number(match.team_b_score)
@@ -97,14 +97,20 @@ function SmartInsightsLive() {
         .eq("join_code", "RALLY365")
         .single();
       if (!group || cancelled) return;
+
       channel = supabase
         .channel("rally365-smart-insights-live")
-        .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `group_id=eq.${group.id}` }, load)
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "matches",
+          filter: `group_id=eq.${group.id}`,
+        }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "match_players" }, load)
         .subscribe();
     };
-    connect();
 
+    connect();
     return () => {
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
@@ -152,164 +158,281 @@ function SmartInsightsLive() {
   }, [mounted, matches]);
 
   const insights = useMemo(() => {
-    const realPlayers = players.filter(p => !isGuest(p.name));
-    const name = (id: string) => players.find(p => p.id === id)?.name || "Player";
+    const realPlayers = players.filter(player => !isGuest(player.name));
+    const name = (id: string) => players.find(player => player.id === id)?.name || "Player";
+    const todayKey = localDateKey(new Date());
     const valid = matches
-      .filter(m => m.status !== "VOIDED" && Number(m.team_a_score) !== Number(m.team_b_score) && m.match_players?.length)
+      .filter(match =>
+        match.status !== "VOIDED" &&
+        Number(match.team_a_score) !== Number(match.team_b_score) &&
+        match.match_players?.length
+      )
       .sort((a, b) => new Date(b.played_at).getTime() - new Date(a.played_at).getTime());
 
     if (!valid.length) return [] as Insight[];
 
+    const todayMatches = valid.filter(match => localDateKey(new Date(match.played_at)) === todayKey);
     const candidates: Insight[] = [];
     const add = (candidate: Omit<Insight, "score"> & { score: number }) => candidates.push(candidate);
 
-    // 1. Form change: compare the last three results with the previous three.
-    for (const p of realPlayers) {
-      const pm = valid.filter(m => m.match_players.some(x => x.player_id === p.id));
-      if (pm.length < 6) continue;
-      const recent = pm.slice(0, 3);
-      const previous = pm.slice(3, 6);
-      const recentRate = recent.filter(m => sideWon(m, p.id)).length / 3;
-      const previousRate = previous.filter(m => sideWon(m, p.id)).length / 3;
-      const delta = Math.round((recentRate - previousRate) * 100);
-      if (Math.abs(delta) < 34) continue;
-      if (delta > 0) {
-        add({ icon: "📈", title: "Form rising", tone: "blue", category: "form-rise", text: `${p.name} improved from ${Math.round(previousRate * 100)}% to ${Math.round(recentRate * 100)}% wins across the last 3 matches.`, score: 95 + delta });
-      } else {
-        add({ icon: "📉", title: "Form slipping", tone: "warm", category: "form-drop", text: `${p.name}'s win rate dropped from ${Math.round(previousRate * 100)}% to ${Math.round(recentRate * 100)}% across the last 3 matches.`, score: 92 + Math.abs(delta) });
+    // Daily signals are based on today's actual games, so new games can change the cards immediately.
+    if (todayMatches.length) {
+      const todayPlayerStats = realPlayers.map(player => {
+        const games = todayMatches.filter(match => match.match_players.some(item => item.player_id === player.id));
+        const wins = games.filter(match => sideWon(match, player.id)).length;
+        const margin = games.reduce((sum, match) => sum + marginForPlayer(match, player.id), 0);
+        return { player, games, wins, margin };
+      }).filter(row => row.games.length > 0);
+
+      const standout = [...todayPlayerStats]
+        .sort((a, b) => b.wins - a.wins || b.margin - a.margin || b.games.length - a.games.length)[0];
+      if (standout && standout.games.length >= 2) {
+        add({
+          icon: "🎯",
+          title: "Today's standout",
+          tone: "blue",
+          category: "today-standout",
+          text: `${standout.player.name} is ${standout.wins}-${standout.games.length - standout.wins} today across ${standout.games.length} matches.`,
+          score: 125 + standout.wins * 5 + standout.games.length,
+        });
+      }
+
+      const close = [...todayMatches]
+        .map(match => ({ match, margin: Math.abs(Number(match.team_a_score) - Number(match.team_b_score)) }))
+        .filter(row => row.margin <= 2)
+        .sort((a, b) => a.margin - b.margin)[0];
+      if (close) {
+        const winner = close.match.team_a_score > close.match.team_b_score ? "A" : "B";
+        add({
+          icon: "🔥",
+          title: "Today's nail-biter",
+          tone: "warm",
+          category: "today-close",
+          text: `${teamPlayers(close.match, winner).map(name).join(" & ")} edged a ${close.margin}-point game today.`,
+          score: 122 - close.margin,
+        });
+      }
+
+      const todayPairs = new Map<string, { ids: string[]; games: Match[] }>();
+      for (const match of todayMatches) {
+        for (const side of ["A", "B"] as const) {
+          const ids = teamPlayers(match, side).filter(id => realPlayers.some(player => player.id === id));
+          if (ids.length !== 2) continue;
+          const key = [...ids].sort().join("|");
+          const row = todayPairs.get(key) || { ids: [...ids], games: [] };
+          row.games.push(match);
+          todayPairs.set(key, row);
+        }
+      }
+      const bestPair = [...todayPairs.values()]
+        .map(pair => ({ ...pair, wins: pair.games.filter(game => sideWon(game, pair.ids[0])).length }))
+        .filter(pair => pair.games.length >= 2)
+        .sort((a, b) => b.wins - a.wins || b.games.length - a.games.length)[0];
+      if (bestPair) {
+        add({
+          icon: "🤝",
+          title: "Today's winning duo",
+          tone: "green",
+          category: "today-duo",
+          text: `${name(bestPair.ids[0])} & ${name(bestPair.ids[1])} are ${bestPair.wins}-${bestPair.games.length - bestPair.wins} together today.`,
+          score: 118 + bestPair.wins * 6 + bestPair.games.length,
+        });
+      }
+
+      const strongest = [...todayPlayerStats].sort((a, b) => b.margin - a.margin)[0];
+      if (strongest && strongest.margin >= 6) {
+        add({
+          icon: "💥",
+          title: "Today's scoring edge",
+          tone: "purple",
+          category: "today-margin",
+          text: `${strongest.player.name} has a +${strongest.margin} combined scoring margin today.`,
+          score: 110 + Math.min(strongest.margin, 15),
+        });
       }
     }
 
-    // 2. Current streak, but only when it is genuinely meaningful.
-    for (const p of realPlayers) {
-      const pm = valid.filter(m => m.match_players.some(x => x.player_id === p.id));
+    // Form shift: compare the latest three results with the previous three.
+    for (const player of realPlayers) {
+      const games = valid.filter(match => match.match_players.some(item => item.player_id === player.id));
+      if (games.length < 6) continue;
+      const recent = games.slice(0, 3);
+      const previous = games.slice(3, 6);
+      const recentRate = recent.filter(match => sideWon(match, player.id)).length / 3;
+      const previousRate = previous.filter(match => sideWon(match, player.id)).length / 3;
+      const delta = Math.round((recentRate - previousRate) * 100);
+      if (Math.abs(delta) < 34) continue;
+      add({
+        icon: delta > 0 ? "📈" : "📉",
+        title: delta > 0 ? "Form rising" : "Form slipping",
+        tone: delta > 0 ? "blue" : "warm",
+        category: delta > 0 ? "form-rise" : "form-drop",
+        text: `${player.name} moved from ${Math.round(previousRate * 100)}% to ${Math.round(recentRate * 100)}% wins across the last 3 matches.`,
+        score: 96 + Math.abs(delta),
+      });
+    }
+
+    // Current streak, using all valid history but ignoring voided games.
+    for (const player of realPlayers) {
+      const games = valid.filter(match => match.match_players.some(item => item.player_id === player.id));
       let streak = 0;
-      for (const m of pm) {
-        if (!sideWon(m, p.id)) break;
+      for (const match of games) {
+        if (!sideWon(match, player.id)) break;
         streak++;
       }
       if (streak >= 3) {
-        add({ icon: "⚡", title: "Hot streak", tone: "purple", category: "streak", text: `${p.name} has won ${streak} straight matches — the streak is still alive.`, score: 88 + Math.min(streak, 8) });
+        add({
+          icon: "⚡",
+          title: "Hot streak",
+          tone: "purple",
+          category: "streak",
+          text: `${player.name} has won ${streak} straight matches — the streak is still alive.`,
+          score: 88 + Math.min(streak, 8),
+        });
       }
     }
 
-    // 3. Recent partnership strength, not simply the duo with the most wins ever.
-    const pairStats = new Map<string, { ids: string[]; matches: Match[] }>();
-    for (const m of valid.slice(0, 30)) {
+    // Recent partnership strength, limited to the latest 30 valid games.
+    const pairStats = new Map<string, { ids: string[]; games: Match[] }>();
+    for (const match of valid.slice(0, 30)) {
       for (const side of ["A", "B"] as const) {
-        const ids = teamPlayers(m, side).filter(id => realPlayers.some(p => p.id === id));
+        const ids = teamPlayers(match, side).filter(id => realPlayers.some(player => player.id === id));
         if (ids.length !== 2) continue;
         const key = [...ids].sort().join("|");
-        const current = pairStats.get(key) || { ids: [...ids], matches: [] };
-        current.matches.push(m);
-        pairStats.set(key, current);
+        const row = pairStats.get(key) || { ids: [...ids], games: [] };
+        row.games.push(match);
+        pairStats.set(key, row);
       }
     }
     for (const pair of pairStats.values()) {
-      if (pair.matches.length < 3) continue;
-      const wins = pair.matches.filter(m => sideWon(m, pair.ids[0])).length;
-      const rate = wins / pair.matches.length;
+      if (pair.games.length < 3) continue;
+      const wins = pair.games.filter(match => sideWon(match, pair.ids[0])).length;
+      const rate = wins / pair.games.length;
       if (rate < 0.67) continue;
-      const latest = new Date(pair.matches[0].played_at).getTime();
-      const ageDays = Math.max(0, (Date.now() - latest) / 86400000);
-      add({ icon: "🤝", title: "Partnership edge", tone: "green", category: "partnership", text: `${name(pair.ids[0])} & ${name(pair.ids[1])} won ${wins} of their last ${pair.matches.length} together.`, score: 72 + Math.round(rate * 15) + Math.max(0, 12 - ageDays) });
+      const ageDays = Math.max(0, (Date.now() - new Date(pair.games[0].played_at).getTime()) / 86400000);
+      add({
+        icon: "🤝",
+        title: "Partnership edge",
+        tone: "green",
+        category: "partnership",
+        text: `${name(pair.ids[0])} & ${name(pair.ids[1])} won ${wins} of their last ${pair.games.length} together.`,
+        score: 72 + Math.round(rate * 15) + Math.max(0, 12 - ageDays),
+      });
     }
 
-    // 4. Recent rivalry swing: compare the latest five encounters with the previous five.
-    const pairMeetings = new Map<string, { a: string; b: string; results: { winner: string; playedAt: number }[] }>();
-    for (const m of valid) {
-      const a = teamPlayers(m, "A").filter(id => realPlayers.some(p => p.id === id));
-      const b = teamPlayers(m, "B").filter(id => realPlayers.some(p => p.id === id));
-      for (const pa of a) for (const pb of b) {
-        const key = [pa, pb].sort().join("|");
-        const current = pairMeetings.get(key) || { a: pa, b: pb, results: [] };
-        current.results.push({ winner: m.team_a_score > m.team_b_score ? "A" : "B", playedAt: new Date(m.played_at).getTime() });
-        pairMeetings.set(key, current);
-      }
-    }
-    for (const h2h of pairMeetings.values()) {
-      if (h2h.results.length < 6) continue;
-      const recent = h2h.results.slice(0, 3);
-      const previous = h2h.results.slice(3, 6);
-      const winsForA = (rows: typeof recent) => rows.filter(r => r.winner === "A").length;
-      const recentA = winsForA(recent) / 3;
-      const previousA = winsForA(previous) / 3;
-      const delta = Math.round(Math.abs(recentA - previousA) * 100);
-      if (delta < 34) continue;
-      const leader = recentA > 0.5 ? h2h.a : h2h.b;
-      const trailer = recentA > 0.5 ? h2h.b : h2h.a;
-      add({ icon: "⚔️", title: "Rivalry shift", tone: "purple", category: "rivalry", text: `${name(leader)} has taken the recent edge over ${name(trailer)} after a ${delta}-point swing in their last 3 vs previous 3 encounters.`, score: 78 + delta / 4 });
-    }
-
-    // 5. Recent giant-killer detection uses pre-match win rates, so old upsets do not live forever.
+    // Recent upset based on pre-match win rates.
     const wins = new Map<string, number>();
     const played = new Map<string, number>();
     const orderedAsc = [...valid].sort((a, b) => new Date(a.played_at).getTime() - new Date(b.played_at).getTime());
     const recentUpsets: { label: string; gap: number; ageDays: number }[] = [];
-    for (const m of orderedAsc) {
-      const a = teamPlayers(m, "A");
-      const b = teamPlayers(m, "B");
+    for (const match of orderedAsc) {
+      const a = teamPlayers(match, "A");
+      const b = teamPlayers(match, "B");
       if (!a.length || !b.length) continue;
-      const aStrength = a.reduce((s, id) => s + ((wins.get(id) || 0) / Math.max(1, played.get(id) || 1)), 0) / a.length;
-      const bStrength = b.reduce((s, id) => s + ((wins.get(id) || 0) / Math.max(1, played.get(id) || 1)), 0) / b.length;
-      const winnerTeam = Number(m.team_a_score) > Number(m.team_b_score) ? "A" : "B";
+      const strength = (ids: string[]) => ids.reduce((sum, id) => sum + ((wins.get(id) || 0) / Math.max(1, played.get(id) || 1)), 0) / ids.length;
+      const aStrength = strength(a);
+      const bStrength = strength(b);
+      const winnerTeam = Number(match.team_a_score) > Number(match.team_b_score) ? "A" : "B";
       const winnerStrength = winnerTeam === "A" ? aStrength : bStrength;
       const loserStrength = winnerTeam === "A" ? bStrength : aStrength;
       if (loserStrength - winnerStrength >= 0.18) {
         const winnerIds = winnerTeam === "A" ? a : b;
         const loserIds = winnerTeam === "A" ? b : a;
-        const ageDays = Math.max(0, (Date.now() - new Date(m.played_at).getTime()) / 86400000);
-        recentUpsets.push({ label: `${winnerIds.map(name).join(" & ")} beat ${loserIds.map(name).join(" & ")}`, gap: loserStrength - winnerStrength, ageDays });
+        const ageDays = Math.max(0, (Date.now() - new Date(match.played_at).getTime()) / 86400000);
+        recentUpsets.push({
+          label: `${winnerIds.map(name).join(" & ")} beat ${loserIds.map(name).join(" & ")}`,
+          gap: loserStrength - winnerStrength,
+          ageDays,
+        });
       }
       for (const id of [...a, ...b]) {
         played.set(id, (played.get(id) || 0) + 1);
         const team = a.includes(id) ? "A" : "B";
-        const won = team === winnerTeam;
-        if (won) wins.set(id, (wins.get(id) || 0) + 1);
+        if (team === winnerTeam) wins.set(id, (wins.get(id) || 0) + 1);
       }
     }
-    const upset = recentUpsets.sort((x, y) => x.ageDays - y.ageDays || y.gap - x.gap)[0];
+    const upset = recentUpsets.sort((a, b) => a.ageDays - b.ageDays || b.gap - a.gap)[0];
     if (upset) {
-      add({ icon: "😈", title: "Giant killer", tone: "warm", category: "upset", text: `${upset.label} — a recent upset against a side with the stronger pre-match record.`, score: 100 - Math.min(35, upset.ageDays * 2) + upset.gap * 20 });
+      add({
+        icon: "😈",
+        title: "Giant killer",
+        tone: "warm",
+        category: "upset",
+        text: `${upset.label} — a recent upset against the side with the stronger pre-match record.`,
+        score: 100 - Math.min(35, upset.ageDays * 2) + upset.gap * 20,
+      });
     }
 
-    // 6. Scoring trend: surface a real change in margins instead of repeating win rate.
-    for (const p of realPlayers) {
-      const pm = valid.filter(m => m.match_players.some(x => x.player_id === p.id));
-      if (pm.length < 6) continue;
-      const recent = pm.slice(0, 3).map(m => marginForPlayer(m, p.id));
-      const previous = pm.slice(3, 6).map(m => marginForPlayer(m, p.id));
+    // Margin trend detects a real scoring change rather than repeating win rate.
+    for (const player of realPlayers) {
+      const games = valid.filter(match => match.match_players.some(item => item.player_id === player.id));
+      if (games.length < 6) continue;
+      const recent = games.slice(0, 3).map(match => marginForPlayer(match, player.id));
+      const previous = games.slice(3, 6).map(match => marginForPlayer(match, player.id));
       const recentAvg = recent.reduce((a, b) => a + b, 0) / 3;
       const previousAvg = previous.reduce((a, b) => a + b, 0) / 3;
       const change = recentAvg - previousAvg;
       if (Math.abs(change) < 2.5) continue;
-      add({ icon: change > 0 ? "📊" : "📉", title: change > 0 ? "Margin improving" : "Margin tightening", tone: change > 0 ? "blue" : "warm", category: "margin", text: `${p.name}'s average scoring margin moved from ${previousAvg.toFixed(1)} to ${recentAvg.toFixed(1)} points across the last 3 matches.`, score: 70 + Math.abs(change) * 5 });
+      add({
+        icon: change > 0 ? "📊" : "📉",
+        title: change > 0 ? "Margin improving" : "Margin tightening",
+        tone: change > 0 ? "blue" : "warm",
+        category: "margin",
+        text: `${player.name}'s average scoring margin moved from ${previousAvg.toFixed(1)} to ${recentAvg.toFixed(1)} points across the last 3 matches.`,
+        score: 70 + Math.abs(change) * 5,
+      });
     }
 
-    // 7. A genuinely recent close/dominant match gives the cards another source of novelty.
+    // Latest-game signal gives the cards immediate freshness after a new result.
     const latest = valid[0];
     const latestMargin = Math.abs(Number(latest.team_a_score) - Number(latest.team_b_score));
-    const latestAge = Math.max(0, (Date.now() - new Date(latest.played_at).getTime()) / 86400000);
+    const latestAgeHours = Math.max(0, (Date.now() - new Date(latest.played_at).getTime()) / 3600000);
     if (latestMargin <= 2) {
-      add({ icon: "🔥", title: "Nail-biter", tone: "warm", category: "match-shape", text: `${teamPlayers(latest, latest.team_a_score > latest.team_b_score ? "A" : "B").map(name).join(" & ")} edged a match by just ${latestMargin} point${latestMargin === 1 ? "" : "s"}.`, score: 88 - latestAge });
+      const winner = latest.team_a_score > latest.team_b_score ? "A" : "B";
+      add({
+        icon: "🔥",
+        title: "Latest nail-biter",
+        tone: "warm",
+        category: "latest-shape",
+        text: `${teamPlayers(latest, winner).map(name).join(" & ")} edged the latest game by ${latestMargin} point${latestMargin === 1 ? "" : "s"}.`,
+        score: 90 - latestAgeHours / 6,
+      });
     } else if (latestMargin >= 8) {
       const winner = latest.team_a_score > latest.team_b_score ? "A" : "B";
-      add({ icon: "💥", title: "Statement win", tone: "green", category: "match-shape", text: `${teamPlayers(latest, winner).map(name).join(" & ")} won the latest match by ${latestMargin} points.`, score: 82 - latestAge });
+      add({
+        icon: "💥",
+        title: "Latest statement",
+        tone: "green",
+        category: "latest-shape",
+        text: `${teamPlayers(latest, winner).map(name).join(" & ")} won the latest game by ${latestMargin} points.`,
+        score: 88 - latestAgeHours / 6,
+      });
     }
 
-    // 8. Milestones are only shown when someone is genuinely close; this replaces the old always-on fallback.
-    for (const p of realPlayers) {
-      const pm = valid.filter(m => m.match_players.some(x => x.player_id === p.id));
-      const pWins = pm.filter(m => sideWon(m, p.id)).length;
-      const target = [10, 25, 50].find(n => pWins < n && n - pWins <= 2);
-      if (target) {
-        const remaining = target - pWins;
-        add({ icon: "🏆", title: "Milestone close", tone: "blue", category: "milestone", text: `${p.name} needs just ${remaining} more win${remaining === 1 ? "" : "s"} to reach ${target} career wins.`, score: 68 + (3 - remaining) * 8 });
-      }
+    // Milestones are only shown when someone is genuinely close.
+    for (const player of realPlayers) {
+      const games = valid.filter(match => match.match_players.some(item => item.player_id === player.id));
+      const playerWins = games.filter(match => sideWon(match, player.id)).length;
+      const target = [10, 25, 50].find(value => playerWins < value && value - playerWins <= 2);
+      if (!target) continue;
+      const remaining = target - playerWins;
+      add({
+        icon: "🏆",
+        title: "Milestone close",
+        tone: "blue",
+        category: "milestone",
+        text: `${player.name} needs just ${remaining} more win${remaining === 1 ? "" : "s"} to reach ${target} career wins.`,
+        score: 68 + (3 - remaining) * 8,
+      });
     }
 
-    // Prefer recent and meaningful changes, then enforce category diversity.
+    // Small deterministic daily tie-break prevents the same historical cards from winning every day.
+    const daySeed = Number(todayKey.replace(/-/g, "")) || 0;
+    candidates.forEach((candidate, index) => {
+      candidate.score += ((daySeed + index * 17) % 7) * 0.05;
+    });
     candidates.sort((a, b) => b.score - a.score);
+
     const selected: Insight[] = [];
     const used = new Set<string>();
     for (const candidate of candidates) {
@@ -326,21 +449,26 @@ function SmartInsightsLive() {
 
   return createPortal(
     <section className={`smart-insights-card ${open ? "open" : "collapsed"}`}>
-      <button type="button" className="smart-insights-heading" onClick={() => setOpen(v => !v)} aria-expanded={open}>
-        <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
+      <button type="button" className="smart-insights-heading" onClick={() => setOpen(value => !value)} aria-expanded={open}>
+        <div>
+          <div className="eyebrow">RALLY365 INTELLIGENCE</div>
+          <h2>Smart insights</h2>
+        </div>
         <span className="smart-insights-toggle"><span aria-hidden="true">✦</span><span aria-hidden="true">⌄</span></span>
       </button>
-      {open && <>
-        <div className="smart-insights-grid">
-          {insights.map((insight, index) => (
-            <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.category}-${index}`}>
-              <span className="smart-insight-icon">{insight.icon}</span>
-              <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
-            </div>
-          ))}
-        </div>
-        <small className="smart-insights-note">Insights are recalculated from your latest match results and recent Rally365 history.</small>
-      </>}
+      {open && (
+        <>
+          <div className="smart-insights-grid">
+            {insights.map((insight, index) => (
+              <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.category}-${index}`}>
+                <span className="smart-insight-icon">{insight.icon}</span>
+                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
+              </div>
+            ))}
+          </div>
+          <small className="smart-insights-note">Insights are recalculated from the latest results, today's games and your Rally365 history.</small>
+        </>
+      )}
     </section>,
     mountNode
   );

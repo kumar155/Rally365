@@ -79,11 +79,14 @@ function getSelectedDate() {
   return localDateKey(new Date());
 }
 
-const isEdited = (match: RefreshMatch) =>
-  Number(match.edit_count || 0) > 0 || Boolean(match.last_edited_at);
-
+// IMPORTANT: status is the source of truth.
+// A VOIDED row must always render VOIDED, even if the void operation also
+// populated last_edited_at. Only a non-voided row can be EDITED.
 const isVoided = (match: RefreshMatch) =>
-  String(match.status || "").toUpperCase() === "VOIDED" && !isEdited(match);
+  String(match.status || "").toUpperCase() === "VOIDED";
+
+const isEdited = (match: RefreshMatch) =>
+  !isVoided(match) && (Number(match.edit_count || 0) > 0 || Boolean(match.last_edited_at));
 
 function applyMatchRowStatus(row: HTMLElement, match: RefreshMatch) {
   const edited = isEdited(match);
@@ -101,7 +104,12 @@ function applyMatchRowStatus(row: HTMLElement, match: RefreshMatch) {
     if (text === "EDITED" || text === "VOIDED") element.remove();
   });
 
-  if (edited) {
+  if (voided) {
+    const badge = document.createElement("small");
+    badge.className = "match-history-voided rally365-refresh-status";
+    badge.textContent = "VOIDED";
+    teams.appendChild(badge);
+  } else if (edited) {
     const badge = document.createElement("small");
     badge.className = "match-history-edit-meta rally365-refresh-status";
     badge.textContent = "EDITED";
@@ -120,11 +128,6 @@ function applyMatchRowStatus(row: HTMLElement, match: RefreshMatch) {
       "letter-spacing:.5px",
       "line-height:1.2",
     ].join(";");
-    teams.appendChild(badge);
-  } else if (voided) {
-    const badge = document.createElement("small");
-    badge.className = "match-history-voided rally365-refresh-status";
-    badge.textContent = "VOIDED";
     teams.appendChild(badge);
   }
 }

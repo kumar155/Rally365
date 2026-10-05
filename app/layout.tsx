@@ -157,12 +157,14 @@ export default function RootLayout({
             color: #b64242 !important;
           }
 
-          /* Keep the dynamically mounted Smart Insights section as the single
-             visible section. The older inline section remains implemented in
-             page-legacy for backwards compatibility but must not render a
-             duplicate card. */
-          .content > .smart-insights-card {
+          /* Only the dynamically mounted Smart Insights card is visible.
+             The older inline card remains in page-legacy but is hidden so the
+             Home page never shows two Smart Insights sections. */
+          .smart-insights-card {
             display: none !important;
+          }
+          .smart-insights-home-mount .smart-insights-card {
+            display: block !important;
           }
 
           /* Match the surviving Smart Insights header to the richer expandable

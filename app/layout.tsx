@@ -157,6 +157,38 @@ export default function RootLayout({
             color: #b64242 !important;
           }
 
+          /* Keep the dynamically mounted Smart Insights section as the single
+             visible section. The older inline section remains implemented in
+             page-legacy for backwards compatibility but must not render a
+             duplicate card. */
+          .content > .smart-insights-card {
+            display: none !important;
+          }
+
+          /* Match the surviving Smart Insights header to the richer expandable
+             treatment: larger intelligence icon, clear chevron and rotation
+             when collapsed. */
+          .smart-insights-home-mount .smart-insights-toggle {
+            gap: 10px !important;
+            min-width: 48px;
+            justify-content: flex-end;
+          }
+          .smart-insights-home-mount .smart-insights-toggle span:first-child {
+            font-size: 25px !important;
+            line-height: 1 !important;
+            font-weight: 700 !important;
+          }
+          .smart-insights-home-mount .smart-insights-toggle span:last-child {
+            display: inline-block;
+            font-size: 24px !important;
+            line-height: 1 !important;
+            font-weight: 700 !important;
+            transition: transform .2s ease;
+          }
+          .smart-insights-home-mount .smart-insights-card.collapsed .smart-insights-toggle span:last-child {
+            transform: rotate(-90deg);
+          }
+
           @media (max-width: 420px) {
             .home-match-history .home-history-score-card {
               grid-template-columns: minmax(0, 1fr) 82px 36px !important;

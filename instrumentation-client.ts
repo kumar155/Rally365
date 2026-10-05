@@ -5,6 +5,20 @@ import { supabase } from "./lib/supabase";
 const REFRESH_BUTTON_ID = "rally365-match-refresh";
 const REFRESHING_TEXT = "Refreshing…";
 
+type RefreshMatch = {
+  id: string;
+  team_a_score: number;
+  team_b_score: number;
+  played_at: string;
+  status: string;
+  edit_count: number | null;
+  last_edited_at: string | null;
+  match_players: { player_id: string; team: "A" | "B" }[];
+};
+
+let lastRefreshedMatches: RefreshMatch[] = [];
+let refreshInFlight = false;
+
 const localDateKey = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -22,7 +36,7 @@ const formatTime = (value: string | null | undefined) => {
 const matchDayLabel = (value: string) => `Today, ${formatTime(value)}`;
 
 const playerTeamLabel = (
-  match: { match_players: { player_id: string; team: "A" | "B" }[] },
+  match: RefreshMatch,
   team: "A" | "B",
   players: Map<string, string>
 ) => {
@@ -65,108 +79,167 @@ function getSelectedDate() {
   return localDateKey(new Date());
 }
 
-async function refreshMatchRows() {
-  const matchList = document.querySelector<HTMLElement>(".home-match-history");
-  if (!matchList) return;
+const isEdited = (match: RefreshMatch) =>
+  Number(match.edit_count || 0) > 0 || Boolean(match.last_edited_at);
 
-  const selectedDate = getSelectedDate();
+const isVoided = (match: RefreshMatch) =>
+  String(match.status || "").toUpperCase() === "VOIDED" && !isEdited(match);
 
-  const { data: group, error: groupError } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("join_code", "RALLY365")
-    .single();
+function applyMatchRowStatus(row: HTMLElement, match: RefreshMatch) {
+  const edited = isEdited(match);
+  const voided = isVoided(match);
 
-  if (groupError || !group) throw new Error(groupError?.message || "Group not found");
+  row.classList.toggle("voided", voided);
 
-  const [{ data: matchRows, error: matchError }, { data: playerRows, error: playerError }] =
-    await Promise.all([
-      supabase
-        .from("matches")
-        .select(
-          "id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)"
-        )
-        .eq("group_id", group.id)
-        .order("played_at", { ascending: false }),
-      supabase.from("players").select("id,name").eq("group_id", group.id),
-    ]);
+  const teams = row.querySelector<HTMLElement>(".teams");
+  if (!teams) return;
 
-  if (matchError) throw new Error(matchError.message);
-  if (playerError) throw new Error(playerError.message);
+  teams.querySelectorAll<HTMLElement>(".rally365-refresh-status").forEach(element => element.remove());
+  teams.querySelectorAll<HTMLElement>(".match-history-edit-meta, .match-history-voided").forEach(element => element.remove());
+  teams.querySelectorAll<HTMLElement>(":scope > small").forEach(element => {
+    const text = element.textContent?.trim().toUpperCase();
+    if (text === "EDITED" || text === "VOIDED") element.remove();
+  });
 
-  const players = new Map((playerRows || []).map(player => [player.id, player.name]));
-  const matches = (matchRows || []).filter(
-    match => localDateKey(new Date(match.played_at)) === selectedDate
-  );
-
-  const sectionTitle = matchList.previousElementSibling;
-  if (sectionTitle instanceof HTMLElement) {
-    const count = sectionTitle.querySelector<HTMLElement>(":scope > span:last-child");
-    if (count) count.textContent = `(${matches.length})`;
+  if (edited) {
+    const badge = document.createElement("small");
+    badge.className = "match-history-edit-meta rally365-refresh-status";
+    badge.textContent = "EDITED";
+    badge.style.cssText = [
+      "display:inline-flex",
+      "align-items:center",
+      "width:fit-content",
+      "margin-top:6px",
+      "padding:3px 8px",
+      "border-radius:999px",
+      "border:1px solid #d7e8df",
+      "background:#eef8f3",
+      "color:#16885d",
+      "font-size:11px",
+      "font-weight:800",
+      "letter-spacing:.5px",
+      "line-height:1.2",
+    ].join(";");
+    teams.appendChild(badge);
+  } else if (voided) {
+    const badge = document.createElement("small");
+    badge.className = "match-history-voided rally365-refresh-status";
+    badge.textContent = "VOIDED";
+    teams.appendChild(badge);
   }
+}
+
+function applyMatchRowsFromCache(matchList: HTMLElement) {
+  if (!lastRefreshedMatches.length) return;
 
   const rows = Array.from(
     matchList.querySelectorAll<HTMLElement>(".home-history-score-card")
   );
 
   rows.forEach((row, index) => {
-    const match = matches[index];
-    if (!match) {
-      row.style.display = "none";
-      return;
-    }
+    const match = lastRefreshedMatches[index];
+    if (!match) return;
 
-    row.style.display = "grid";
+    const edited = isEdited(match);
+    const voided = isVoided(match);
+    const hasEditedBadge = Array.from(row.querySelectorAll("small")).some(
+      element => element.textContent?.trim().toUpperCase() === "EDITED"
+    );
+    const hasVoidedBadge = Array.from(row.querySelectorAll("small")).some(
+      element => element.textContent?.trim().toUpperCase() === "VOIDED"
+    );
 
-    const edited = Number(match.edit_count || 0) > 0 || Boolean(match.last_edited_at);
-    const status = String(match.status || "").toUpperCase();
-    const voided = status === "VOIDED" && !edited;
-
-    // Never let the manual refresh create a false voided state for an edited match.
-    row.classList.toggle("voided", voided);
-
-    const number = row.querySelector<HTMLElement>(".match-number b");
-    if (number) number.textContent = `M${matches.length - index}`;
-
-    const timestamp = row.querySelector<HTMLElement>(".match-timestamp");
-    if (timestamp) timestamp.textContent = matchDayLabel(match.played_at);
-
-    const teamElements = row.querySelectorAll<HTMLElement>(".teams > div > strong");
-    if (teamElements[0]) {
-      teamElements[0].textContent = playerTeamLabel(match, "A", players);
-      teamElements[0].className =
-        match.team_a_score > match.team_b_score ? "home-team-win" : "home-team-loss";
-    }
-    if (teamElements[1]) {
-      // Deliberately no "vs" prefix. The match card already represents both teams.
-      teamElements[1].textContent = playerTeamLabel(match, "B", players);
-      teamElements[1].className =
-        match.team_b_score > match.team_a_score ? "home-team-win" : "home-team-loss";
-    }
-
-    const scoreBox = row.children[2] as HTMLElement | undefined;
-    const scoreValues = scoreBox?.querySelectorAll<HTMLElement>("b, span");
-    if (scoreValues?.[0]) scoreValues[0].textContent = String(match.team_a_score);
-    if (scoreValues?.[1]) scoreValues[1].textContent = String(match.team_b_score);
-
-    const teams = row.querySelector<HTMLElement>(".teams");
-    if (!teams) return;
-
-    // Remove every status <small> produced by either React or an older refresh implementation.
-    teams.querySelectorAll<HTMLElement>(":scope > small").forEach(element => element.remove());
-
-    if (edited) {
-      const badge = document.createElement("small");
-      badge.className = "match-history-edit-meta";
-      badge.textContent = "EDITED";
-      teams.appendChild(badge);
-    } else if (voided) {
-      const badge = document.createElement("small");
-      badge.className = "match-history-voided";
-      badge.textContent = "VOIDED";
-      teams.appendChild(badge);
+    if (row.classList.contains("voided") !== voided || hasEditedBadge !== edited || hasVoidedBadge !== voided) {
+      applyMatchRowStatus(row, match);
     }
   });
+}
+
+async function refreshMatchRows() {
+  const matchList = document.querySelector<HTMLElement>(".home-match-history");
+  if (!matchList || refreshInFlight) return;
+
+  refreshInFlight = true;
+  try {
+    const selectedDate = getSelectedDate();
+
+    const { data: group, error: groupError } = await supabase
+      .from("groups")
+      .select("id")
+      .eq("join_code", "RALLY365")
+      .single();
+
+    if (groupError || !group) throw new Error(groupError?.message || "Group not found");
+
+    const [{ data: matchRows, error: matchError }, { data: playerRows, error: playerError }] =
+      await Promise.all([
+        supabase
+          .from("matches")
+          .select(
+            "id,group_id,team_a_score,team_b_score,played_at,status,edit_count,last_edited_at,match_players(player_id,team)"
+          )
+          .eq("group_id", group.id)
+          .order("played_at", { ascending: false }),
+        supabase.from("players").select("id,name").eq("group_id", group.id),
+      ]);
+
+    if (matchError) throw new Error(matchError.message);
+    if (playerError) throw new Error(playerError.message);
+
+    const players = new Map((playerRows || []).map(player => [player.id, player.name]));
+    const matches = ((matchRows || []) as RefreshMatch[]).filter(
+      match => localDateKey(new Date(match.played_at)) === selectedDate
+    );
+
+    lastRefreshedMatches = matches;
+
+    const sectionTitle = matchList.previousElementSibling;
+    if (sectionTitle instanceof HTMLElement) {
+      const titleText = sectionTitle.querySelector<HTMLElement>(":scope > span:first-child");
+      if (titleText) titleText.textContent = `Match history (${matches.length})`;
+    }
+
+    const rows = Array.from(
+      matchList.querySelectorAll<HTMLElement>(".home-history-score-card")
+    );
+
+    rows.forEach((row, index) => {
+      const match = matches[index];
+      if (!match) {
+        row.style.display = "none";
+        return;
+      }
+
+      row.style.display = "grid";
+
+      const number = row.querySelector<HTMLElement>(".match-number b");
+      if (number) number.textContent = `M${matches.length - index}`;
+
+      const timestamp = row.querySelector<HTMLElement>(".match-timestamp");
+      if (timestamp) timestamp.textContent = matchDayLabel(match.played_at);
+
+      const teamElements = row.querySelectorAll<HTMLElement>(".teams > div > strong");
+      if (teamElements[0]) {
+        teamElements[0].textContent = playerTeamLabel(match, "A", players);
+        teamElements[0].className =
+          match.team_a_score > match.team_b_score ? "home-team-win" : "home-team-loss";
+      }
+      if (teamElements[1]) {
+        teamElements[1].textContent = playerTeamLabel(match, "B", players);
+        teamElements[1].className =
+          match.team_b_score > match.team_a_score ? "home-team-win" : "home-team-loss";
+      }
+
+      const scoreBox = row.children[2] as HTMLElement | undefined;
+      const scoreValues = scoreBox?.querySelectorAll<HTMLElement>("b, span");
+      if (scoreValues?.[0]) scoreValues[0].textContent = String(match.team_a_score);
+      if (scoreValues?.[1]) scoreValues[1].textContent = String(match.team_b_score);
+
+      applyMatchRowStatus(row, match);
+    });
+  } finally {
+    refreshInFlight = false;
+  }
 }
 
 function addMatchRefreshButton() {
@@ -225,8 +298,28 @@ function addMatchRefreshButton() {
 
 function watchForMatchList() {
   addMatchRefreshButton();
-  const observer = new MutationObserver(() => addMatchRefreshButton());
-  observer.observe(document.body, { childList: true, subtree: true });
+
+  const bodyObserver = new MutationObserver(() => addMatchRefreshButton());
+  bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+  let observedMatchList: HTMLElement | null = null;
+  let matchObserver: MutationObserver | null = null;
+
+  const attachMatchObserver = () => {
+    const matchList = document.querySelector<HTMLElement>(".home-match-history");
+    if (!matchList || matchList === observedMatchList) return;
+
+    matchObserver?.disconnect();
+    observedMatchList = matchList;
+    matchObserver = new MutationObserver(() => {
+      applyMatchRowsFromCache(matchList);
+    });
+    matchObserver.observe(matchList, { childList: true, subtree: true });
+  };
+
+  const listObserver = new MutationObserver(attachMatchObserver);
+  listObserver.observe(document.body, { childList: true, subtree: true });
+  attachMatchObserver();
 }
 
 if (document.readyState === "loading") {

@@ -420,6 +420,10 @@ export default function Home() {
     const eligiblePlayers = players.filter(p => !isGuest(p) && todayAttendingIds.has(p.id));
     const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
     const todayMatches = homeMatches.filter(m => m.status !== "VOIDED");
+    // MVP is based on players who actually played on the selected Home date.
+    // Do not require attendance to be recorded; older match history may exist
+    // even when attendance was not entered for that date.
+    const mvpEligiblePlayers = players.filter(p => !isGuest(p) && todayMatches.some(m => m.match_players.some(x => x.player_id === p.id)));
     const playerName = (id: string): string => players.find(p => p.id === id)?.name || "?";
 
     const insights: { icon: string; title: string; text: string; tone: "warm" | "green" | "purple" | "blue" }[] = [];
@@ -536,7 +540,7 @@ export default function Home() {
     // MVP of the selected Home date. Guests are excluded. Wins are the
     // primary criterion; total points are used only when wins are tied.
     // Win rate and matches are deterministic fallbacks for a complete tie.
-    const mvpCandidates = eligiblePlayers.map(p => {
+    const mvpCandidates = mvpEligiblePlayers.map(p => {
       const pm = todayMatches.filter(m => m.match_players.some(x => x.player_id === p.id));
       const wins = pm.filter(m => {
         const side = m.match_players.find(x => x.player_id === p.id)?.team;

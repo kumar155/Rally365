@@ -2272,6 +2272,22 @@ const totalFines = fines.reduce(
           </label>
           <button type="button" className="home-date-arrow" onClick={() => moveHomeDate(1)} aria-label="Next date"><ChevronRight size={18} /></button>
         </div>
+        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
+          <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
+            <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
+            <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
+          </button>
+          {smartInsightsOpen && <>
+            <div className="smart-insights-grid">
+              {smartInsights.map((insight, index) => <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.title}-${index}`}>
+                <span className="smart-insight-icon">{insight.icon}</span>
+                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
+              </div>)}
+            </div>
+            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
+
+          </>}
+        </section>}
         {homeDate === localDateKey(new Date()) && <div className={`today-freeze-panel ${todayMatchesFrozen ? "frozen" : ""}`}>
           <div><strong>{todayMatchesFrozen ? "Today is locked" : "Match entry"}</strong><small>{todayMatchesFrozen ? "No one can add or record matches while today is locked." : "Anyone can lock match entry for today."}</small></div>
           {todayMatchesFrozen ? <button type="button" className="freeze-action admin" onClick={requestUnfreezeToday}><LockKeyhole size={16} /> Admin unlock</button> : <button type="button" className="freeze-action" onClick={freezeToday}><LockKeyhole size={16} /> Lock today</button>}
@@ -2290,22 +2306,6 @@ const totalFines = fines.reduce(
               <div><b>{mvpOfDay.winRate}%</b><span>Win rate</span></div>
             </div>
           </div>
-        </section>}
-        {homeDate === localDateKey(new Date()) && smartInsights.length > 0 && <section className={`smart-insights-card ${smartInsightsOpen ? "open" : "collapsed"}`}>
-          <button type="button" className="smart-insights-heading" onClick={() => setSmartInsightsOpen(v => !v)} aria-expanded={smartInsightsOpen}>
-            <div><div className="eyebrow">RALLY365 INTELLIGENCE</div><h2>Smart insights</h2></div>
-            <span className="smart-insights-toggle"><Sparkles size={20} /><ChevronDown size={18} /></span>
-          </button>
-          {smartInsightsOpen && <>
-            <div className="smart-insights-grid">
-              {smartInsights.map((insight, index) => <div className={`smart-insight smart-insight-${insight.tone}`} key={`${insight.title}-${index}`}>
-                <span className="smart-insight-icon">{insight.icon}</span>
-                <div><strong>{insight.title}</strong><p>{insight.text}</p></div>
-              </div>)}
-            </div>
-            <small className="smart-insights-note">{smartInsightData.hasDateMatches ? "Insights update from the selected match date and your full Rally365 history." : "No matches on this date yet. Insights update automatically when matches are recorded."}</small>
-
-          </>}
         </section>}
         {homeDate === localDateKey(new Date()) && homeSchedule.length > 0 && <div className="home-schedule-export">
           <div className="section-title">
